@@ -14,7 +14,7 @@ enum color {
 enum object {
 	NONE=0,FREE,PEASANT,CAPITAL,SPEARMAN,CASTLE,KNIGHT
 };
-char *obj_strs[KNIGHT+1]={
+char *obj_strs[]={
 	"  ","()","[]","/\\","||","%%","<>"
 };
 struct hex {
@@ -35,7 +35,7 @@ void draw_isle(struct hex *isle)
 	for (int i=0;i<AREA;i++)
 		draw_tile(isle[i],i%WIDTH,i/WIDTH);
 }
-int avg_around_hex(int *elevs)
+int avg_around(int *elevs)
 {
 	int sum=0;
 	sum+=elevs[-WIDTH-1];
@@ -78,7 +78,7 @@ void generate_isles(struct hex *isle,int erosion)
 		for (int x=1;x<WIDTH-1;x++)
 		for (int y=1;y<HEIGHT-1;y++) {
 			int i=x+y*WIDTH;
-			tmp[i]=avg_around_hex(&elevs[i]);
+			tmp[i]=avg_around(&elevs[i]);
 		}
 		for (int i=0;i<AREA;i++)
 			elevs[i]=tmp[i];
