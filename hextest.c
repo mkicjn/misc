@@ -9,25 +9,25 @@
 // 4 5 6
 //  7 8 9
 enum color {
-	BLACK=0,RED,GREEN,YELLOW,BLUE,MAGENTA,CYAN,WHITE
+	BLACK,RED,GREEN,YELLOW,BLUE,MAGENTA,CYAN,WHITE
 };
 enum object {
-	NONE=0,FREE,PEASANT,CAPITAL,SPEARMAN,CASTLE,KNIGHT
+	NONE,FREE,PEASANT,CAPITAL,SPEARMAN,CASTLE,KNIGHT,BARON
 };
 char *obj_strs[]={
-	"  ","()","[]","/\\","||","%%","<>"
+	"~~","()","[]","/\\","||","##","{}","<>"
 };
 struct hex {
 	unsigned char team;
 	unsigned char obj;
-	bool mobile;
+	bool mob;
 };
 void draw_tile(struct hex tile,int x,int y)
 {
 	x<<=1;
 	x+=!(y&1);
 	printf("\033[%d;%dH",y+1,x+1);
-	printf("\033[1;%d;%dm",30+(tile.mobile?CYAN:tile.team),40+tile.team);
+	printf("\033[1;%d;%dm",30+(tile.mob?CYAN:tile.team),40+tile.team);
 	printf("%s",obj_strs[tile.obj]);
 }
 void draw_isle(struct hex *isle)
@@ -49,7 +49,7 @@ int avg_around(int *elevs)
 }
 void generate_isles(struct hex *isle,int erosion)
 {
-	static const struct hex WATER={CYAN,NONE,false};
+	static const struct hex WATER={BLUE,NONE,false};
 	static const struct hex LAND={GREEN,FREE,false};
 	static const int WATER_LEVEL=0;
 	int elevs[AREA];
@@ -62,19 +62,6 @@ void generate_isles(struct hex *isle,int erosion)
 	for (int y=1;y<HEIGHT-1;y++)
 		elevs[x+y*WIDTH]=-100+rand()%201;
 	while (erosion-->0) {
-		/**/
-		for (int i=0;i<AREA;i++) {
-			if (elevs[i]<WATER_LEVEL) {
-				draw_tile(WATER,i%WIDTH,i/WIDTH);
-			} else {
-				draw_tile(LAND,i%WIDTH,i/WIDTH);
-			}
-		}
-		putchar('\n');
-		clock_t t=clock();
-		while ((clock()-t)/CLOCKS_PER_SEC<0.5);
-		printf("\033[2J");
-		/**/
 		for (int x=1;x<WIDTH-1;x++)
 		for (int y=1;y<HEIGHT-1;y++) {
 			int i=x+y*WIDTH;
@@ -90,12 +77,20 @@ void generate_isles(struct hex *isle,int erosion)
 			isle[i]=LAND;
 	}
 }
+void init_territories(struct hex *isle,enum color *teams,int n_players)
+{
+	for (int i=0;i<AREA;i++)
+		if (isle[i].team!=BLUE)
+			isle[i].team=teams[rand()%n_players];
+}
 int main(int argc,char **argv)
 {
+	enum color teams[]={RED,GREEN,YELLOW,MAGENTA,CYAN,WHITE};
 	printf("\033[2J");
 	srand(time(NULL));
 	struct hex isle[AREA];
 	generate_isles(isle,3);
+	init_territories(isle,teams,6);
 	draw_isle(isle);
 	printf("\033[m\n");
 }
