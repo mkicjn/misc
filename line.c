@@ -14,13 +14,13 @@ void line(void (*f)(int,int),int x1,int y1,int x2,int y2)
 		float slope=(float)dy/dx;
 		for (int x=x1;x<=x2;x++) {
 			float y=slope*(x-x1)+y1;
-			f(x,y-(int)y>0.5?1+(int)y:(int)y);
+			f(x,y-(int)y<0.5?(int)y:1+(int)y);
 		}
 	} else {
 		float slope=(float)dx/dy;
 		for (int y=y1;y<=y2;y++) {
 			float x=slope*(y-y1)+x1;
-			f(x-(int)x>0.5?1+(int)x:(int)x,y);
+			f(x-(int)x<0.5?(int)x:1+(int)x,y);
 		}
 	}
 }
