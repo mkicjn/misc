@@ -7,9 +7,9 @@ int jump_north(char *m,const int w,const int h,int n,int g)
 			return g;
 		if (m[n]!=' ')
 			return -1;
-		if (m[n+1]=='#'&&m[n+1-w]!='#')
+		if (m[n+1]=='#'&&m[n+1-w]==' ')
 			return n;
-		if (m[n-1]=='#'&&m[n-1-w]!='#')
+		if (m[n-1]=='#'&&m[n-1-w]==' ')
 			return n;
 		n-=w;
 	}
@@ -23,9 +23,9 @@ int jump_south(char *m,const int w,const int h,int n,int g)
 			return g;
 		if (m[n]!=' ')
 			return -1;
-		if (m[n+1]=='#'&&m[n+1+w]!='#')
+		if (m[n+1]=='#'&&m[n+1+w]==' ')
 			return n;
-		if (m[n-1]=='#'&&m[n-1+w]!='#')
+		if (m[n-1]=='#'&&m[n-1+w]==' ')
 			return n;
 		n+=w;
 	}
@@ -39,9 +39,9 @@ int jump_west(char *m,const int w,const int h,int n,int g)
 			return g;
 		if (m[n]!=' ')
 			return -1;
-		if (m[n+w]=='#'&&m[n+w-1]!='#')
+		if (m[n+w]=='#'&&m[n+w-1]==' ')
 			return n;
-		if (m[n-w]=='#'&&m[n-w-1]!='#')
+		if (m[n-w]=='#'&&m[n-w-1]==' ')
 			return n;
 		n--;
 	}
@@ -55,9 +55,9 @@ int jump_east(char *m,const int w,const int h,int n,int g)
 			return g;
 		if (m[n]!=' ')
 			return -1;
-		if (m[n+w]=='#'&&m[n+w+1]!='#')
+		if (m[n+w]=='#'&&m[n+w+1]==' ')
 			return n;
-		if (m[n-w]=='#'&&m[n-w+1]!='#')
+		if (m[n-w]=='#'&&m[n-w+1]==' ')
 			return n;
 		n++;
 	}

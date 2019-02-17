@@ -11,8 +11,7 @@ int dist(int p1,int p2,int w)
 {
 	int dx=p2%w-p1%w;
 	int dy=p2/w-p1/w;
-	return dx>dy?dx:dy; // Chessboard
-	//return dx*dx+dy*dy; // Euclidean
+	return dx*dx+dy*dy; // Euclidean
 }
 void randomize_map(char *m,int w,int h)
 {
@@ -68,14 +67,14 @@ enum dir path(char *map,int w,int h,int start,int goal)
 		jps[i]=jump[i](map,w,h,start,goal);
 		if (jps[i]>=0) {
 			// Record its distance to the goal
-			if (jps[i]==goal) {
+			dists[i]=dist(jps[i],goal,w);
+			if (!dists[i]) { // If it is the goal
 				// Clean up
 				for (int i=0;i<w*h;i++)
 					if (map[i]=='?')
 						map[i]=' ';
 				return i;
 			}
-			dists[i]=dist(jps[i],goal,w);
 		} else
 			dists[i]=-1;
 	}
@@ -87,10 +86,10 @@ enum dir path(char *map,int w,int h,int start,int goal)
 			swap(&jps[j-1],&jps[j]);
 		}
 	// Check each jump point for viable path
-	for (int i=0;i<9;i++) {
+	for (int i=0;i<10;i++) {
 		if (jps[i]<0)
 			continue;
-		printf("Jump point from %d: %d (%d)\n",start,jps[i],dists[i]);
+		printf("Jump point from %d,%d =%d=> %d,%d (%d)\n",start%w,start/w,dirs[i],jps[i]%w,jps[i]/w,dists[i]);
 		if (dists[i]==0)
 			return dirs[i];
 		map[jps[i]]='?';
