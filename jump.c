@@ -71,6 +71,10 @@ int jump_northeast(char *m,const int w,const int h,int n,int g)
 			return g;
 		if (m[n]!=' ')
 			return -1;
+		if (m[n-1]=='#'&&m[n-1-w]==' ')
+			return n;
+		if (m[n+w]=='#'&&m[n+w+1]==' ')
+			return n;
 		if (jump_north(m,w,h,n,g)>=0)
 			return n;
 		if (jump_east(m,w,h,n,g)>=0)
@@ -87,6 +91,10 @@ int jump_northwest(char *m,const int w,const int h,int n,int g)
 			return g;
 		if (m[n]!=' ')
 			return -1;
+		if (m[n+1]=='#'&&m[n+1-w]==' ')
+			return n;
+		if (m[n+w]=='#'&&m[n+w-1]==' ')
+			return n;
 		if (jump_north(m,w,h,n,g)>=0)
 			return n;
 		if (jump_west(m,w,h,n,g)>=0)
@@ -103,6 +111,10 @@ int jump_southeast(char *m,const int w,const int h,int n,int g)
 			return g;
 		if (m[n]!=' ')
 			return -1;
+		if (m[n-1]=='#'&&m[n-1+w]==' ')
+			return n;
+		if (m[n-w]=='#'&&m[n-w+1]==' ')
+			return n;
 		if (jump_south(m,w,h,n,g)>=0)
 			return n;
 		if (jump_east(m,w,h,n,g)>=0)
@@ -119,6 +131,10 @@ int jump_southwest(char *m,const int w,const int h,int n,int g)
 			return g;
 		if (m[n]!=' ')
 			return -1;
+		if (m[n+1]=='#'&&m[n+1+w]==' ')
+			return n;
+		if (m[n-w]=='#'&&m[n-w-1]==' ')
+			return n;
 		if (jump_south(m,w,h,n,g)>=0)
 			return n;
 		if (jump_west(m,w,h,n,g)>=0)
