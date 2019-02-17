@@ -11,9 +11,9 @@ int dist(int p1,int p2,int w)
 {
 	int dx=p2%w-p1%w;
 	int dy=p2/w-p1/w;
-	return dx*dx+dy*dy;//dx>dy?dx:dy;
+	return dx>dy?dx:dy; // Chessboard
+	//return dx*dx+dy*dy; // Euclidean
 }
-// Map generation
 void randomize_map(char *m,int w,int h)
 {
 	int a=w*h;
@@ -62,12 +62,13 @@ void swap(int *a,int *b)
 enum dir path(char *map,int w,int h,int start,int goal)
 { // TODO: Tidy up, move to jump.c
 	int dirs[10],jps[10],dists[10];
-	for (int i=0;i<10;i++) {
+	for (int i=0;i<10;i++) { // For each direction
 		dirs[i]=i;
+		// Record jump point in that direction
 		jps[i]=jump[i](map,w,h,start,goal);
 		if (jps[i]>=0) {
+			// Record its distance to the goal
 			if (jps[i]==goal) {
-				// printf("Found goal 1 jump from %d\n",start);
 				// Clean up
 				for (int i=0;i<w*h;i++)
 					if (map[i]=='?')
@@ -78,23 +79,18 @@ enum dir path(char *map,int w,int h,int start,int goal)
 		} else
 			dists[i]=-1;
 	}
-	// Sort jump points by increasing distance to goal
+	// Sort jump points/directions/distances by increasing jump point distance to goal
 	for (int i=0;i<9;i++)
 		for (int j=i+1;j&&dists[j]<dists[j-1];j--) {
 			swap(&dists[j-1],&dists[j]);
 			swap(&dirs[j-1],&dirs[j]);
 			swap(&jps[j-1],&jps[j]);
 		}
-	/* // Print nodes
-	for (int i=0;i<9;i++) {
-		if (jps[i]>-1)
-			printf("Jump point from %d: %d (%d)\n",start,jps[i],dists[i]);
-	}
-	*/
 	// Check each jump point for viable path
 	for (int i=0;i<9;i++) {
 		if (jps[i]<0)
 			continue;
+		printf("Jump point from %d: %d (%d)\n",start,jps[i],dists[i]);
 		if (dists[i]==0)
 			return dirs[i];
 		map[jps[i]]='?';
@@ -105,31 +101,48 @@ enum dir path(char *map,int w,int h,int start,int goal)
 }
 int dir_offset(enum dir d,int w)
 {
+	if (d<1||d>9)
+		return 0;
 	d=9-d;
 	return (1-d%3)+(d/3-1)*w;
 }
 int main(int argc,char **argv)
 {
-	static const int WIDTH=50,HEIGHT=25;
+	static const int WIDTH=80,HEIGHT=24;
 	static const int AREA=WIDTH*HEIGHT;
 	static char map[AREA];
-	srand(time(NULL));
+	static char disp[AREA];
+	unsigned int seed=time(NULL);
+	if (argc>1)
+		sscanf(argv[1],"%u",&seed);
+	srand(seed);
 
 	randomize_map(map,WIDTH,HEIGHT);
-	int s=rand()%AREA,g=rand()%AREA;
-	map[s]='O';
-	map[g]='X';
+	int start=rand()%AREA,goal=rand()%AREA;
+	for (int i=0;i<AREA;i++)
+		disp[i]=map[i];
+
+	// Test new pathfinding algorithm
+	int n=0;
 	clock_t t=clock();
-	enum dir d=path(map,WIDTH,HEIGHT,s,g);
-	t=clock()-t;
-	while (s!=g) {
-		d=path(map,WIDTH,HEIGHT,s,g);
-		s+=dir_offset(d,WIDTH);
-		//printf("New step: %d\n",s);
-		if (s!=g)
-			map[s]='.';
+	disp[start]='O';
+	int pos=start;
+	while (pos!=goal) {
+		enum dir d=path(map,WIDTH,HEIGHT,pos,goal);
+		if (!d)
+			break;
+		pos+=dir_offset(d,WIDTH);
+		printf("New step: %d,%d\n",pos%WIDTH,pos/WIDTH);
+		disp[pos]='.';
+		n++;
 	}
-	print_map(map,WIDTH,HEIGHT);
-	printf("First iteration of path() took %fms\n",1000.0*t/CLOCKS_PER_SEC);
+	disp[goal]='X';
+	t=clock()-t;
+	print_map(disp,WIDTH,HEIGHT);
+	printf("Pathfinding took:\n\tSum: %fms\n\tAvg: %fms\n",
+			1000.0*t/CLOCKS_PER_SEC,
+			1000.0*t/CLOCKS_PER_SEC/n);
+
+	printf("%u\n",seed);
 	return 0;
 }
