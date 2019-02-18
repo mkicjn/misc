@@ -81,6 +81,7 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 		dists[n]=sjd+jgd; // Minimum possible path length
 		dirs[n]=i;
 		n++;
+		map[j]='?';
 	}
 	if (n<1) {
 		printf("(%d,%d): No jump points\n",start%w,start/w);

@@ -11,7 +11,7 @@ int jump_north(char *m,const int w,const int h,int n,int g)
 			return n;
 		if (m[n-1]=='#'&&m[n-1-w]==' ')
 			return n;
-		m[n]='_';
+		m[n]='x';
 		n-=w;
 	}
 	return -1;
@@ -28,7 +28,7 @@ int jump_south(char *m,const int w,const int h,int n,int g)
 			return n;
 		if (m[n-1]=='#'&&m[n-1+w]==' ')
 			return n;
-		m[n]='_';
+		m[n]='x';
 		n+=w;
 	}
 	return -1;
@@ -45,7 +45,7 @@ int jump_west(char *m,const int w,const int h,int n,int g)
 			return n;
 		if (m[n-w]=='#'&&m[n-w-1]==' ')
 			return n;
-		m[n]='_';
+		m[n]='x';
 		n--;
 	}
 	return -1;
@@ -62,7 +62,7 @@ int jump_east(char *m,const int w,const int h,int n,int g)
 			return n;
 		if (m[n-w]=='#'&&m[n-w+1]==' ')
 			return n;
-		m[n]='_';
+		m[n]='x';
 		n++;
 	}
 	return -1;
@@ -88,7 +88,7 @@ int jump_northeast(char *m,const int w,const int h,int n,int g)
 			UNMARK(m,n,1);
 			return n;
 		}
-		m[n]='_';
+		m[n]='x';
 		n+=1-w;
 	}
 	return -1;
@@ -113,7 +113,7 @@ int jump_northwest(char *m,const int w,const int h,int n,int g)
 			UNMARK(m,n,-1);
 			return n;
 		}
-		m[n]='_';
+		m[n]='x';
 		n+=-1-w;
 	}
 	return -1;
@@ -138,7 +138,7 @@ int jump_southeast(char *m,const int w,const int h,int n,int g)
 			UNMARK(m,n,1);
 			return n;
 		}
-		m[n]='_';
+		m[n]='x';
 		n+=1+w;
 	}
 	return -1;
@@ -163,7 +163,7 @@ int jump_southwest(char *m,const int w,const int h,int n,int g)
 			UNMARK(m,n,-1);
 			return n;
 		}
-		m[n]='_';
+		m[n]='x';
 		n+=w-1;
 	}
 	return -1;
