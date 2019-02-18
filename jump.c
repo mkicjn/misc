@@ -5,7 +5,7 @@ int jump_north(char *m,const int w,const int h,int n,int g)
 	while (n>0) {
 		if (n==g)
 			return g;
-		if (m[n]=='#')
+		if (m[n]!=' ')
 			return -1;
 		if (m[n+1]=='#'&&m[n+1-w]==' ')
 			return n;
@@ -22,7 +22,7 @@ int jump_south(char *m,const int w,const int h,int n,int g)
 	while (n<w*h) {
 		if (n==g)
 			return g;
-		if (m[n]=='#')
+		if (m[n]!=' ')
 			return -1;
 		if (m[n+1]=='#'&&m[n+1+w]==' ')
 			return n;
@@ -39,7 +39,7 @@ int jump_west(char *m,const int w,const int h,int n,int g)
 	while (n%w<w-1) {
 		if (n==g)
 			return g;
-		if (m[n]=='#')
+		if (m[n]!=' ')
 			return -1;
 		if (m[n+w]=='#'&&m[n+w-1]==' ')
 			return n;
@@ -56,7 +56,7 @@ int jump_east(char *m,const int w,const int h,int n,int g)
 	while (n%w>0) {
 		if (n==g)
 			return g;
-		if (m[n]=='#')
+		if (m[n]!=' ')
 			return -1;
 		if (m[n+w]=='#'&&m[n+w+1]==' ')
 			return n;
@@ -73,7 +73,7 @@ int jump_northeast(char *m,const int w,const int h,int n,int g)
 	while (n>0&&n%w>0) {
 		if (n==g)
 			return g;
-		if (m[n]=='#')
+		if (m[n]!=' ')
 			return -1;
 		if (m[n-1]=='#'&&m[n-1-w]==' ')
 			return n;
@@ -94,7 +94,7 @@ int jump_northwest(char *m,const int w,const int h,int n,int g)
 	while (n>0&&n%w<w-1) {
 		if (n==g)
 			return g;
-		if (m[n]=='#')
+		if (m[n]!=' ')
 			return -1;
 		if (m[n+1]=='#'&&m[n+1-w]==' ')
 			return n;
@@ -115,7 +115,7 @@ int jump_southeast(char *m,const int w,const int h,int n,int g)
 	while (n<w*h&&n%w>0) {
 		if (n==g)
 			return g;
-		if (m[n]=='#')
+		if (m[n]!=' ')
 			return -1;
 		if (m[n-1]=='#'&&m[n-1+w]==' ')
 			return n;
@@ -136,7 +136,7 @@ int jump_southwest(char *m,const int w,const int h,int n,int g)
 	while (n<w*h&&n%w<w-1) {
 		if (n==g)
 			return g;
-		if (m[n]=='#')
+		if (m[n]!=' ')
 			return -1;
 		if (m[n+1]=='#'&&m[n+1+w]==' ')
 			return n;

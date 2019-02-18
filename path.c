@@ -58,87 +58,57 @@ void print_map(char *m,int w,int h)
 	}
 	printf("\033[m");
 }
-void swap(int *a,int *b)
-{
-	int c=*a;
-	*a=*b;
-	*b=c;
-}
 int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 {
-	if (start==goal)
-		return 0;
-	if (maxlen<1)
-		return -1;
-	int dirs[8],jps[8],dists[8];
-	int n=0; // Number of jump points
-	dists[0]=-1;
-	// Collect jump points for each direction
+	int jps[8],dists[8],dirs[8];
+	int n=0;
 	for (int i=1;i<=9;i++) {
 		int j=jump[i](map,w,h,start,goal);
-		// ^ 5 is ignored; jump[5](...)=-1
-		if (j==goal) {
-			printf("\033[1;31mFound jump from %d,%d =%d=> goal (%d)\033[m\n",start%w,start/w,i,dist(j,goal,w));
-			return dist(j,goal,w);
-		}
-		// If jump point found and path may be short enough
-		if (j>=0&&dist(start,j,w)+dist(j,goal,w)<maxlen) {
-			printf("(%d,%d): Found jump point %d,%d (i=%d)\n",start%w,start/w,j%w,j/w,i);
-			// add it to the list of jump points to evaluate
-			jps[n]=j;
-			dists[n]=dist(j,goal,w);
-			dirs[n]=i;
-			n++;
-		}
-	}
-	if (!n) // No jump points
-		return -1;
-	// Sort jump points by distance to goal
-	// in order to find a path quickly
-	for (int i=0;i<n-1;i++)
-		for (int j=i+1;j&&dists[j]<dists[j-1];j--) {
-			swap(&dists[j-1],&dists[j]);
-			swap(&dirs[j-1],&dirs[j]);
-			swap(&jps[j-1],&jps[j]);
-		}
-	// Check each jump point for viable path
-	// Update each distance record with path length
-	for (int i=0;i<n;i++) {
-		//printf("Analyzing jump point from %d,%d =%d=> %d,%d (%d)\n",start%w,start/w,dirs[i],jps[i]%w,jps[i]/w,dists[i]);
-		int jd=dist(start,jps[i],w); // Get jump distance
-		if (jd>maxlen)
+		if (j<0)
 			continue;
-		int pl=path_length(map,w,h,jps[i],goal,maxlen-jd); // Get actual path length
-		//map[jps[i]]=' ';
-		if (pl<0||pl+jd>=maxlen) { // No path or path too long
-			printf("(%d,%d): Nothing useful through %d,%d (%d>%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,pl+jd,maxlen);
-			// Remove jump point
+		int sjd=dist(start,j,w); // Start->Jump dist
+		if (j==goal) {
+			printf("(%d,%d): Found goal (i=%d)\n",start%w,start/w,i);
+			return sjd;
+		}
+		printf("(%d,%d): Found jump point %d,%d (i=%d)\n",start%w,start/w,j%w,j/w,i);
+		if (sjd>maxlen)
+			continue;
+		int jgd=dist(j,goal,w); // Jump->Goal dist
+		if (sjd+jgd>maxlen)
+			continue;
+		jps[n]=j;
+		dists[n]=sjd+jgd; // Minimum possible path length
+		dirs[n]=i;
+		n++;
+	}
+	if (n<1)
+		return -1;
+	// Update dist[] with actual path lengths
+	for (int i=0;i<n;i++) {
+		printf("(%d,%d): Analyzing path through %d,%d (maxlen=%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,maxlen);
+		int jd=dist(start,jps[i],w); // Jump distance
+		int pl=path_length(map,w,h,jps[i],goal,maxlen); // Path length
+		if (pl<0||jd+pl>maxlen) { // If no path or path too long
+			printf("(%d,%d): Pruning jump point %d,%d\n",start%w,start/w,jps[i]%w,jps[i]/w);
+			// Discard jump point
 			n--;
-			swap(&dists[i],&dists[n]);
-			swap(&dirs[i],&dirs[n]);
-			swap(&jps[i],&jps[n]);
+			jps[i]=jps[n];
+			dirs[i]=dirs[n];
+			dists[i]=dists[n];
 			i--;
-		} else {
-			dists[i]=pl+jd;
-			// If shorter path to goal is found, signal to ignore any longer paths
-			printf("(%d,%d): Shorter path found through %d,%d (%d<%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,pl+jd,maxlen);
-			maxlen=pl+jd;
+		}
+		if (jd+pl<maxlen) {
+			maxlen=jd+pl;
+			printf("(%d,%d): New best path through %d,%d (%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,maxlen);
 		}
 	}
-	// Sort directions by distance to goal on path through jump point
-	for (int i=0;i<n-1;i++)
-		for (int j=i+1;j&&dists[j]<dists[j-1];j--) {
-			swap(&dists[j-1],&dists[j]);
-			swap(&dirs[j-1],&dirs[j]);
-			swap(&jps[j-1],&jps[j]);
-		}
-	// Take jump point with shortest path to goal
-	int ret=dists[0];
-	if (ret>maxlen)
-		ret=-1;
-	else
-		printf("path_length(%d,%d,%d) = %d\n",start%w,start/w,maxlen,ret);
-	return ret;
+	// Return minimum distance
+	int min=dists[0];
+	for (int i=1;i<n;i++)
+		if (dists[i]<min)
+			min=dists[i];
+	return min;
 }
 int dir_offset(enum dir d,int w)
 {
