@@ -67,6 +67,7 @@ int jump_east(char *m,const int w,const int h,int n,int g)
 	}
 	return -1;
 }
+#define UNMARK(m,n,o) for (int i=n+o;m[i]!=' ';i+=o) m[i]=' ';
 int jump_northeast(char *m,const int w,const int h,int n,int g)
 {
 	n+=1-w;
@@ -79,10 +80,14 @@ int jump_northeast(char *m,const int w,const int h,int n,int g)
 			return n;
 		if (m[n+w]=='#'&&m[n+w+1]==' ')
 			return n;
-		if (jump_north(m,w,h,n,g)>=0)
+		if (jump_north(m,w,h,n,g)>=0) {
+			UNMARK(m,n,-w);
 			return n;
-		if (jump_east(m,w,h,n,g)>=0)
+		}
+		if (jump_east(m,w,h,n,g)>=0) {
+			UNMARK(m,n,1);
 			return n;
+		}
 		m[n]='_';
 		n+=1-w;
 	}
@@ -100,10 +105,14 @@ int jump_northwest(char *m,const int w,const int h,int n,int g)
 			return n;
 		if (m[n+w]=='#'&&m[n+w-1]==' ')
 			return n;
-		if (jump_north(m,w,h,n,g)>=0)
+		if (jump_north(m,w,h,n,g)>=0) {
+			UNMARK(m,n,-w);
 			return n;
-		if (jump_west(m,w,h,n,g)>=0)
+		}
+		if (jump_west(m,w,h,n,g)>=0) {
+			UNMARK(m,n,-1);
 			return n;
+		}
 		m[n]='_';
 		n+=-1-w;
 	}
@@ -121,10 +130,14 @@ int jump_southeast(char *m,const int w,const int h,int n,int g)
 			return n;
 		if (m[n-w]=='#'&&m[n-w+1]==' ')
 			return n;
-		if (jump_south(m,w,h,n,g)>=0)
+		if (jump_south(m,w,h,n,g)>=0) {
+			UNMARK(m,n,w);
 			return n;
-		if (jump_east(m,w,h,n,g)>=0)
+		}
+		if (jump_east(m,w,h,n,g)>=0) {
+			UNMARK(m,n,1);
 			return n;
+		}
 		m[n]='_';
 		n+=1+w;
 	}
@@ -142,10 +155,14 @@ int jump_southwest(char *m,const int w,const int h,int n,int g)
 			return n;
 		if (m[n-w]=='#'&&m[n-w-1]==' ')
 			return n;
-		if (jump_south(m,w,h,n,g)>=0)
+		if (jump_south(m,w,h,n,g)>=0) {
+			UNMARK(m,n,w);
 			return n;
-		if (jump_west(m,w,h,n,g)>=0)
+		}
+		if (jump_west(m,w,h,n,g)>=0) {
+			UNMARK(m,n,-1);
 			return n;
+		}
 		m[n]='_';
 		n+=w-1;
 	}
