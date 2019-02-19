@@ -72,11 +72,15 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 			return sjd;
 		}
 		printf("(%d,%d): Found jump point %d,%d (i=%d)\n",start%w,start/w,j%w,j/w,i);
-		if (sjd>maxlen)
+		if (sjd>maxlen) {
+			printf("(%d,%d): Forgetting %d,%d; jump is too long\n",start%w,start/w,j%w,j/w);
 			continue;
+		}
 		int jgd=dist(j,goal,w); // Jump->Goal dist
-		if (sjd+jgd>maxlen)
+		if (sjd+jgd>maxlen) {
+			printf("(%d,%d): Forgetting %d,%d; shortest possible path is too long\n",start%w,start/w,j%w,j/w);
 			continue;
+		}
 		jps[n]=j;
 		dists[n]=sjd+jgd; // Minimum possible path length
 		dirs[n]=i;
@@ -84,28 +88,31 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 		map[j]='?';
 	}
 	if (n<1) {
-		printf("(%d,%d): No jump points\n",start%w,start/w);
+		printf("(%d,%d): No viable jump points\n",start%w,start/w);
 		return -1;
 	}
 	// Update dist[] with actual path lengths
+	// jps[] should only contain coordinates for viable jump points
 	for (int i=0;i<n;i++) {
 		printf("(%d,%d): Analyzing path through %d,%d (maxlen=%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,maxlen);
 		int jd=dist(start,jps[i],w); // Jump distance
 		int pl=path_length(map,w,h,jps[i],goal,maxlen); // Path length
 		if (pl<0||jd+pl>maxlen) { // If no path or path too long
 			printf("(%d,%d): Pruning jump point %d,%d (pl=%d,jd=%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,pl,jd);
+			/*
 			// Discard jump point
 			n--;
 			jps[i]=jps[n];
 			dirs[i]=dirs[n];
 			dists[i]=dists[n];
 			i--;
-		}
-		if (jd+pl<maxlen) {
+			*/
+		} else if (jd+pl<maxlen) {
 			maxlen=jd+pl;
 			printf("(%d,%d): New best path through %d,%d (%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,maxlen);
 		}
 	}
+	return maxlen;
 	// Return minimum distance
 	int min=dists[0];
 	for (int i=1;i<n;i++)
@@ -132,6 +139,10 @@ int main(int argc,char **argv)
 "#                                      ##                                      #"
 "#                                      ##                                      #"
 "#                                      ##                                      #"
+"#                      #               ##                                      #"
+"#                                      ##                                      #"
+"#                                      ##                                      #"
+"#                         #            ##                                      #"
 "#                                      ##                                      #"
 "#                                      ##                                      #"
 "#                                      ##                                      #"
@@ -144,10 +155,6 @@ int main(int argc,char **argv)
 "#                                      ##                                      #"
 "#                                      ##                                      #"
 "#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                                                              #"
-"#                                                                              #"
-"#                                                                              #"
 "################################################################################";
 	static char disp[AREA];
 	unsigned int seed=time(NULL);
