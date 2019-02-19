@@ -116,37 +116,39 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 			swap(&dirs[j],&dirs[j-1]);
 			swap(&jps[j],&jps[j-1]);
 		}
-	// Update dist[] with actual path lengths
-	// jps[] should only contain coordinates for viable jump points
+	// Check each jump point for viable paths, updating maxlen if improvement is made
 	for (int i=0;i<n;i++) {
 		printf("(%d,%d): Analyzing path through %d,%d (maxlen=%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,maxlen);
-		int jd=dist(start,jps[i],w); // Jump distance
-		if (jd>maxlen)
-			goto DISCARD_JP;
-		int pl=path_length(map,w,h,jps[i],goal,maxlen-jd); // Path length
-		if (pl<0||jd+pl>maxlen) { // If no path or path too long
+		if (dists[i]>maxlen) // If it's not possible for the jump point to yield a shorter path:
+			goto DISCARD_JP; // Discard it
+		int jd=dist(start,jps[i],w); // Get jump distance
+		int pl=path_length(map,w,h,jps[i],goal,maxlen-jd); // Get actual path length
+		if (pl<0||jd+pl>maxlen) { // If no path or path too long:
+			// Discard jump point
 DISCARD_JP:
 			printf("(%d,%d): Discarding jump point %d,%d (%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,pl);
-			// Discard jump point
 			n--;
 			jps[i]=jps[n];
 			dirs[i]=dirs[n];
 			dists[i]=dists[n];
 			i--;
 			continue;
-		}
-		if (jd+pl<maxlen) {
-			maxlen=jd+pl;
+		} else {
+			// Update the criterion
 			printf("(%d,%d): New best path through %d,%d (%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,maxlen);
+			maxlen=jd+pl;
 		}
 	}
+	// Return minimum path length (i.e. search criteria maxlen)
 	return maxlen;
-	// Return minimum distance
-	int min=dists[0];
+	// Can use loop like this to find *direction* of best path later
+	/*
+	int min=0;
 	for (int i=1;i<n;i++)
-		if (dists[i]<min)
-			min=dists[i];
-	return min;
+		if (dists[i]<dists[0])
+			min=i;
+	return dists[min];
+	*/
 }
 int dir_offset(enum dir d,int w)
 {
