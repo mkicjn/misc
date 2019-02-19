@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stdbool.h>
 #include "jump.c"
 #ifndef VISUALIZE
 #define VISUALIZE 0
@@ -13,14 +14,16 @@ enum dir {
 int dist(int p1,int p2,int w)
 {
 	int dx=p2%w-p1%w;
+	int dy=p2/w-p1/w;
+	return dx*dx+dy*dy; // Euclidean
+	/*
 	if (dx<0)
 		dx=-dx;
-	int dy=p2/w-p1/w;
 	if (dy<0)
 		dy=-dy;
-	//return dx*dx+dy*dy; // Euclidean
+	*/
+	//return dx+dy; // Taxicab
 	//return dx>dy?dx:dy; // Chessboard
-	return dx+dy; // Taxicab
 }
 void randomize_map(char *m,int w,int h)
 {
@@ -29,7 +32,7 @@ void randomize_map(char *m,int w,int h)
 		m[i]='#';
 	for (int x=1;x<w-1;x++)
 	for (int y=1;y<h-1;y++)
-		if (rand()%20)
+		if (rand()%5)
 			m[x+y*w]=' ';
 }
 void print_map(char *m,int w,int h)
@@ -157,35 +160,12 @@ int dir_offset(enum dir d,int w)
 	d=9-d;
 	return (1-d%3)+(d/3-1)*w;
 }
+#include "oldpath.c"
 int main(int argc,char **argv)
 {
-	static const int WIDTH=80,HEIGHT=24;
+	static const int WIDTH=200,HEIGHT=50;
 	static const int AREA=WIDTH*HEIGHT;
-	static char map[AREA]=
-"################################################################################"
-"#                                                                              #"
-"#                                                                              #"
-"#                                                                              #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                      #               ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                         #            ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"#                                      ##                                      #"
-"################################################################################";
+	static char map[AREA];
 	static char disp[AREA];
 	unsigned int seed=time(NULL);
 	if (argc>1)
@@ -193,8 +173,7 @@ int main(int argc,char **argv)
 	srand(seed);
 
 	randomize_map(map,WIDTH,HEIGHT);
-	int start=20+12*WIDTH,goal=60+12*WIDTH;
-	//int start=rand()%AREA,goal=rand()%AREA;
+	int start=rand()%AREA,goal=rand()%AREA;
 	map[start]='O';
 	map[goal]='X';
 	for (int i=0;i<AREA;i++)
@@ -217,15 +196,20 @@ int main(int argc,char **argv)
 	}
 	*/
 	printf("Start coordinates: %d,%d\n",start%WIDTH,start/WIDTH);
-	printf("Path length: %d\n",path_length(map,WIDTH,HEIGHT,start,goal,AREA));
+	printf("Path length: %d\n",path_length(map,WIDTH,HEIGHT,start,goal,WIDTH*WIDTH+HEIGHT*HEIGHT));
 	disp[goal]='X';
 	t=clock()-t;
 	print_map(disp,WIDTH,HEIGHT);
-	printf("Pathfinding took:\n\tSum: %fms\n\tAvg: %fms\n",
-			1000.0*t/CLOCKS_PER_SEC,
-			1000.0*t/CLOCKS_PER_SEC/n);
+	printf("Pathfinding (JPS) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
 	map[goal]='X';
 	print_map(map,WIDTH,HEIGHT);
+
+	t=clock();
+	int *dm=plan_path(map,WIDTH,HEIGHT,start,goal);
+	t=clock()-t;
+	print_distmap(dm,WIDTH,HEIGHT);
+	free(dm);
+	printf("Pathfinding (BFS) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
 
 	printf("%u\n",seed);
 	return 0;
