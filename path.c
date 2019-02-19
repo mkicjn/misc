@@ -123,7 +123,7 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 		int jd=dist(start,jps[i],w); // Jump distance
 		if (jd>maxlen)
 			goto DISCARD_JP;
-		int pl=path_length(map,w,h,jps[i],goal,maxlen); // Path length
+		int pl=path_length(map,w,h,jps[i],goal,maxlen-jd); // Path length
 		if (pl<0||jd+pl>maxlen) { // If no path or path too long
 DISCARD_JP:
 			printf("(%d,%d): Discarding jump point %d,%d (%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,pl);
