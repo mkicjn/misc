@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include "jump.c"
+#ifndef VISUALIZE
+#define VISUALIZE 0
+#endif
 enum dir {
 	SOUTHWEST=1,SOUTH,SOUTHEAST,
 	WEST,NONE,EAST,
@@ -64,6 +67,11 @@ void swap(int *a,int *b)
 	*a=*b;
 	*b=c;
 }
+void clocksleep(int ms)
+{
+	clock_t t=clock();
+	while (1000.0*(clock()-t)/CLOCKS_PER_SEC<ms);
+}
 int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 {
 	int jps[8],dists[8],dirs[8];
@@ -92,6 +100,10 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 		dirs[n]=i;
 		n++;
 		map[j]='?';
+		if (VISUALIZE) {
+			print_map(map,w,h);
+			clocksleep(200);
+		}
 	}
 	if (n<1) {
 		printf("(%d,%d): No viable jump points\n",start%w,start/w);
@@ -99,7 +111,7 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 	}
 	// Sort jump points by shortest possible path distance
 	for (int i=0;i<n-1;i++)
-		for (int j=i+1;j&&dists[j]>dists[j-1];j--) {
+		for (int j=i+1;j&&dists[j]<dists[j-1];j--) {
 			swap(&dists[j],&dists[j-1]);
 			swap(&dirs[j],&dirs[j-1]);
 			swap(&jps[j],&jps[j-1]);
@@ -178,9 +190,11 @@ int main(int argc,char **argv)
 		sscanf(argv[1],"%u",&seed);
 	srand(seed);
 
-	//randomize_map(map,WIDTH,HEIGHT);
+	randomize_map(map,WIDTH,HEIGHT);
 	int start=20+12*WIDTH,goal=60+12*WIDTH;
 	//int start=rand()%AREA,goal=rand()%AREA;
+	map[start]='O';
+	map[goal]='X';
 	for (int i=0;i<AREA;i++)
 		disp[i]=map[i];
 
@@ -208,7 +222,6 @@ int main(int argc,char **argv)
 	printf("Pathfinding took:\n\tSum: %fms\n\tAvg: %fms\n",
 			1000.0*t/CLOCKS_PER_SEC,
 			1000.0*t/CLOCKS_PER_SEC/n);
-	map[start]='O';
 	map[goal]='X';
 	print_map(map,WIDTH,HEIGHT);
 
