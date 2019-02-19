@@ -32,7 +32,7 @@ void randomize_map(char *m,int w,int h)
 		m[i]='#';
 	for (int x=1;x<w-1;x++)
 	for (int y=1;y<h-1;y++)
-		if (rand()%5)
+		if (rand()%3)
 			m[x+y*w]=' ';
 }
 void print_map(char *m,int w,int h)
@@ -85,17 +85,17 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 			continue;
 		int sjd=dist(start,j,w); // Start->Jump dist
 		if (j==goal) {
-			printf("(%d,%d): Found goal (i=%d)\n",start%w,start/w,i);
+			//printf("(%d,%d): Found goal (i=%d)\n",start%w,start/w,i);
 			return sjd;
 		}
-		printf("(%d,%d): Found jump point %d,%d (i=%d)\n",start%w,start/w,j%w,j/w,i);
+		//printf("(%d,%d): Found jump point %d,%d (i=%d)\n",start%w,start/w,j%w,j/w,i);
 		if (sjd>maxlen) {
-			printf("(%d,%d):\tDiscarded; direct jump is too long\n",start%w,start/w);
+			//printf("(%d,%d):\tDiscarded; direct jump is too long\n",start%w,start/w);
 			continue;
 		}
 		int jgd=dist(j,goal,w); // Jump->Goal dist
 		if (sjd+jgd>maxlen) {
-			printf("(%d,%d):\tDiscarded; shortest possible path is too long\n",start%w,start/w);
+			//printf("(%d,%d):\tDiscarded; shortest possible path is too long\n",start%w,start/w);
 			continue;
 		}
 		jps[n]=j;
@@ -109,7 +109,7 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 		}
 	}
 	if (n<1) {
-		printf("(%d,%d): No viable jump points\n",start%w,start/w);
+		//printf("(%d,%d): No viable jump points\n",start%w,start/w);
 		return -1;
 	}
 	// Sort jump points by shortest possible path distance
@@ -121,7 +121,7 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 		}
 	// Check each jump point for viable paths, updating maxlen if improvement is made
 	for (int i=0;i<n;i++) {
-		printf("(%d,%d): Analyzing path through %d,%d (maxlen=%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,maxlen);
+		//printf("(%d,%d): Analyzing path through %d,%d (maxlen=%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,maxlen);
 		if (dists[i]>maxlen) // If it's not possible for the jump point to yield a shorter path:
 			goto DISCARD_JP; // Discard it
 		int jd=dist(start,jps[i],w); // Get jump distance
@@ -129,7 +129,7 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 		if (pl<0||jd+pl>maxlen) { // If no path or path too long:
 			// Discard jump point
 DISCARD_JP:
-			printf("(%d,%d): Discarding jump point %d,%d (%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,pl);
+			//printf("(%d,%d): Discarding jump point %d,%d (%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,pl);
 			n--;
 			jps[i]=jps[n];
 			dirs[i]=dirs[n];
@@ -138,7 +138,7 @@ DISCARD_JP:
 			continue;
 		} else {
 			// Update the criterion
-			printf("(%d,%d): New best path through %d,%d (%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,maxlen);
+			//printf("(%d,%d): New best path through %d,%d (%d)\n",start%w,start/w,jps[i]%w,jps[i]/w,maxlen);
 			maxlen=jd+pl;
 		}
 	}
