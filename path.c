@@ -144,14 +144,6 @@ DISCARD_JP:
 	}
 	// Return minimum path length (i.e. search criteria maxlen)
 	return maxlen;
-	// Can use loop like this to find *direction* of best path later
-	/*
-	int min=0;
-	for (int i=1;i<n;i++)
-		if (dists[i]<dists[0])
-			min=i;
-	return dists[min];
-	*/
 }
 int dir_offset(enum dir d,int w)
 {
