@@ -175,18 +175,6 @@ int main(int argc,char **argv)
 	int n=0;
 	clock_t t=clock();
 	disp[start]='O';
-	/*
-	int pos=start;
-	while (pos!=goal) {
-		enum dir d=path(map,WIDTH,HEIGHT,pos,goal);
-		if (!d)
-			break;
-		pos+=dir_offset(d,WIDTH);
-		printf("New step: %d,%d\n",pos%WIDTH,pos/WIDTH);
-		disp[pos]='.';
-		n++;
-	}
-	*/
 	printf("Start coordinates: %d,%d\n",start%WIDTH,start/WIDTH);
 	printf("Path length: %d\n",path_length(map,WIDTH,HEIGHT,start,goal,WIDTH*WIDTH+HEIGHT*HEIGHT));
 	disp[goal]='X';
