@@ -70,7 +70,7 @@ void swap(int *a,int *b)
 	*a=*b;
 	*b=c;
 }
-void clocksleep(int ms)
+void clkslp(int ms)
 {
 	clock_t t=clock();
 	while (1000.0*(clock()-t)/CLOCKS_PER_SEC<ms);
@@ -105,7 +105,7 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 		map[j]='?';
 		if (VISUALIZE) {
 			print_map(map,w,h);
-			clocksleep(200);
+			clkslp(200);
 		}
 	}
 	if (n<1) {
@@ -170,26 +170,26 @@ int main(int argc,char **argv)
 	map[goal]='X';
 	for (int i=0;i<AREA;i++)
 		disp[i]=map[i];
+	disp[start]='O';
+	disp[goal]='X';
+	printf("Start coordinates: %d,%d\n",start%WIDTH,start/WIDTH);
+	print_map(disp,WIDTH,HEIGHT);
+
+	// Time old pathfining algorithm
+	clock_t t=clock();
+	int *dm=plan_path(map,WIDTH,HEIGHT,start,goal);
+	t=clock()-t;
+	printf("Pathfinding (BFS) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
+	print_distmap(dm,WIDTH,HEIGHT);
+	free(dm);
 
 	// Test new pathfinding algorithm
-	int n=0;
-	clock_t t=clock();
-	disp[start]='O';
-	printf("Start coordinates: %d,%d\n",start%WIDTH,start/WIDTH);
+	t=clock();
 	printf("Path length: %d\n",path_length(map,WIDTH,HEIGHT,start,goal,WIDTH*WIDTH+HEIGHT*HEIGHT));
-	disp[goal]='X';
 	t=clock()-t;
-	print_map(disp,WIDTH,HEIGHT);
 	printf("Pathfinding (JPS) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
 	map[goal]='X';
 	print_map(map,WIDTH,HEIGHT);
-
-	t=clock();
-	int *dm=plan_path(map,WIDTH,HEIGHT,start,goal);
-	t=clock()-t;
-	print_distmap(dm,WIDTH,HEIGHT);
-	free(dm);
-	printf("Pathfinding (BFS) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
 
 	printf("%u\n",seed);
 	return 0;

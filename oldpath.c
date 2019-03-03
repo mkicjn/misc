@@ -1,3 +1,21 @@
+void print_distmap(int *m,const int w,const int h)
+{
+	for (int i=0;i<w*h;i++) {
+		switch (m[i]) {
+		case -2:
+			printf("\033[1;30m#");
+			break;
+		case -1:
+			putchar(' ');
+			break;
+		default:
+			printf("\033[1;%dm%c",31+(m[i]/10)%7,'0'+m[i]%10);
+		}
+		if (i%w==w-1)
+			putchar('\n');
+	}
+	printf("\033[m");
+}
 int *plan_path(char *map,const int w,const int h,int start,int goal)
 {
 	int *m=malloc(w*h*sizeof(int));
@@ -8,6 +26,10 @@ int *plan_path(char *map,const int w,const int h,int start,int goal)
 	m[goal]=0;
 	bool possible=true;
 	for (int d=1;possible&&m[start]<0;d++) {
+		if (VISUALIZE) {
+			print_distmap(m,w,h);
+			clkslp(200);
+		}
 		possible=false;
 		for (int i=0;i<w*h;i++) {
 			if (m[i]!=d-1)
@@ -26,22 +48,4 @@ int *plan_path(char *map,const int w,const int h,int start,int goal)
 		}
 	}
 	return m;
-}
-void print_distmap(int *m,const int w,const int h)
-{
-	for (int i=0;i<w*h;i++) {
-		switch (m[i]) {
-		case -2:
-			printf("\033[1;30m#");
-			break;
-		case -1:
-			putchar(' ');
-			break;
-		default:
-			printf("\033[1;%dm%c",31+(m[i]/10)%7,'0'+m[i]%10);
-		}
-		if (i%w==w-1)
-			putchar('\n');
-	}
-	printf("\033[m");
 }
