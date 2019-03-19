@@ -11,6 +11,13 @@ enum dir {
 	WEST,NONE,EAST,
 	NORTHWEST,NORTH,NORTHEAST
 }; // Represents numpad
+int dir_offset(enum dir d,int w)
+{
+	if (d<1||d>9)
+		return 0;
+	d=9-d;
+	return (1-d%3)+(d/3-1)*w;
+}
 int dist(int p1,int p2,int w)
 {
 	int dx=p2%w-p1%w;
@@ -124,13 +131,6 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 	}
 	// Return length of shortest path found
 	return max==maxlen?-1:max;
-}
-int dir_offset(enum dir d,int w)
-{
-	if (d<1||d>9)
-		return 0;
-	d=9-d;
-	return (1-d%3)+(d/3-1)*w;
 }
 #include "oldpath.c"
 int main(int argc,char **argv)
