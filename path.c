@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
-#include "jump.c"
 #ifndef VISUALIZE
 #define VISUALIZE 0
 #endif
@@ -22,15 +21,13 @@ int dist(int p1,int p2,int w)
 {
 	int dx=p2%w-p1%w;
 	int dy=p2/w-p1/w;
-	return dx*dx+dy*dy; // Euclidean
-	/*
+	//return dx*dx+dy*dy; // Euclidean
 	if (dx<0)
 		dx=-dx;
 	if (dy<0)
 		dy=-dy;
-	*/
-	//return dx+dy; // Taxicab
 	//return dx>dy?dx:dy; // Chessboard
+	return dx+dy; // Taxicab
 }
 void randomize_map(char *m,int w,int h)
 {
@@ -84,52 +81,54 @@ void clkslp(int ms)
 }
 int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 {
-	int jps[8],dists[8],dirs[8];
-	int n=0;
+	if (maxlen<1)
+		return -1;
+	map[start]='x';
+	int nbs[8],dirs[8],dists[8],n=0;
+	// Collect unevaluated neighbors
 	for (int i=1;i<=9;i++) {
-		int j=jump[i](map,w,h,start,goal);
-		if (j<0)
+		if (i==5)
 			continue;
-		int sjd=dist(start,j,w); // Calculate start->jump dist
+		int j=start+dir_offset(i,w);
+		int dx=start%w-j%w;
 		if (j==goal)
-			return sjd;
-		if (sjd>maxlen)
-			continue; // Jump is longer than maxlen
-		int jgd=dist(j,goal,w); // Calculate jump->goal dist
-		if (sjd+jgd>maxlen)
-			continue; // Shortest possible path length > maxlen
-		jps[n]=j;
-		dists[n]=sjd+jgd; // Record shortest possible path length
+			return 1;
+		if (dx<-1||dx>1||j<0||j>=w*h)
+			continue;
+		if (map[j]!=' ')
+			continue;
+		nbs[n]=j;
+		dists[n]=dist(j,goal,w);
 		dirs[n]=i;
 		n++;
 		map[j]='?';
 	}
 	if (VISUALIZE) {
 		print_map(map,w,h);
-		clkslp(200);
+		clkslp(100);
 	}
+	// Sort neighbors by best possible distance to goal
 	if (n<1)
-		return -1; // No viable jump points
-	// Sort jump points by shortest possible path distance
+		return -1;
 	for (int i=0;i<n-1;i++)
-		for (int j=i+1;j&&dists[j]<dists[j-1];j--) {
-			swap(&dists[j],&dists[j-1]);
-			swap(&dirs[j],&dirs[j-1]);
-			swap(&jps[j],&jps[j-1]);
-		}
-	// Check each jump point for viable paths, updating max if improvement is made
+	for (int j=i+1;j&&dists[j]<dists[j-1];j--) {
+		swap(&dists[j],&dists[j-1]);
+		swap(&dirs[j],&dirs[j-1]);
+		swap(&nbs[j],&nbs[j-1]);
+	}
+	// Try each neighbor for a new best path, if possible
 	int max=maxlen;
 	for (int i=0;i<n;i++) {
-		if (dists[i]>max) // If it's not possible for the jump point to yield a shorter path:
+		if (dists[i]>=max) {
+			//printf("%d,%d: No good path through %d,%d (%d>=%d)\n",start%w,start/w,nbs[i]%w,nbs[i]/w,dists[i],max);
 			continue;
-		int jd=dist(start,jps[i],w); // Get jump distance
-		int pl=path_length(map,w,h,jps[i],goal,max-jd); // Get actual path length
-		if (pl<0||jd+pl>max) // If no path or path too long:
-			continue;
-		else
-			max=jd+pl;
+		}
+		int d=path_length(map,w,h,nbs[i],goal,max-1);
+		if (d>0&&d<max) {
+			//printf("%d,%d: New best path through %d,%d (%d<%d)\n",start%w,start/w,nbs[i]%w,nbs[i]/w,d,max);
+			max=d+1;
+		}
 	}
-	// Return length of shortest path found
 	return max==maxlen?-1:max;
 }
 #include "oldpath.c"
@@ -138,7 +137,7 @@ int main(int argc,char **argv)
 	static const int WIDTH=200,HEIGHT=50;
 	static const int AREA=WIDTH*HEIGHT;
 	static char map[AREA];
-	static char disp[AREA];
+	//static char disp[AREA];
 	unsigned int seed=time(NULL);
 	if (argc>1)
 		sscanf(argv[1],"%u",&seed);
@@ -146,28 +145,31 @@ int main(int argc,char **argv)
 
 	randomize_map(map,WIDTH,HEIGHT);
 	int start=rand()%AREA,goal=rand()%AREA;
-	map[start]='O';
-	map[goal]='X';
-	for (int i=0;i<AREA;i++)
+	//map[start]='O';
+	//map[goal]='X';
+	/*for (int i=0;i<AREA;i++)
 		disp[i]=map[i];
 	disp[start]='O';
-	disp[goal]='X';
+	disp[goal]='X';*/
 	printf("Start coordinates: %d,%d\n",start%WIDTH,start/WIDTH);
-	print_map(disp,WIDTH,HEIGHT);
+	//print_map(disp,WIDTH,HEIGHT);
 
 	// Time old pathfining algorithm
+	/*
 	clock_t t=clock();
 	int *dm=plan_path(map,WIDTH,HEIGHT,start,goal);
 	t=clock()-t;
 	printf("Pathfinding (BFS) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
 	print_distmap(dm,WIDTH,HEIGHT);
 	free(dm);
+	*/
 
 	// Test new pathfinding algorithm
-	t=clock();
-	printf("Path length: %d\n",path_length(map,WIDTH,HEIGHT,start,goal,WIDTH*WIDTH+HEIGHT*HEIGHT));
+	clock_t t=clock();
+	printf("Path length: %d\n",path_length(map,WIDTH,HEIGHT,start,goal,AREA*AREA));
 	t=clock()-t;
-	printf("Pathfinding (JPS) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
+	printf("Pathfinding (A*?) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
+	map[start]='O';
 	map[goal]='X';
 	print_map(map,WIDTH,HEIGHT);
 
