@@ -60,71 +60,50 @@ void insertion_sort(int *a,int len)
 		for (int j=i+1;j&&a[j]<a[j-1];j--)
 			swap(&a[j],&a[j-1]);
 }
+void quicksort(int *arr,int len)
+{
+	if (len<2)
+		return;
+	int pivot=0;
+	for (int i=1;i<len;i++)
+		if (arr[i]<arr[0])
+			swap(&arr[++pivot],&arr[i]);
+	swap(&arr[0],&arr[pivot]);
+	quicksort(arr,pivot);
+	quicksort(&arr[pivot+1],len-pivot-1);
+}
 int main(int argc,char **argv)
 {
 	int size=100;
 	if (argc>1)
 		sscanf(argv[1],"%d",&size);
 	srand(time(NULL));
-	int *arrh,*arri;
+	int *arrh,*arrq,*arri;
 	arrh=malloc(size*sizeof(int));
+	arrq=malloc(size*sizeof(int));
 	arri=malloc(size*sizeof(int));
 	/**/
 	for (int i=0;i<size;i++) {
 		int n=rand()%1000;
 		arrh[i]=n;
+		arrq[i]=n;
 		arri[i]=n;
 	}
-	puts("Random distribution:");
 	clock_t h=clock();
 	heapsort(arrh,size);
 	h=clock()-h;
 	printf("Heapsort took %fms\n",1000.0*h/CLOCKS_PER_SEC);
+	clock_t q=clock();
+	quicksort(arrq,size);
+	q=clock()-q;
+	printf("Quicksort took %fms\n",1000.0*q/CLOCKS_PER_SEC);
 	clock_t i=clock();
 	insertion_sort(arri,size);
 	i=clock()-i;
 	printf("Insertion sort took %fms\n",1000.0*i/CLOCKS_PER_SEC);
-	putchar('\n');
-	/* Lazy copy paste */
-	for (int i=0;i<size;i++) {
-		int n=size-i;
-		arrh[i]=n;
-		arri[i]=n;
-	}
-	puts("Reverse order:");
-	h=clock();
-	heapsort(arrh,size);
-	h=clock()-h;
-	printf("Heapsort took %fms\n",1000.0*h/CLOCKS_PER_SEC);
-	i=clock();
-	insertion_sort(arri,size);
-	i=clock()-i;
-	printf("Insertion sort took %fms\n",1000.0*i/CLOCKS_PER_SEC);
-	putchar('\n');
-	/* Lazy copy paste */
-	for (int i=0;i<size;i++) {
-		int n=i+1;
-		arrh[i]=n;
-		arri[i]=n;
-	}
-	for (int i=0;i<size/100;i++) {
-		int n1=size/100+rand()%(size-size/50);
-		int n2=n1-size/100+rand()%(size/50);
-		swap(&arrh[n1],&arrh[n2]);
-		swap(&arri[n1],&arri[n2]);
-	}
-	puts("Mostly sorted:");
-	h=clock();
-	heapsort(arrh,size);
-	h=clock()-h;
-	printf("Heapsort took %fms\n",1000.0*h/CLOCKS_PER_SEC);
-	i=clock();
-	insertion_sort(arri,size);
-	i=clock()-i;
-	printf("Insertion sort took %fms\n",1000.0*i/CLOCKS_PER_SEC);
-	putchar('\n');
 	/**/
 	free(arrh);
+	free(arrq);
 	free(arri);
 	return 0;
 }
