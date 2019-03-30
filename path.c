@@ -79,11 +79,34 @@ void clkslp(int ms)
 	clock_t t=clock();
 	while (1000.0*(clock()-t)/CLOCKS_PER_SEC<ms);
 }
-int path_length(char *map,int w,int h,int start,int goal,int maxlen)
+void print_distmap(int *m,const int w,const int h)
 {
+	for (int i=0;i<w*h;i++) {
+		switch (m[i]) {
+		case -3:
+			printf("\033[1;37m?");
+			break;
+		case -2:
+			printf("\033[1;30m#");
+			break;
+		case -1:
+			putchar(' ');
+			break;
+		default:
+			printf("\033[1;%dm%c",31+(m[i]/10)%6,'0'+m[i]%10);
+		}
+		if (i%w==w-1)
+			putchar('\n');
+	}
+	printf("\033[m");
+}
+int path_length(int *map,int w,int h,int start,int goal,int maxlen)
+{ // map: n: distance, -1: unvisited, -2: walls, -3: visited
+	if (map[start]>=0)
+		return map[start];
 	if (maxlen<1)
 		return -1;
-	map[start]='x';
+	map[start]=-3;
 	int nbs[8],dirs[8],dists[8],n=0;
 	// Collect unevaluated neighbors
 	for (int i=1;i<=9;i++) {
@@ -95,21 +118,20 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 			return 1;
 		if (dx<-1||dx>1||j<0||j>=w*h)
 			continue;
-		if (map[j]!=' ')
+		if (map[j]!=-1)
 			continue;
 		nbs[n]=j;
 		dists[n]=dist(j,goal,w);
 		dirs[n]=i;
 		n++;
-		map[j]='?';
 	}
 	if (VISUALIZE) {
-		print_map(map,w,h);
+		print_distmap(map,w,h);
 		clkslp(100);
 	}
 	// Sort neighbors by best possible distance to goal
 	if (n<1)
-		return -1;
+		return -3;
 	for (int i=0;i<n-1;i++)
 	for (int j=i+1;j&&dists[j]<dists[j-1];j--) {
 		swap(&dists[j],&dists[j-1]);
@@ -120,18 +142,24 @@ int path_length(char *map,int w,int h,int start,int goal,int maxlen)
 	int max=maxlen;
 	for (int i=0;i<n;i++) {
 		if (dists[i]>=max) {
-			//printf("%d,%d: No good path through %d,%d (%d>=%d)\n",start%w,start/w,nbs[i]%w,nbs[i]/w,dists[i],max);
+			printf("%d,%d: No good path through %d,%d (%d>=%d)\n",start%w,start/w,nbs[i]%w,nbs[i]/w,dists[i],max);
 			continue;
 		}
 		int d=path_length(map,w,h,nbs[i],goal,max-1);
+		map[nbs[i]]=d;
 		if (d>0&&d<max) {
-			//printf("%d,%d: New best path through %d,%d (%d<%d)\n",start%w,start/w,nbs[i]%w,nbs[i]/w,d,max);
+			printf("%d,%d: New best path through %d,%d (%d<%d)\n",start%w,start/w,nbs[i]%w,nbs[i]/w,d,max);
 			max=d+1;
 		}
 	}
-	return max==maxlen?-1:max;
+	if (VISUALIZE) {
+		print_distmap(map,w,h);
+		clkslp(100);
+	}
+	if (max==maxlen)
+		max=-3;
+	return max;
 }
-#include "oldpath.c"
 int main(int argc,char **argv)
 {
 	static const int WIDTH=200,HEIGHT=50;
@@ -154,24 +182,17 @@ int main(int argc,char **argv)
 	printf("Start coordinates: %d,%d\n",start%WIDTH,start/WIDTH);
 	//print_map(disp,WIDTH,HEIGHT);
 
-	// Time old pathfining algorithm
-	/*
-	clock_t t=clock();
-	int *dm=plan_path(map,WIDTH,HEIGHT,start,goal);
-	t=clock()-t;
-	printf("Pathfinding (BFS) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
-	print_distmap(dm,WIDTH,HEIGHT);
-	free(dm);
-	*/
-
 	// Test new pathfinding algorithm
+	int *imap=malloc(AREA*sizeof(int));
+	for (int i=0;i<AREA;i++)
+		imap[i]=map[i]==' '?-1:-2;
 	clock_t t=clock();
-	printf("Path length: %d\n",path_length(map,WIDTH,HEIGHT,start,goal,AREA*AREA));
+	printf("Path length: %d\n",path_length(imap,WIDTH,HEIGHT,start,goal,AREA*AREA));
 	t=clock()-t;
 	printf("Pathfinding (A*?) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
 	map[start]='O';
 	map[goal]='X';
-	print_map(map,WIDTH,HEIGHT);
+	print_distmap(imap,WIDTH,HEIGHT);
 
 	printf("%u\n",seed);
 	return 0;
