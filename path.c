@@ -108,10 +108,12 @@ int *old_path(int *m,const int w,const int h,int start,int goal)
 	int x_b[2]={goal%w,goal%w};
 	int y_b[2]={goal/w,goal/w};
 	for (int d=1;possible&&m[start]<0;d++) {
+		/*
 		if (VISUALIZE) {
 			print_distmap(m,w,h);
 			clkslp(100);
 		}
+		*/
 		possible=false;
 		for (int x=x_b[0];x<=x_b[1];x++)
 		for (int y=y_b[0];y<=y_b[1];y++) {
@@ -159,7 +161,7 @@ int path(int *map,int w,int h,int start,int goal,int maxlen)
 			return 1;
 		if (dx<-1||dx>1||j<0||j>=w*h)
 			continue;
-		if (map[j]!=-1)
+		if (map[j]<-1)
 			continue;
 		nbs[n]=j;
 		dists[n]=dist(j,goal,w);
