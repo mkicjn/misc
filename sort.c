@@ -1,57 +1,43 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-static inline int parent(int i)
-{
-	return (i-1)>>1;
-}
-static inline int left_child(int i)
-{
-	return (i<<1)+1;
-}
-static inline int right_child(int i)
-{
-	return (i<<1)+2;
-}
 void swap(int *a,int *b)
 {
 	*a^=*b;
 	*b^=*a;
 	*a^=*b;
 }
-void sift_down(int *a,int start,int end)
+void siftup(int *h,int s,int i)
 {
-	int r=start;
-	while (left_child(r)<=end) {
-		int c=left_child(r),s=r;
-		if (a[s]<a[c])
-			s=c;
-		if (c+1<=end&&a[s]<a[c+1])
-			s=c+1;
-		if (s==r)
-			return;
-		else {
-			swap(&a[r],&a[s]);
-			r=s;
-		}
+	while (i>0)
+		if (h[i]>h[(i-1)>>1])
+			swap(&h[i],&h[(i-1)>>1]);
+}
+void siftdown(int *h,int n,int i)
+{
+	while (i<n) {
+		int l=(i<<1)+1,r=(i<<1)+2;
+		if (l>=n)
+			break;
+		int s=r<n&&h[r]>=h[l]?r:l;
+		if (h[i]<h[s])
+			swap(&h[i],&h[s]);
+		else
+			break;
+		i=s;
 	}
 }
-void heapify(int *a,int len)
+void heapify(int *h,int n)
 {
-	int start=parent(len-1);
-	while (start>=0) {
-		sift_down(a,start,len-1);
-		start--;
-	}
+	for (int i=(n-2)>>1;i>=0;i--)
+		siftdown(h,n,i);
 }
-void heapsort(int *a,int len)
+void heapsort(int *h,int n)
 {
-	heapify(a,len);
-	int end=len-1;
-	while (end>0) {
-		swap(&a[0],&a[end]);
-		end--;
-		sift_down(a,0,end);
+	heapify(h,n);
+	while (n>0) {
+		swap(&h[0],&h[--n]);
+		siftdown(h,n,0);
 	}
 }
 void insertion_sort(int *a,int len)
@@ -60,17 +46,17 @@ void insertion_sort(int *a,int len)
 		for (int j=i+1;j&&a[j]<a[j-1];j--)
 			swap(&a[j],&a[j-1]);
 }
-void quicksort(int *arr,int len)
+void quicksort(int *a,int n)
 {
-	if (len<2)
+	if (n<2)
 		return;
-	int pivot=0;
-	for (int i=1;i<len;i++)
-		if (arr[i]<arr[0])
-			swap(&arr[++pivot],&arr[i]);
-	swap(&arr[0],&arr[pivot]);
-	quicksort(arr,pivot);
-	quicksort(&arr[pivot+1],len-pivot-1);
+	int p=0;
+	for (int i=1;i<n;i++)
+		if (a[i]<a[0])
+			swap(&a[++p],&a[i]);
+	swap(&a[0],&a[p]);
+	quicksort(a,p);
+	quicksort(&a[p+1],n-p-1);
 }
 int main(int argc,char **argv)
 {
