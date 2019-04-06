@@ -27,14 +27,10 @@ void siftdown(int *h,int n,int i)
 		i=s;
 	}
 }
-void heapify(int *h,int n)
+void heapsort(int *h,int n)
 {
 	for (int i=(n-2)>>1;i>=0;i--)
 		siftdown(h,n,i);
-}
-void heapsort(int *h,int n)
-{
-	heapify(h,n);
 	while (n>0) {
 		swap(&h[0],&h[--n]);
 		siftdown(h,n,0);
