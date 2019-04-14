@@ -3,9 +3,9 @@
 #include <time.h>
 void swap(int *a,int *b)
 {
-	*a^=*b;
-	*b^=*a;
-	*a^=*b;
+	int c=*a;
+	*a=*b;
+	*b=c;
 }
 void siftup(int *h,int s,int i)
 {
@@ -54,38 +54,34 @@ void quicksort(int *a,int n)
 	quicksort(a,p);
 	quicksort(&a[p+1],n-p-1);
 }
+void benchmark(int *a,int n,void (*f)(int *,int),const char *s)
+{
+	int *t=malloc(n*sizeof(int));
+	for (int i=0;i<n;i++)
+		t[i]=a[i];
+	clock_t dt=clock();
+	f(t,n);
+	dt=clock()-dt;
+	for (int i=1;i<n;i++)
+		if (t[i-1]>t[i]) {
+			printf("(failed) ");
+			break;
+		}
+	printf("%s: %fms\n",s,1000.0*dt/CLOCKS_PER_SEC);
+	free(t);
+}
 int main(int argc,char **argv)
 {
-	int size=100;
-	if (argc>1)
-		sscanf(argv[1],"%d",&size);
 	srand(time(NULL));
-	int *arrh,*arrq,*arri;
-	arrh=malloc(size*sizeof(int));
-	arrq=malloc(size*sizeof(int));
-	arri=malloc(size*sizeof(int));
-	/**/
-	for (int i=0;i<size;i++) {
-		int n=rand()%1000;
-		arrh[i]=n;
-		arrq[i]=n;
-		arri[i]=n;
-	}
-	clock_t h=clock();
-	heapsort(arrh,size);
-	h=clock()-h;
-	printf("Heapsort took %fms\n",1000.0*h/CLOCKS_PER_SEC);
-	clock_t q=clock();
-	quicksort(arrq,size);
-	q=clock()-q;
-	printf("Quicksort took %fms\n",1000.0*q/CLOCKS_PER_SEC);
-	clock_t i=clock();
-	insertion_sort(arri,size);
-	i=clock()-i;
-	printf("Insertion sort took %fms\n",1000.0*i/CLOCKS_PER_SEC);
-	/**/
-	free(arrh);
-	free(arrq);
-	free(arri);
+	int n=100;
+	if (argc>1)
+		sscanf(argv[1],"%d",&n);
+	int *a=malloc(n*sizeof(int));
+	for (int i=0;i<n;i++)
+		a[i]=rand()%n;
+	benchmark(a,n,&heapsort,"Heapsort");
+	benchmark(a,n,&quicksort,"Quicksort");
+	benchmark(a,n,&insertion_sort,"Insertion sort");
+	free(a);
 	return 0;
 }
