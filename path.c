@@ -143,67 +143,47 @@ int *old_path(int *m,const int w,const int h,int start,int goal)
 	}
 	return m;
 }
-int path(int *map,int w,int h,int start,int goal,int maxlen)
+int path(int *map,int w,int h,int start,int goal)
 { // map: n: distance, -1: unvisited, -2: walls, -3: visited
+	if (start==goal)
+		return 0;
 	if (map[start]>=0)
 		return map[start];
-	if (maxlen<1)
-		return -1;
+	int nbs[8],dists[8],n=0;
 	map[start]=-3;
-	int nbs[8],dirs[8],dists[8],n=0;
-	// Collect unevaluated neighbors
 	for (int i=1;i<=9;i++) {
-		if (i==5)
-			continue;
-		int j=start+dir_offset(i,w);
-		int dx=start%w-j%w;
-		if (j==goal)
+		int nb=start+dir_offset(i,w);
+		int dx=nb%w-start%w;
+		if (nb==goal)
 			return 1;
-		if (dx<-1||dx>1||j<0||j>=w*h)
+		if (dx<-1||dx>1||nb<0||nb>=w*h)
 			continue;
-		if (map[j]<-1)
+		if (i==5||map[nb]<-1)
 			continue;
-		nbs[n]=j;
-		dists[n]=dist(j,goal,w);
-		dirs[n]=i;
+		nbs[n]=nb;
+		dists[n]=dist(nb,goal,w);
 		n++;
 	}
-	if (VISUALIZE) {
-		print_distmap(map,w,h);
-		clkslp(50);
-	}
-	// Sort neighbors by best possible distance to goal
 	if (n<1)
-		return -1;
+		return -1; // ???
 	for (int i=0;i<n-1;i++)
-	for (int j=i+1;j&&dists[j]<dists[j-1];j--) {
-		swap(&dists[j],&dists[j-1]);
-		swap(&dirs[j],&dirs[j-1]);
-		swap(&nbs[j],&nbs[j-1]);
-	}
-	// Try each neighbor for a new best path, if possible
-	int max=maxlen;
+		for (int j=i+1;j&&dists[j]<dists[j-1];j--) {
+			swap(&dists[j],&dists[j-1]);
+			swap(&nbs[j],&nbs[j-1]);
+		}
+	int max=-1;
+	if (VISUALIZE) {print_distmap(map,w,h); clkslp(50);}
 	for (int i=0;i<n;i++) {
-		if (dists[i]>=max) {
-			//printf("%d,%d: No good path through %d,%d (%d>=%d)\n",start%w,start/w,nbs[i]%w,nbs[i]/w,dists[i],max);
+		if (max>0&&dists[i]>=max)
 			continue;
-		}
-		int d=path(map,w,h,nbs[i],goal,max-1);
+		int d=path(map,w,h,nbs[i],goal);
 		map[nbs[i]]=d;
-		if (d>0&&d<max) {
-			//printf("%d,%d: New best path through %d,%d (%d<%d)\n",start%w,start/w,nbs[i]%w,nbs[i]/w,d,max);
-			max=d+1;
-		}
+		if (max<0||(d>0&&d<max))
+			max=d;
 	}
-	if (VISUALIZE) {
-		print_distmap(map,w,h);
-		clkslp(50);
-	}
-	/*
-	if (max==maxlen)
-		max=-3;
-		*/
-	return max;
+	if (VISUALIZE) {print_distmap(map,w,h); clkslp(50);}
+	map[start]=1+max;
+	return 1+max;
 }
 int main(int argc,char **argv)
 {
@@ -247,9 +227,9 @@ int main(int argc,char **argv)
 	for (int i=0;i<AREA;i++)
 		imap[i]=map[i]==' '?-1:-2;
 	clock_t t=clock();
-	printf("Path length: %d\n",path(imap,WIDTH,HEIGHT,start,goal,AREA*AREA));
+	printf("Path length: %d\n",path(imap,WIDTH,HEIGHT,start,goal));
 	t=clock()-t;
-	printf("Pathfinding (A*?) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
+	printf("Pathfinding (DFS?) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
 	map[start]='O';
 	map[goal]='X';
 	print_distmap(imap,WIDTH,HEIGHT);
