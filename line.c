@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 void cls(void)
 {
 	printf("\033[2J");
@@ -9,20 +10,12 @@ void mark(int x,int y)
 }
 void line(void (*f)(int,int),int x1,int y1,int x2,int y2)
 {
-	int dx=x2-x1,dy=y2-y1;
-	if (dx>dy) {
-		float slope=(float)dy/dx;
-		for (int x=x1;x<=x2;x++) {
-			float y=slope*(x-x1)+y1;
-			f(x,y-(int)y<0.5?(int)y:1+(int)y);
-		}
-	} else {
-		float slope=(float)dx/dy;
-		for (int y=y1;y<=y2;y++) {
-			float x=slope*(y-y1)+x1;
-			f(x-(int)x<0.5?(int)x:1+(int)x,y);
-		}
-	}
+	float dx=x2-x1,dy=y2-y1;
+	float m=sqrt(dx*dx+dy*dy);
+	dx/=m,dy/=m;
+	float x=x1,y=y1;
+	for (int i=0;i<m;i++)
+		f(round(x+=dx),round(y+=dy));
 }
 int main(int argc,char **argv)
 {
