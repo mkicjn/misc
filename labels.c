@@ -9,7 +9,6 @@ typedef struct link_s {
 int main(int argc,char **argv)
 {
 	(void) argc; (void) argv;
-#define next() wp=*(ip++); goto **wp;
 
 	/* The below block would be automatically generated */
 typedef struct {link_t link; void *xt[1];} bye_t;
@@ -25,15 +24,18 @@ static add_t add_def={{0,"+",1},{&&add_code}}; (void) add_def;
 
 	static void **inc[]={&&enter_code,dolit_def.xt,(void *)1,add_def.xt,exit_def.xt};
 	static void **test[]={dolit_def.xt,(void *)2,(void *)&inc,bye_def.xt};
-	static cell_t stack[100];
-	static cell_t rstack[100];
+	cell_t stack[100];
+	cell_t rstack[100];
 
 	register void ***ip=test;
 	register void **wp=0;
 	register cell_t *sp=stack;
 	register cell_t *rp=rstack;
 	register cell_t tos=0;
-	next();
+
+next:
+	wp=*(ip++);
+	goto **wp;
 
 bye_code:
 	return tos;
@@ -41,18 +43,18 @@ bye_code:
 dolit_code:
 	*(sp++)=tos;
 	tos=(cell_t)*(ip++);
-	next();
+	goto next;
 
 enter_code:
 	*(rp++)=(cell_t)ip;
 	ip=(void ***)wp+1;
-	next();
+	goto next;
 
 exit_code:
 	ip=(void ***)*(--rp);
-	next();
+	goto next;
 
 add_code:
 	tos+=*(--sp);
-	next();
+	goto next;
 }
