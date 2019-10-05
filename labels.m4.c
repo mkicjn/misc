@@ -1,3 +1,4 @@
+// m4 -P labels.m4.c | cc -x c -
 typedef long cell_t;
 
 typedef struct link_s {
@@ -7,16 +8,19 @@ typedef struct link_s {
 } link_t;
 
 int main(int argc,char **argv)
-{ (void) argc; (void) argv;
+{
+	(void) argc; (void) argv;
 m4_dnl/*
+m4_define(`m4_prev',`0')m4_dnl
 m4_define(`m4_prim',`m4_divert(0)
 	typedef struct {link_t link; void *xt[1];} $1_t;
-	static $1_t $1_def={{0,"$2",m4_len($2)},{&&$1_code}}; (void) $1_def;m4_dnl
+	static $1_t $1_def={{m4_prev,"$2",m4_len($2)},{&&$1_code}}; (void) $1_def;m4_dnl
+m4_define(`m4_prev',&$1_def.link)m4_dnl
 m4_divert(1)m4_dnl
 $1_code:')m4_dnl*/
 m4_divert(1)
 
-	static void **inc[]={&&enter_code,dolit_def.xt,(void *)1,add_def.xt,exit_def.xt};
+	static void **inc[]={&&docol_code,dolit_def.xt,(void *)1,add_def.xt,exit_def.xt};
 	static void **test[]={dolit_def.xt,(void *)2,(void *)&inc,bye_def.xt};
 	cell_t stack[100];
 	cell_t rstack[100];
