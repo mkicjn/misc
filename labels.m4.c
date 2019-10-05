@@ -1,4 +1,5 @@
-// m4 -P labels.m4.c | cc -x c -
+#include <termios.h>
+#include <stdio.h>
 typedef long cell_t;
 
 typedef struct link_s {
@@ -6,6 +7,14 @@ typedef struct link_s {
 	char *name;
 	cell_t len;
 } link_t;
+
+void toggle_raw(void)
+{
+	struct termios t;
+	tcgetattr(fileno(stdin),&t);
+	t.c_lflag^=ICANON|ECHO;
+	tcsetattr(fileno(stdin),TCSANOW,&t);
+}
 
 int main(int argc,char **argv)
 {
@@ -21,7 +30,7 @@ $1_code:')m4_dnl*/
 m4_divert(1)
 
 	static void **inc[]={&&docol_code,dolit_def.xt,(void *)1,add_def.xt,exit_def.xt};
-	static void **test[]={dolit_def.xt,(void *)2,(void *)&inc,bye_def.xt};
+	static void **test[]={key_def.xt,emit_def.xt,dolit_def.xt,(void *)2,(void *)&inc,bye_def.xt};
 	cell_t stack[100];
 	cell_t rstack[100];
 
@@ -31,11 +40,13 @@ m4_divert(1)
 	register cell_t *rp=rstack;
 	register cell_t tos=0;
 
+	toggle_raw();
 next:
 	wp=*(ip++);
 	goto **wp;
 
 m4_prim(bye,BYE)
+	toggle_raw();
 	return tos;
 
 m4_prim(dolit,DOLIT)
@@ -50,6 +61,16 @@ m4_prim(docol,DOCOL)
 
 m4_prim(exit,EXIT)
 	ip=(void ***)*(--rp);
+	goto next;
+
+m4_prim(key,KEY)
+	*(sp++)=tos;
+	tos=getchar();
+	goto next;
+
+m4_prim(emit,EMIT)
+	putchar(tos);
+	tos=*(--sp);
 	goto next;
 
 m4_prim(add,+)
