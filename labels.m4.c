@@ -32,57 +32,60 @@ m4_divert(1)
 	static void **inc[]={&&docol_code,dolit_def.xt,(void *)1,add_def.xt,exit_def.xt};
 	static void **test[]={key_def.xt,emit_def.xt,dolit_def.xt,(void *)2,(void *)&inc,bye_def.xt};
 
-	const int STACK_SIZE=100;
-	const int RSTACK_SIZE=100;
+#define STACK_SIZE 100
+#define RSTACK_SIZE 100
 	cell_t stack[STACK_SIZE];
 	cell_t rstack[RSTACK_SIZE];
 
 	register void ***ip=test;
-	register void **wp=0;
-	register cell_t tos=0;
-#ifndef DOWNWARD_STACK
-	/* Stack grows upwards in memory */
+	register union {void **p; cell_t c;} w;
 	register cell_t *sp=stack;
 	register cell_t *rp=rstack;
-	#define PUSH(x) *(x++)
-	#define POP(x) *(--x)
-#else
-	/* Stack grows downwards in memory */
-	register cell_t *sp=&stack[STACK_SIZE];
-	register cell_t *rp=&rstack[RSTACK_SIZE];
-	#define PUSH(x) *(--x)
-	#define POP(x) *(x++)
-#endif
+	register cell_t tos=0;
+#define PUSH(x) *(x++)
+#define POP(x) *(--x)
 
 	toggle_raw();
 next:
-	wp=*(ip++);
-	goto **wp;
+	goto **(w.p=*(ip++));
 
 m4_prim(bye,BYE)
 	toggle_raw();
 	return tos;
-
 m4_prim(dolit,DOLIT)
 	PUSH(sp)=tos;
 	tos=(cell_t)*(ip++);
 	goto next;
-
 m4_prim(docol,DOCOL)
 	PUSH(rp)=(cell_t)ip;
-	ip=(void ***)wp+1;
+	ip=(void ***)w.p+1;
 	goto next;
-
 m4_prim(exit,EXIT)
 	ip=(void ***)POP(rp);
 	goto next;
 
+m4_prim(dup,DUP)
+	PUSH(sp)=tos;
+	goto next;
+m4_prim(drop,DROP)
+	tos=POP(sp);
+	goto next;
+m4_prim(swap,SWAP)
+	w.c=sp[-1];
+	sp[-1]=tos;
+	tos=w.c;
+	goto next;
+m4_prim(rot,ROT)
+	w.c=tos;
+	tos=sp[-1];
+	sp[-1]=sp[-2];
+	sp[-2]=w.c;
+	goto next;
 
 m4_prim(key,KEY)
 	PUSH(sp)=tos;
 	tos=getchar();
 	goto next;
-
 m4_prim(emit,EMIT)
 	putchar(tos);
 	tos=POP(sp);
