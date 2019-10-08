@@ -29,8 +29,8 @@ m4_divert(1)m4_dnl
 $1_code:')m4_dnl*/
 m4_divert(1)
 
-	static void **inc[]={&&docol_code,dolit_def.xt,(void *)1,add_def.xt,exit_def.xt};
-	static void **test[]={key_def.xt,emit_def.xt,dolit_def.xt,(void *)2,(void *)&inc,bye_def.xt};
+	static void **p2[]={&&docol_code,dolit_def.xt,(void *)2,add_def.xt,exit_def.xt};
+	static void **test[]={key_def.xt,emit_def.xt,dolit_def.xt,(void *)2,(void **)&p2,bye_def.xt};
 
 #define STACK_SIZE 100
 #define RSTACK_SIZE 100
@@ -91,7 +91,6 @@ m4_prim(emit,EMIT)
 	tos=POP(sp);
 	goto next;
 
-
 m4_dnl/*
 m4_define(`m4_2op',`m4_dnl
 m4_prim($1,$2)
@@ -109,6 +108,7 @@ m4_2op(lsh,LSHIFT,<<) m4_2op(rsh,RSHIFT,>>)
 m4_1op(mul2,2*,,*2) m4_1op(div2,2/,,/2)
 m4_2op(and,AND,&) m4_2op(or,OR,|) m4_2op(xor,XOR,^)
 m4_1op(not,INVERSE,~) m4_1op(neg,NEGATE,-)
+m4_1op(incr,1+,,+1) m4_1op(decr,1-,,-1)
 
 m4_2op(gt,>,>) m4_1op(gtz,0>,,>0)
 m4_2op(gte,>=,>=) m4_1op(gtez,0>=,,>=0)
