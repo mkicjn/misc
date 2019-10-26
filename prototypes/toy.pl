@@ -1,20 +1,28 @@
 #!/usr/bin/perl
 use strict;
-my @stack;
+my @sp;
 my %dict = (
 	'+' => sub {
-		my $a = pop @stack;
-		my $b = pop @stack;
-		push @stack, ($a + $b);
+		my $a = pop @sp;
+		my $b = pop @sp;
+		push @sp, $a + $b;
 	},
 	'.' => sub {
-		print(pop @stack, " ")
+		print(pop @sp, " ")
 	},
 );
 
+INTERP:
 while (<>) {
 	for (split /\s/) {
-		push @stack, $_ and next if /^-?\d+$/;
-		$dict{$_}();
+		push @sp, int $_ and next if /^-?\d+$/;
+		eval {
+			$dict{uc $_}();
+		} or do {
+			print uc $_, "?\n";
+			@sp = ();
+			next INTERP;
+		}
 	}
+	print "ok\n";
 }
