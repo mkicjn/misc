@@ -1,47 +1,102 @@
-#include <termios.h>
 #include <stdio.h>
+#include <termios.h>
 typedef long cell_t;
 
-typedef struct link_s {
-	struct link_s *prev;
+struct link {
+	struct link *prev;
 	char *name;
 	cell_t namelen;
-} link_t;
+};
 
-typedef void (*vf)();
-union wr {vf *p; cell_t c;};
-#define FTH_REGS (vf **ip, cell_t *sp, cell_t *rp, union wr w, cell_t tos)
+union workreg;
+#define FTH_REGS (void (**ip[])(), cell_t *sp, cell_t *rp, union workreg w, cell_t tos)
+union workreg {
+	void (**p) FTH_REGS;
+	cell_t c;
+};
 
-typedef struct {
-	struct link_s link;
-	vf **xt[1];
-} prim_t;
+struct primitive {
+	struct link link;
+	void (**xt[1]) FTH_REGS;
+};
 
 static inline void next FTH_REGS
 {
-	w.p=*(ip++);
-	(*w.p)(ip,sp,rp,w,tos);
+	w.p = *(ip++);
+	(*w.p)(ip, sp, rp, w, tos);
 }
 
 void bye_code FTH_REGS
 {
 	return;
 }
-prim_t bye_def={.link={.prev=NULL,.name="BYE",.namelen=3},.xt={(vf **)bye_code}};
+struct primitive bye_def = {
+	.link = {
+		.prev = (struct link *)NULL,
+		.name = "BYE",
+		.namelen = 3,
+	},
+	.xt = {(void *)bye_code},
+};
 
-int main(int argc,char **argv)
+void dolit_code FTH_REGS
 {
-	/*
-m4_prim(dolit,DOLIT)
-	PUSH(sp)=tos;
-	tos=(cell_t)*(ip++);
-	goto next;
-m4_prim(docol,DOCOL)
-	PUSH(rp)=(cell_t)ip;
-	ip=(void ***)w.p+1;
-	goto next;
-m4_prim(exit,EXIT)
-	ip=(void ***)POP(rp);
-	goto next;
-	*/
+	*(sp++) = tos;
+	tos = (cell_t)*(ip++);
+	next(ip, sp, rp, w, tos);
+}
+struct primitive dolit_def = {
+	.link = {
+		.prev = (struct link *)NULL,
+		.name = "DOLIT",
+		.namelen = 5,
+	},
+	.xt = {(void *)dolit_code},
+};
+
+void docol_code FTH_REGS
+{
+	*(rp++) = (cell_t)ip;
+	ip = (void *)(w.p + 1);
+	next(ip, sp, rp, w, tos);
+}
+struct primitive docol_def = {
+	.link = {
+		.prev = (struct link *)NULL,
+		.name = "DOCOL",
+		.namelen = 5,
+	},
+	.xt = {(void *)docol_code},
+};
+
+void exit_code FTH_REGS
+{
+	ip = (void *)*(--rp);
+	next(ip, sp, rp, w, tos);
+}
+struct primitive exit_def = {
+	.link = {
+		.prev = (struct link *)NULL,
+		.name = "EXIT",
+		.namelen = 4,
+	},
+	.xt = {(void *)exit_code},
+};
+
+void interp(void (**ip[])())
+{
+	cell_t sp[64];
+	cell_t rp[32];
+	union workreg w = {.p = NULL};
+	cell_t tos = 0;
+	next(ip, sp, rp, w, tos);
+}
+
+int main(int argc, char **argv)
+{
+	void (**p[])() = {
+		dolit_def.xt, 2, bye_def.xt,
+	};
+	interp(p);
+	return 0;
 }
