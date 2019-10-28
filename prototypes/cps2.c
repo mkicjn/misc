@@ -83,6 +83,20 @@ struct primitive exit_def = {
 	.xt = {(void *)exit_code},
 };
 
+void add_code FTH_REGS
+{
+	tos += *(--sp);
+	next(ip, sp, rp, w, tos);
+}
+struct primitive add_def = {
+	.link = {
+		.prev = (struct link *)NULL,
+		.name = "+",
+		.namelen = 1,
+	},
+	.xt = {(void *)add_code},
+};
+
 void interp(void (**ip[])())
 {
 	cell_t sp[64];
@@ -94,8 +108,8 @@ void interp(void (**ip[])())
 
 int main(int argc, char **argv)
 {
-	void (**p[])() = {
-		dolit_def.xt, 2, bye_def.xt,
+	static void (**p[])() = {
+		dolit_def.xt, 2, dolit_def.xt, 1, add_def.xt, bye_def.xt,
 	};
 	interp(p);
 	return 0;
