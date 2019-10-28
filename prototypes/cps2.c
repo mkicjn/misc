@@ -113,9 +113,20 @@ void interp(void (**ip[])())
 
 int main(int argc, char **argv)
 {
-	static void (**p[])() = {
-		dolit_def.xt, 2, dolit_def.xt, 1, add_def.xt, bye_def.xt,
+	/* Temporary */
+	typedef void (**f)();
+	static void (**inc_xt[])() = {
+		(f)docol_code, // !!
+		(f)dolit_def.xt, (f)1,
+		(f)add_def.xt,
+		(f)exit_def.xt,
 	};
+	static void (**p[])() = {
+		(f)dolit_def.xt, (f)2,
+		(f)inc_xt,
+		(f)bye_def.xt,
+	};
+	/* ********* */
 	interp(p);
 	return 0;
 }
