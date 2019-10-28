@@ -8,8 +8,13 @@ struct link {
 	cell_t namelen;
 };
 
-union workreg;
-#define FTH_REGS (void (**ip[])(), cell_t *sp, cell_t *rp, union workreg w, cell_t tos)
+#define FTH_REGS ( \
+		void (**ip[])(), \
+		cell_t *sp, \
+		cell_t *rp, \
+		union workreg w, \
+		cell_t tos \
+	)
 union workreg {
 	void (**p) FTH_REGS;
 	cell_t c;
