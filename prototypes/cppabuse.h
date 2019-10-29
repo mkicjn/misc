@@ -1,4 +1,6 @@
 #define EVAL1(...) __VA_ARGS__
+#define BL
+#define POSTPONE(x) x BL
 
 #define TESTS(INI,X,FIN) \
 	INI() \
@@ -7,8 +9,6 @@
 	X(c,3) \
 	FIN()
 
-#define BL
-#define POSTPONE(x) x BL
 #define M_INI() POSTPONE(D) (NULL,
 #define M(n,v) n,v) POSTPONE(D) (&n,
 #define M_FIN() tail,NULL)

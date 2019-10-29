@@ -31,18 +31,40 @@ static inline void next FTH_REGS
 	(*w.p)(ip, sp, rp, w, tos);
 }
 
+#define BL
+#define POSTPONE(x) x BL
+#define EVAL(...) __VA_ARGS__
+
+#define NAMES(INIT,PER_ENTRY,END) \
+	INIT() \
+	PER_ENTRY(bye, BYE) \
+	PER_ENTRY(dolit, DOLIT) \
+	PER_ENTRY(docol, DOCOL) \
+	PER_ENTRY(exit, EXIT) \
+	PER_ENTRY(add, +) \
+	END()
+
+#define NAMES_INIT() POSTPONE(DEF) (0,
+#define PER_NAME_ENTRY(c,f) c, f) POSTPONE(DEF) (&c##_def,
+#define NAMES_END() tail, "")
+#define DEF(p,c,f) \
+void c##_code FTH_REGS; \
+struct primitive c##_def = { \
+	.link = { \
+		.prev = (struct link *)p, \
+		.name = #f, \
+		.namelen = sizeof(#f), \
+	}, \
+	.xt = {(void *)c##_code}, \
+};
+void tail_code FTH_REGS {}
+
+EVAL(NAMES(NAMES_INIT,PER_NAME_ENTRY,NAMES_END))
+
 void bye_code FTH_REGS
 {
 	return;
 }
-struct primitive bye_def = {
-	.link = {
-		.prev = (struct link *)NULL,
-		.name = "BYE",
-		.namelen = 3,
-	},
-	.xt = {(void *)bye_code},
-};
 
 void dolit_code FTH_REGS
 {
@@ -50,14 +72,6 @@ void dolit_code FTH_REGS
 	tos = (cell_t)*(ip++);
 	next(ip, sp, rp, w, tos);
 }
-struct primitive dolit_def = {
-	.link = {
-		.prev = (struct link *)NULL,
-		.name = "DOLIT",
-		.namelen = 5,
-	},
-	.xt = {(void *)dolit_code},
-};
 
 void docol_code FTH_REGS
 {
@@ -65,42 +79,18 @@ void docol_code FTH_REGS
 	ip = (void *)(w.p + 1);
 	next(ip, sp, rp, w, tos);
 }
-struct primitive docol_def = {
-	.link = {
-		.prev = (struct link *)NULL,
-		.name = "DOCOL",
-		.namelen = 5,
-	},
-	.xt = {(void *)docol_code},
-};
 
 void exit_code FTH_REGS
 {
 	ip = (void *)*(--rp);
 	next(ip, sp, rp, w, tos);
 }
-struct primitive exit_def = {
-	.link = {
-		.prev = (struct link *)NULL,
-		.name = "EXIT",
-		.namelen = 4,
-	},
-	.xt = {(void *)exit_code},
-};
 
 void add_code FTH_REGS
 {
 	tos += *(--sp);
 	next(ip, sp, rp, w, tos);
 }
-struct primitive add_def = {
-	.link = {
-		.prev = (struct link *)NULL,
-		.name = "+",
-		.namelen = 1,
-	},
-	.xt = {(void *)add_code},
-};
 
 void interp(void (**ip[])())
 {
