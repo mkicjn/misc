@@ -35,15 +35,6 @@ static inline void next FTH_REGS
 #define POSTPONE(x) x BL
 #define EVAL(...) __VA_ARGS__
 
-#define NAMES(INIT,PER_ENTRY,END) \
-	INIT() \
-	PER_ENTRY(bye, BYE) \
-	PER_ENTRY(dolit, DOLIT) \
-	PER_ENTRY(docol, DOCOL) \
-	PER_ENTRY(exit, EXIT) \
-	PER_ENTRY(add, +) \
-	END()
-
 #define NAMES_INIT() POSTPONE(DEF) (0,
 #define PER_NAME_ENTRY(c,f) c, f) POSTPONE(DEF) (&c##_def,
 #define NAMES_END() tail, "")
@@ -59,7 +50,17 @@ struct primitive c##_def = { \
 };
 void tail_code FTH_REGS {}
 
-EVAL(NAMES(NAMES_INIT,PER_NAME_ENTRY,NAMES_END))
+#define NAMES(INIT,PER_ENTRY,END) \
+	INIT() \
+	PER_ENTRY(bye, BYE) \
+	PER_ENTRY(dolit, DOLIT) \
+	PER_ENTRY(docol, DOCOL) \
+	PER_ENTRY(exit, EXIT) \
+	PER_ENTRY(add, +) \
+	PER_ENTRY(sub, -) \
+	PER_ENTRY(mul, *) \
+	PER_ENTRY(div, /) \
+	END()
 
 void bye_code FTH_REGS
 {
@@ -86,11 +87,13 @@ void exit_code FTH_REGS
 	next(ip, sp, rp, w, tos);
 }
 
-void add_code FTH_REGS
-{
-	tos += *(--sp);
-	next(ip, sp, rp, w, tos);
-}
+#define ARITH2(c,op) \
+void c##_code FTH_REGS \
+{ tos op##= *(--sp); next(ip, sp, rp, w, tos); }
+ARITH2(add, +)
+ARITH2(sub, -)
+ARITH2(mul, *)
+ARITH2(div, /)
 
 void interp(void (**ip[])())
 {
@@ -100,6 +103,8 @@ void interp(void (**ip[])())
 	cell_t tos = 0;
 	next(ip, sp, rp, w, tos);
 }
+
+EVAL(NAMES(NAMES_INIT,PER_NAME_ENTRY,NAMES_END))
 
 int main(int argc, char **argv)
 {
