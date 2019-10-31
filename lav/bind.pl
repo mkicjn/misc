@@ -3,13 +3,13 @@ use strict;
 my $prev = "NULL";
 my %dict;
 for (<>) {
-	if (m{//: (.*?) \( (.*?) \)}) {
+	if (m{/\* : (.*?) => (.*?) \*/}) {
 	print <<"EOT";
 static struct primitive $2_def = {
 	.link = {
 		.prev = (struct link *)$prev,
-		.name = \"$1\",
-		.namelen = sizeof(\"$1\"),
+		.name = "$1",
+		.namelen = @{[length $1]},
 	},
 	.cfa = &&$2_code,
 };

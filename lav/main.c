@@ -9,25 +9,25 @@ struct primitive *engine(FTH_REGS)
 next:
 	goto **(w.p = *(ip++));
 
-docol_code: //: DOCOL ( docol )
+docol_code: /* : DOCOL => docol */
 	PUSH(rp) = (cell_t)ip;
 	ip = (void ***)w.p + 1;
 	goto next;
-exit_code: //: EXIT ( exit )
+exit_code: /* : EXIT => exit */
 	ip = (void ***)POP(rp);
 	goto next;
-dolit_code: //: DOLIT ( dolit )
+dolit_code: /* : DOLIT => dolit */
 	PUSH(sp) = tos;
 	tos = (cell_t) * (ip++);
 	goto next;
 
 #define OP2(op) tos = POP(sp) op tos; goto next;
-add_code: OP2(+) //: + ( add )
-sub_code: OP2(-) //: - ( sub )
-mul_code: OP2(*) //: * ( mul )
-div_code: OP2(/) //: / ( div )
+add_code: OP2(+) /* : + => add */
+sub_code: OP2(-) /* : - => sub */
+mul_code: OP2(*) /* : * => mul */
+div_code: OP2(/) /* : / => div */
 
-bye_code: //: BYE ( bye )
+bye_code: /* : BYE => bye */
 	return NULL;
 }
 

@@ -1,4 +1,4 @@
-CFLAGS = -Os -g
+CFLAGS = -ansi -Os -g
 WORD_LOCS = main.c
 
 a.out: main.c fthdef.h dict.c
