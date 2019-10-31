@@ -1,11 +1,8 @@
 CFLAGS = -Os -g
 WORD_LOCS = cps.c
 
-cps: cps.c fthdef.h dict.h
-	$(CC) $(CFLAGS) $< > $@
-
-lav: lav.c fthdef.h dict.h
-	$(CC) $(CFLAGS) $< > $@
+a.out: cps.c fthdef.h dict.h
+	$(CC) $(CFLAGS) $< -o $@
 
 dict.h: bind.pl $(WORD_LOCS)
 	./$< $^ > $@
@@ -14,6 +11,6 @@ dict.h: bind.pl $(WORD_LOCS)
 clean:
 	rm -f dict.h
 cleaner: clean
-	rm -f cps lav
+	rm -f cps
 cleanest: cleaner
 	rm -f .*~ *~

@@ -3,9 +3,6 @@
 
 int main(int argc, char **argv)
 {
-	(void)argc;
-	(void)argv;
-
 	static void **inc[] = {
 		&&docol_code,
 		dolit_def.xt, (void *)1,
@@ -13,7 +10,7 @@ int main(int argc, char **argv)
 	};
 	static void **test[] = {
 		dolit_def.xt, (void *)2,
-		(void **)&p2,
+		(void **)&inc,
 		bye_def.xt
 	};
 
@@ -25,6 +22,8 @@ int main(int argc, char **argv)
 	register cell_t *sp = stack;
 	register cell_t *rp = rstack;
 	register cell_t tos = 0;
+
+	// TODO: Generate dictionary entries, #include somewhere
 
 next:
 	goto **(w.p = *(ip++));
