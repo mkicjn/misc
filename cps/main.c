@@ -28,13 +28,13 @@ void exit_code(FTH_REGS)
 	next(ip, sp, rp, w, tos);
 }
 
-#define ARITH2(c,op) \
+#define OP2(c,op) \
 void c##_code(FTH_REGS) \
-{ tos op##= POP(sp); next(ip, sp, rp, w, tos); }
-ARITH2(add, +) //: + ( add )
-ARITH2(sub, -) //: - ( sub )
-ARITH2(mul, *) //: * ( mul )
-ARITH2(div, /) //: / ( div )
+{ tos = POP(sp) op tos; next(ip, sp, rp, w, tos); }
+OP2(add, +) //: + ( add )
+OP2(sub, -) //: - ( sub )
+OP2(mul, *) //: * ( mul )
+OP2(div, /) //: / ( div )
 
 void interp(void (**ip[])())
 {

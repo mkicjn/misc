@@ -45,9 +45,10 @@ exit_code: //: EXIT ( exit )
 	ip = (void ***)POP(rp);
 	goto next;
 
-#define OP2(op) tos op##= POP(sp); goto next;
+#define OP2(op) tos = POP(sp) op tos; goto next;
 add_code: OP2(+) //: + ( add )
 sub_code: OP2(-) //: - ( sub )
 mul_code: OP2(*) //: * ( mul )
 div_code: OP2(/) //: / ( div )
+
 }
