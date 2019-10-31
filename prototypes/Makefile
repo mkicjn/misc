@@ -11,6 +11,6 @@ dict.h: bind.pl $(WORD_LOCS)
 clean:
 	rm -f dict.h
 cleaner: clean
-	rm -f cps
+	rm -f a.out
 cleanest: cleaner
 	rm -f .*~ *~
