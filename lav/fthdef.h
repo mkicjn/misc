@@ -24,14 +24,24 @@ struct link {
 	cell_t namelen;
 };
 
+#define FTH_REGS \
+	void **ip[], \
+	cell_t *sp, \
+	cell_t *rp, \
+	union workreg w, \
+	cell_t tos
+
 union workreg {
 	void **p;
 	cell_t c;
 };
 
+const union workreg w0 = {.p = NULL};
+
 struct primitive {
 	struct link link;
-	void **xt[1];
+	void *cfa;
+	void **xt[];
 };
 
 #define PUSH(x) *(x++)
