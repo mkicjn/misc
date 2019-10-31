@@ -1,7 +1,7 @@
 CFLAGS = -Os -g
-WORD_LOCS = cps.c
+WORD_LOCS = main.c
 
-a.out: cps.c fthdef.h dict.h
+a.out: main.c fthdef.h dict.h
 	$(CC) $(CFLAGS) $< -o $@
 
 dict.h: bind.pl $(WORD_LOCS)

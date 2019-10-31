@@ -3,27 +3,29 @@
 
 int main(int argc, char **argv)
 {
+#include "dict.h"
+	/* Temporary */
+	typedef void **f;
 	static void **inc[] = {
-		&&docol_code,
-		dolit_def.xt, (void *)1,
-		add_def.xt, exit_def.xt
+		(f)&&docol_code,
+		(f)dolit_def.xt, (f)1,
+		(f)add_def.xt, (f)exit_def.xt
 	};
 	static void **test[] = {
-		dolit_def.xt, (void *)2,
-		(void **)&inc,
-		bye_def.xt
+		(f)dolit_def.xt, (f)2,
+		(f)&inc,
+		(f)bye_def.xt
 	};
+	/* ********* */
 
 	cell_t stack[64];
 	cell_t rstack[32];
 
-	register void ***ip = test;
+	register void ***ip = test; // = ??
 	register union workreg w = {.p = NULL};
 	register cell_t *sp = stack;
 	register cell_t *rp = rstack;
 	register cell_t tos = 0;
-
-	// TODO: Generate dictionary entries, #include somewhere
 
 next:
 	goto **(w.p = *(ip++));
