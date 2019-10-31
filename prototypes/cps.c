@@ -3,45 +3,45 @@
 
 #include "dict.h"
 
-void bye_code FTH_REGS
-{ // : BYE ( bye )
+void bye_code(FTH_REGS)
+{ //: BYE ( bye )
 	return;
 }
 
-void dolit_code FTH_REGS
-{ // : DOLIT ( dolit )
-	*(sp++) = tos;
+void dolit_code(FTH_REGS)
+{ //: DOLIT ( dolit )
+	PUSH(sp) = tos;
 	tos = (cell_t)*(ip++);
 	next(ip, sp, rp, w, tos);
 }
 
-void docol_code FTH_REGS
-{ // : DOCOL ( docol )
-	*(rp++) = (cell_t)ip;
+void docol_code(FTH_REGS)
+{ //: DOCOL ( docol )
+	PUSH(rp) = (cell_t)ip;
 	ip = (void *)(w.p + 1);
 	next(ip, sp, rp, w, tos);
 }
 
-void exit_code FTH_REGS
-{ // : EXIT ( exit )
-	ip = (void *)*(--rp);
+void exit_code(FTH_REGS)
+{ //: EXIT ( exit )
+	ip = (void *)POP(rp);
 	next(ip, sp, rp, w, tos);
 }
 
 #define ARITH2(c,op) \
-void c##_code FTH_REGS \
-{ tos op##= *(--sp); next(ip, sp, rp, w, tos); }
-ARITH2(add, +) // : + ( add )
-ARITH2(sub, -) // : - ( sub )
-ARITH2(mul, *) // : * ( mul )
-ARITH2(div, /) // : / ( div )
+void c##_code(FTH_REGS) \
+{ tos op##= POP(sp); next(ip, sp, rp, w, tos); }
+ARITH2(add, +) //: + ( add )
+ARITH2(sub, -) //: - ( sub )
+ARITH2(mul, *) //: * ( mul )
+ARITH2(div, /) //: / ( div )
 
 void interp(void (**ip[])())
 {
 	cell_t sp[64];
 	cell_t rp[32];
-	union workreg w = {.p = NULL};
-	cell_t tos = 0;
+	register union workreg w = {.p = NULL};
+	register cell_t tos = 0;
 	next(ip, sp, rp, w, tos);
 }
 

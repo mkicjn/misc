@@ -1,8 +1,8 @@
 #!/usr/bin/perl -n
 BEGIN {$prev = "NULL"}
-if (m{// : (.*?) \( (.*?) \)}) {
+if (m{//: (.*?) \( (.*?) \)}) {
 	print "\
-void $2_code FTH_REGS;
+void $2_code(FTH_REGS);
 static struct primitive $2_def = {
 	.link = {
 		.prev = (struct link *)$prev,

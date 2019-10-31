@@ -1,16 +1,19 @@
-CFLAGS=-Os -g
-DICT_LOCS=cps2.c
+CFLAGS = -Os -g
+WORD_LOCS = cps.c
 
-a.out: cps2.c fthdef.h dict.h
-	$(CC) $(CFLAGS) $<
+cps: cps.c fthdef.h dict.h
+	$(CC) $(CFLAGS) $< > $@
 
-dict.h: bind.pl $(DICT_LOCS)
+lav: lav.c fthdef.h dict.h
+	$(CC) $(CFLAGS) $< > $@
+
+dict.h: bind.pl $(WORD_LOCS)
 	./$< $^ > $@
 
 .PHONY: clean cleaner cleanest
 clean:
 	rm -f dict.h
 cleaner: clean
-	rm -f a.out
+	rm -f cps lav
 cleanest: cleaner
 	rm -f .*~ *~

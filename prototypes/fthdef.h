@@ -24,26 +24,29 @@ struct link {
 	cell_t namelen;
 };
 
-#define FTH_REGS ( \
-		void (**ip[])(), \
-		cell_t *sp, \
-		cell_t *rp, \
-		union workreg w, \
-		cell_t tos \
-	)
+#define FTH_REGS \
+	void (**ip[])(), \
+	cell_t *sp, \
+	cell_t *rp, \
+	union workreg w, \
+	cell_t tos
+
 union workreg {
-	void (**p) FTH_REGS;
+	void (**p)(FTH_REGS);
 	cell_t c;
 };
 
 struct primitive {
 	struct link link;
-	void (**xt[1]) FTH_REGS;
+	void (**xt[1])(FTH_REGS);
 };
 
-static inline void next FTH_REGS
+static inline void next(FTH_REGS)
 {
 	w.p = *(ip++);
 	(*w.p)(ip, sp, rp, w, tos);
 }
+
+#define PUSH(x) *(x++)
+#define POP(x) *(--x)
 #endif
