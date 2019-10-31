@@ -24,13 +24,6 @@ struct link {
 	cell_t namelen;
 };
 
-#define FTH_REGS \
-	void **ip[], \
-	cell_t *sp, \
-	cell_t *rp, \
-	union workreg w, \
-	cell_t tos
-
 union workreg {
 	void **p;
 	cell_t c;
