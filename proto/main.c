@@ -58,33 +58,33 @@ unrot_code: /* : -ROT => unrot */
 	tos = w.c;
 	goto next;
 
-#define OP2(op,...) tos = __VA_ARGS__(POP(sp) op tos); goto next;
-add_code: OP2(+) /* : + => add */
-sub_code: OP2(-) /* : - => sub */
-mul_code: OP2(*) /* : * => mul */
-div_code: OP2(/) /* : / => div */
-lsh_code: OP2(<<) /* : LSHIFT => lsh */
-rsh_code: OP2(>>) /* : RSHIFT => rsh */
+#define OP2(a,b) tos = b(POP(sp) a tos); goto next;
+add_code: OP2(+,) /* : + => add */
+sub_code: OP2(-,) /* : - => sub */
+mul_code: OP2(*,) /* : * => mul */
+div_code: OP2(/,) /* : / => div */
+lsh_code: OP2(<<,) /* : LSHIFT => lsh */
+rsh_code: OP2(>>,) /* : RSHIFT => rsh */
 
-gt_code: OP2(>, -) /* : > => gt */
-gte_code: OP2(>=, -) /* : >= => gte */
-lt_code: OP2(<, -) /* : < => lt */
-lte_code: OP2(<=, -) /* : <= => lte */
-eq_code: OP2(==, -) /* : = => eq */
-neq_code: OP2(!=, -) /* : <> => neq */
+gt_code: OP2(>,-) /* : > => gt */
+gte_code: OP2(>=,-) /* : >= => gte */
+lt_code: OP2(<,-) /* : < => lt */
+lte_code: OP2(<=,-) /* : <= => lte */
+eq_code: OP2(==,-) /* : = => eq */
+neq_code: OP2(!=,-) /* : <> => neq */
 
-#define OP1(op,...) tos = op(tos __VA_ARGS__); goto next;
-neg_code: OP1(-) /* : NEGATE => neg */
-not_code: OP1(~) /* : INVERT => not */
-lsh1_code: OP1(, << 1) /* : 2* => lsh1 */
-rsh1_code: OP1(, >> 1) /* : 2/ => rsh1 */
+#define OP1(a,b) tos = a(tos b); goto next;
+neg_code: OP1(-,) /* : NEGATE => neg */
+not_code: OP1(~,) /* : INVERT => not */
+lsh1_code: OP1(,<<1) /* : 2* => lsh1 */
+rsh1_code: OP1(,>>1) /* : 2/ => rsh1 */
 
-gtz_code: OP1(-, > 0) /* : 0> => gtz */
-gtez_code: OP1(-, >= 0) /* : 0>= => gtez */
-ltz_code: OP1(-, < 0) /* : 0< => ltz */
-ltez_code: OP1(-, <= 0) /* : 0<= => ltez */
-eqz_code: OP1(-, == 0) /* : 0= => eqz */
-neqz_code: OP1(-, != 0) /* : 0<> => neqz */
+gtz_code: OP1(-,>0) /* : 0> => gtz */
+gtez_code: OP1(-,>=0) /* : 0>= => gtez */
+ltz_code: OP1(-,<0) /* : 0< => ltz */
+ltez_code: OP1(-,<=0) /* : 0<= => ltez */
+eqz_code: OP1(-,==0) /* : 0= => eqz */
+neqz_code: OP1(-,!=0) /* : 0<> => neqz */
 
 bye_code: /* : BYE => bye */
 	return NULL;
