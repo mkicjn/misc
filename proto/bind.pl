@@ -1,21 +1,22 @@
 #!/usr/bin/perl
 use strict;
-my $prev = "NULL";
+my $last="NULL";
 my %dict;
-for (<>) {
-	if (m{/\* : (.*?) => (.*?) \*/}) {
+my @lines=(<>);
+m{: ([^ ]*) \( ([^ ]*) \)} and $dict{$1}="&$2_def.xt" for @lines;
+for (@lines) {
+	if (m{//: ([^ ]*) \( ([^ ]*) \)}) {
 	print <<"EOT";
 static struct primitive $2_def = {
 	.link = {
-		.prev = (struct link *)$prev,
+		.prev = (struct link *)$last,
 		.name = "$1",
 		.namelen = @{[length $1]},
 	},
 	.cfa = &&$2_code,
 };
 EOT
-		$prev = "&$2_def";
-		$dict{$1} = "&$2_def.xt";
+		$last="&$2_def";
 	}
 }
-print "static struct primitive *latest=$prev;";
+print "static struct primitive *latest=$last;";
