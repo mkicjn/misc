@@ -50,17 +50,31 @@ sub interp ($) {
 	}
 }
 
-$ct{'DOCOL'}="docol"; #TODO: Remove
-$ct{'EXIT'}="exit"; #TODO: Remove
-
 my @lines=(<>);
 /: (\S+) \( (\S+) \)/ and $ct{$1}="$2" for @lines;
 &interp for @lines;
 
+my $fh;
+open($fh,'>','primdecs.c') or die;
 for (sort keys %defs) {
-	printf("Definition of $_: ");
-	for (@{$defs{$_}}) {
-		print $_,' ';
-	}
-	print "\n";
+	print $fh "static struct primitive $ct{$_}_def;\n"
 }
+close $fh;
+
+open($fh,'>','primdefs.c') or die;
+my $last="NULL";
+for (sort keys %defs) {
+	print $fh <<"EOT";
+$ct{$_}_def = (struct primitive){
+	.link = {
+		.prev = $last,
+		.name = \"$_\",
+		.namelen = @{[length]},
+	},
+	.cfa = &&@{[shift @{$defs{$_}}]},
+	.xt = {@{[join ', ',@{$defs{$_}}]}},
+};
+EOT
+	$last="&$ct{$_}_def.link";
+}
+close $fh;
