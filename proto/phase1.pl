@@ -55,25 +55,26 @@ my @lines=(<>);
 &interp for @lines;
 
 my $fh;
-open($fh,'>','primdecs.c') or die;
-print $fh "static struct primitive *latest;\n";
+open($fh,'>','cfas.c') or die;
+print $fh "static void **cfas[] = {\n";
 for (sort keys %defs) {
-	print $fh "static struct primitive $ct{$_}_def;\n"
+	print $fh "@{[shift @{$defs{$_}}]},\n"
 }
+print $fh "};";
 close $fh;
 
-open($fh,'>','primdefs.c') or die;
+open($fh,'>','dict.c') or die;
 my $last="NULL";
-for (sort keys %defs) {
+for (reverse sort keys %defs) {
 	print $fh <<"EOT";
-$ct{$_}_def = (struct primitive){
+static struct primitive $ct{$_}_def = {
 	.link = {
 		.prev = $last,
 		.name = \"$_\",
 		.namelen = @{[length]},
 	},
-	.cfa = &&@{[shift @{$defs{$_}}]},
-	//.xt = {@{[join ', ',@{$defs{$_}}]}},
+	.cfa = NULL;
+	.xt = {@{[join ', ',@{$defs{$_}}]}},
 };
 EOT
 	$last="&$ct{$_}_def.link";

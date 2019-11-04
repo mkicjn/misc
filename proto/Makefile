@@ -9,7 +9,7 @@ dict.c: bind.pl $(WORD_LOCS)
 
 .PHONY: clean cleaner cleanest
 clean:
-	rm -f dict.c
+	rm -f dict.c cfas.c
 cleaner: clean
 	rm -f a.out
 cleanest: cleaner
