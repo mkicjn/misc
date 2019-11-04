@@ -43,13 +43,9 @@ sub interp ($) {
 		my $word=shift @line;
 		#print "$word\n"; next;
 		if ($imm{$word}) {
-			print "Executing Perl definition of '$word'\n";
 			$imm{$word}();
 		} elsif ($state && $ct{$word}) {
-			print "Compiling word '$word' using C token '$ct{$word}'\n";
 			comma("&$ct{$word}_def.xt");
-		} else {
-			print "Ignoring $word\n"
 		}
 	}
 }
@@ -61,8 +57,7 @@ my @lines=(<>);
 /: (\S+) \( (\S+) \)/ and $ct{$1}="$2" for @lines;
 &interp for @lines;
 
-print "Done\n";
-for (keys %defs) {
+for (sort keys %defs) {
 	printf("Definition of $_: ");
 	for (@{$defs{$_}}) {
 		print $_,' ';
