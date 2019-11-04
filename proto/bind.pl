@@ -5,7 +5,7 @@ my %dict;
 my @lines=(<>);
 m{: ([^ ]*) \( ([^ ]*) \)} and $dict{$1}="&$2_def.xt" for @lines;
 for (@lines) {
-	if (m{//: ([^ ]*) \( ([^ ]*) \)}) {
+	if (m{/\*: ([^ ]*) \( ([^ ]*) \) ;\*/}) {
 	print <<"EOT";
 static struct primitive $2_def = {
 	.link = {

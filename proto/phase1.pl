@@ -14,10 +14,9 @@ sub comma ($) {
 }
 
 my %imm = (
-	'C:' => sub {
+	'/*:' => sub {
 		$state=shift @line;
 		$defs{$state}=["$ct{$state}_code"];
-		@line=();
 	},
 	':' => sub {
 		$state=shift @line;
@@ -25,6 +24,9 @@ my %imm = (
 	},
 	';' => sub {
 		comma("&$ct{'EXIT'}_def.xt");
+		undef $state;
+	},
+	';*/' => sub {
 		undef $state;
 	},
 	'(' => sub {
@@ -43,11 +45,11 @@ sub interp ($) {
 		if ($imm{$word}) {
 			print "Executing Perl definition of '$word'\n";
 			$imm{$word}();
-		} elsif ($ct{$word}) {
+		} elsif ($state && $ct{$word}) {
 			print "Compiling word '$word' using C token '$ct{$word}'\n";
 			comma("&$ct{$word}_def.xt");
 		} else {
-			die "$word?\n"
+			print "Ignoring $word\n"
 		}
 	}
 }
