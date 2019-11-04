@@ -56,6 +56,7 @@ my @lines=(<>);
 
 my $fh;
 open($fh,'>','primdecs.c') or die;
+print $fh "static struct primitive *latest;\n";
 for (sort keys %defs) {
 	print $fh "static struct primitive $ct{$_}_def;\n"
 }
@@ -72,9 +73,10 @@ $ct{$_}_def = (struct primitive){
 		.namelen = @{[length]},
 	},
 	.cfa = &&@{[shift @{$defs{$_}}]},
-	.xt = {@{[join ', ',@{$defs{$_}}]}},
+	//.xt = {@{[join ', ',@{$defs{$_}}]}},
 };
 EOT
 	$last="&$ct{$_}_def.link";
 }
+print $fh "latest = (struct primitive *)$last;\n";
 close $fh;
