@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include "fthdef.h"
 
@@ -7,13 +8,26 @@
 #define ASMLABEL(x)
 #endif
 
-struct primitive *engine(FTH_REGS)
-{
 #include "dict.c"
-	if (!ip)
-		return latest;
+#define LEN(x) (sizeof(x) / sizeof(x[0]))
+
+void engine(FTH_REGS)
+{
+	#include "cfas.c"
+	if (!ip) {
+		struct primitive *d = latest;
+		for (int i = 0; i < LEN(cfas); i++) {
+			d->cfa = cfas[i];
+			d = (struct primitive *)d->link.prev;
+		}
+		return;
+	}
+
 next: ASMLABEL(next);
 	goto **(w.p = *(ip++));
+
+bye_code: ASMLABEL(bye_code); /*: BYE ( bye ) ;*/
+	return;
 
 docol_code: ASMLABEL(docol_code); /*: DOCOL ( docol ) ;*/
 	PUSH(rp) = (cell_t)ip;
@@ -98,8 +112,6 @@ OP1(ltez,-,<=0) /*: 0<= ( ltez ) ;*/
 OP1(eqz,-,==0) /*: 0= ( eqz ) ;*/
 OP1(neqz,-,!=0) /*: 0<> ( neqz ) ;*/
 
-bye_code: ASMLABEL(bye_code); /*: BYE ( bye ) ;*/
-	return NULL;
 }
 
 void execute(void **xt,cell_t *sp,cell_t *rp)
@@ -125,7 +137,7 @@ void interp(void **xt)
 
 int main(int argc, char **argv)
 {
-	void **xt = &engine(NULL, NULL, NULL, w0, 0)->cfa;
-	interp(xt);
+	engine(NULL, NULL, NULL, w0, 0);
+	interp(&bye_def.cfa);
 	return 0;
 }

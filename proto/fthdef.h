@@ -41,7 +41,7 @@ const union workreg w0 = {.p = NULL};
 struct primitive {
 	struct link link;
 	void *cfa;
-	void **xt[];
+	void **data[];
 };
 
 #define PUSH(x) *(x++)

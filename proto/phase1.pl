@@ -23,7 +23,7 @@ my %imm = (
 		$defs{$state}=["$ct{'DOCOL'}_code"];
 	},
 	';' => sub {
-		comma("&$ct{'EXIT'}_def.xt");
+		comma("&$ct{'EXIT'}_def.data");
 		undef $state;
 	},
 	';*/' => sub {
@@ -41,11 +41,10 @@ sub interp ($) {
 	@line=split ' ',$_;
 	while (@line) {
 		my $word=shift @line;
-		#print "$word\n"; next;
 		if ($imm{$word}) {
 			$imm{$word}();
 		} elsif ($state && $ct{$word}) {
-			comma("&$ct{$word}_def.xt");
+			comma("&$ct{$word}_def.cfa");
 		}
 	}
 }
@@ -58,26 +57,27 @@ my $fh;
 open($fh,'>','cfas.c') or die;
 print $fh "static void **cfas[] = {\n";
 for (sort keys %defs) {
-	print $fh "@{[shift @{$defs{$_}}]},\n"
+	print $fh "\t&&@{[shift @{$defs{$_}}]},\n"
 }
 print $fh "};";
 close $fh;
 
 open($fh,'>','dict.c') or die;
-my $last="NULL";
+my $last;
+print $fh "static struct primitive $ct{$_}_def;\n" for keys %defs;
+print $fh "\n";
 for (reverse sort keys %defs) {
 	print $fh <<"EOT";
 static struct primitive $ct{$_}_def = {
 	.link = {
-		.prev = $last,
+		.prev = @{[$last?"&${last}.link":"NULL"]},
 		.name = \"$_\",
 		.namelen = @{[length]},
 	},
-	.cfa = NULL;
-	.xt = {@{[join ', ',@{$defs{$_}}]}},
+	.data = {@{[join ', ',@{$defs{$_}}]}},
 };
 EOT
-	$last="&$ct{$_}_def.link";
+	$last="$ct{$_}_def";
 }
-print $fh "latest = (struct primitive *)$last;\n";
+print $fh "static struct primitive *latest = &$last;\n";
 close $fh;
