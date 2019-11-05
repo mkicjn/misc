@@ -23,7 +23,7 @@ my %imm = (
 		$defs{$state}=["$ct{'DOCOL'}_code"];
 	},
 	';' => sub {
-		comma("&$ct{'EXIT'}_def.data");
+		comma("&$ct{'EXIT'}_def.cfa");
 		undef $state;
 	},
 	';*/' => sub {
@@ -32,7 +32,15 @@ my %imm = (
 	'(' => sub {
 		while (@line && shift @line ne ')') {}
 	},
-	')' => sub {},
+	')' => sub {
+	},
+	'POSTPONE' => sub {
+		comma("&$ct{shift @line}_def.cfa");
+	},
+	'[\']' => sub {
+		comma("&$ct{'DOLIT'}_def.cfa");
+		comma("&$ct{shift @line}_def.cfa");
+	},
 	#TODO Other immediates
 );
 
@@ -43,6 +51,9 @@ sub interp ($) {
 		my $word=shift @line;
 		if ($imm{$word}) {
 			$imm{$word}();
+		} elsif ($word=~/^-?\d+$/) {
+			comma("&$ct{'DOLIT'}_def.cfa");
+			comma("(void **)$word");
 		} elsif ($state && $ct{$word}) {
 			comma("&$ct{$word}_def.cfa");
 		}
@@ -57,7 +68,7 @@ my $fh;
 open($fh,'>','cfas.c') or die;
 print $fh "static void *cfas[] = {\n";
 for (sort keys %defs) {
-	print $fh "\t&&@{[shift @{$defs{$_}}]},\n"
+	print $fh "\t&&@{$defs{$_}}[0],\n"
 }
 print $fh "};";
 close $fh;
@@ -74,6 +85,7 @@ static struct primitive $ct{$_}_def = {
 		.name = \"$_\",
 		.namelen = @{[length]},
 	},
+	// .cfa = &&@{[shift @{$defs{$_}}]},
 	.data = {@{[join ', ',@{$defs{$_}}]}},
 };
 EOT

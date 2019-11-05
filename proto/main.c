@@ -1,4 +1,3 @@
-#include <stdbool.h>
 #include <stddef.h>
 #include "fthdef.h"
 
@@ -8,15 +7,16 @@
 #define ASMLABEL(x)
 #endif
 
+#define countof(a) (sizeof(a) / sizeof(a[0]))
+
 #include "dict.c"
-#define LEN(x) (sizeof(x) / sizeof(x[0]))
 
 void engine(FTH_REGS)
 {
 	#include "cfas.c"
 	if (!ip) {
 		struct primitive *d = latest;
-		for (int i = 0; i < LEN(cfas); i++) {
+		for (size_t i = 0; i < countof(cfas); i++) {
 			d->cfa = cfas[i];
 			d = (struct primitive *)d->link.prev;
 		}
@@ -64,7 +64,7 @@ over_code: ASMLABEL(over_code); /*: OVER ( over ) ;*/
 	tos = sp[-2];
 	goto next;
 nip_code: ASMLABEL(nip_code); /*: NIP ( nip ) ;*/
-	POP(sp);
+	(void)POP(sp);
 	goto next;
 tuck_code: ASMLABEL(tuck_code); /*: TUCK ( tuck ) ;*/
 	w.c = sp[-1];
@@ -137,6 +137,8 @@ void interp(void **xt)
 
 int main(int argc, char **argv)
 {
+	(void)argc;
+	(void)argv;
 	engine(NULL, NULL, NULL, w0, 0);
 	interp(&bye_def.cfa);
 	return 0;
