@@ -55,7 +55,7 @@ my @lines=(<>);
 
 my $fh;
 open($fh,'>','cfas.c') or die;
-print $fh "static void **cfas[] = {\n";
+print $fh "static void *cfas[] = {\n";
 for (sort keys %defs) {
 	print $fh "\t&&@{[shift @{$defs{$_}}]},\n"
 }
