@@ -13,7 +13,7 @@ while {![eof stdin]} {
 		if {[info exists prim($word)]} {
 			apply $prim($word)
 		} else {
-			push $word
+			push stack $word
 		}
 	}
 }
