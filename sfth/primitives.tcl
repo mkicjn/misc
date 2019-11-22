@@ -1,6 +1,5 @@
 proc push {value} {
-	global stack
-	lappend stack $value
+	lappend ::stack $value
 }
 
 proc pop {} {
@@ -17,30 +16,42 @@ proc bind {args} {
 	}
 }
 
-proc prim {name body} {
-	# Create a prim with a given name and body
-	uplevel "set prim($name) {{} {global stack; $body}}"
+proc prim {cname name body} {
+	# Create a primitive with a given name and body
+	set ::prim($name) "{} {$body}"
+	set ::ct($name) $cname
+	set ::cfa($name) "&&${cname}_code"
+	set ::data($name) [list]
 }
 
 proc op2 {op {pre {}}} {
-	# Create a prim body representing a binary operator
-	return "bind a b; push \[expr {${pre}(\$a $op \$b)}]"
+	# Create a primitive body representing a binary operator
+	return "bind a b; push \[expr {${pre}(\$a$op\$b)}]"
 }
-
-prim + [op2 +]
-prim - [op2 -]
-prim * [op2 *]
-prim LSHIFT [op2 <<]
-prim RSHIFT [op2 >>]
-prim << [op2 -]
-prim >> [op2 -]
-prim /MOD {
+prim add + [op2 +]
+prim sub - [op2 -]
+prim mul * [op2 *]
+prim div / [op2 /]
+prim mod % [op2 %]
+prim shl LSHIFT [op2 <<]
+prim shr RSHIFT [op2 >>]
+prim lt < [op2 < -]
+prim gt > [op2 > -]
+prim eq = [op2 = -]
+prim divmod /MOD {
 	bind a b
-	push [expr {$a % $b}]
-	push [expr {$a / $b}]
+	push [expr {$a%$b}]
+	push [expr {$a/$b}]
 }
 
-prim . {
+proc op1 {pre {post {}}} {
+	# Create a primitive body representing a unary operator
+	return "bind a; push \[expr {${pre}(\$a$post)}]"
+}
+prim not INVERT [op1 ~]
+prim neg NEGATE [op1 -]
+
+prim dot . {
 	bind a
 	puts $a
 }
