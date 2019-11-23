@@ -2,18 +2,29 @@
 
 source primitives.tcl
 
-set stack [list]
-set line {}
+proc : {name args} {
+	set ::colon($name) $args
+}
 
-while {![eof stdin]} {
-	set line [split [gets stdin]]
-	while {[llength $line]} {
-		set line [lassign $line word]
-		if {$word eq ""} continue
+: 1+ 1 + ;
+: test 2 1+ . ;
+
+proc docol {body} {
+	global prim colon
+	foreach word $body {
 		if {[info exists prim($word)]} {
+			puts "Applying primitive $word"
 			apply $prim($word)
+		} elseif {[info exists colon($word)]} {
+			puts "Interpreting colon definition $word"
+			docol $colon($word)
 		} else {
-			push stack $word
+			puts "Pushing string literal $word"
+			push $word
 		}
 	}
+}
+
+while {![eof stdin]} {
+	docol [gets stdin]
 }
