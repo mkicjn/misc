@@ -89,13 +89,13 @@ prim START-WORD {
 
 prim ! {
 	bind val name
-	upvar $name var
-	set var $val
+	global $name
+	set $name $val
 }
 prim @ {
 	bind name
-	upvar $name var
-	push $var
+	global $name
+	push [set $name]
 }
 prim , {
 	lappend ::colon($::state) [pop]
