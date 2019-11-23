@@ -12,7 +12,7 @@ proc pop {} {
 
 proc bind {args} {
 	# Bind values on stack to names given by args
-	foreach var $args {
+	foreach var [lreverse $args] {
 		uplevel 1 "set $var [pop]"
 	}
 }
@@ -52,7 +52,66 @@ proc op1 {pre {post {}}} {
 prim INVERT [op1 ~]
 prim NEGATE [op1 -]
 
-prim . {
+prim DUP {
 	bind a
-	puts $a
+	push $a
+	push $a
+}
+prim DROP {
+	pop
+}
+prim SWAP {
+	bind a b
+	push $b
+	push $a
+}
+
+prim . {
+	puts -nonewline "[pop] "
+}
+prim CR {
+	puts {}
+}
+
+global line
+set line [list]
+prim REFILL {
+	set ::line [gets stdin]
+}
+prim PARSE-NAME {
+	global line
+	set line [lassign $line v]
+	push $v
+}
+prim START-WORD {
+	set ::colon($::state) [list]
+}
+
+prim ! {
+	bind val name
+	upvar $name var
+	set var $val
+}
+prim @ {
+	bind name
+	upvar $name var
+	push $var
+}
+prim , {
+	lappend ::colon($::state) [pop]
+}
+
+prim BRANCH {
+	uplevel 1 {
+		incr i [lindex $body [expr {$i+1}]]
+	}
+}
+prim 0BRANCH {
+	if {[pop]} {
+		apply $::prim(BRANCH)
+	} else {
+		uplevel 1 {
+			incr i
+		}
+	}
 }

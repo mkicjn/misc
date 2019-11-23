@@ -7,24 +7,26 @@ proc : {name args} {
 }
 
 : 1+ 1 + ;
-: test 2 1+ . ;
 
-proc docol {body} {
+proc dobody {body} {
 	global prim colon
-	foreach word $body {
+	for {set i 0} {$i < [llength $body]} {incr i} {
+		set word [lindex $body $i]
 		if {[info exists prim($word)]} {
 			puts "Applying primitive $word"
 			apply $prim($word)
 		} elseif {[info exists colon($word)]} {
 			puts "Interpreting colon definition $word"
-			docol $colon($word)
+			dobody $colon($word)
 		} else {
 			puts "Pushing string literal $word"
 			push $word
 		}
+		incr index
 	}
 }
 
 while {![eof stdin]} {
-	docol [gets stdin]
+	dobody [gets stdin]
+	puts "ok"
 }
