@@ -103,14 +103,14 @@ prim , {
 
 prim BRANCH {
 	uplevel 1 {
-		incr i [lindex $body [expr {$i+1}]]
+		incr i [lindex $body $i]
 	}
 }
 prim 0BRANCH {
-	if {[pop]} {
-		apply $::prim(BRANCH)
-	} else {
-		uplevel 1 {
+	uplevel 1 {
+		if {[pop]} {
+			apply $::prim(BRANCH)
+		} else {
 			incr i
 		}
 	}
