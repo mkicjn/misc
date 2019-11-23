@@ -7,8 +7,8 @@ proc : {name args} {
 }
 
 : 1- 1 - ;
-: 0<= 0 < INVERT ;
-: i. DUP 0<= 0BRANCH 6 1- DUP . BRANCH -8 ;
+: 0>= 0 < INVERT ;
+: i. DUP 0>= 0BRANCH 6 DUP . 1- BRANCH -8 ;
 
 proc dobody {body} {
 	global prim colon

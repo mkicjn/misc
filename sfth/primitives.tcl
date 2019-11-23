@@ -108,7 +108,7 @@ prim BRANCH {
 }
 prim 0BRANCH {
 	uplevel 1 {
-		if {[pop]} {
+		if {[pop] == 0} {
 			apply $::prim(BRANCH)
 		} else {
 			incr i
