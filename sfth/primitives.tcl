@@ -1,20 +1,18 @@
 global stack
 set stack {}
-proc push {value} {
-	lappend ::stack $value
+proc push {args} {
+	lappend ::stack {*}$args
 }
-proc pop {} {
+proc pop {{n 1}} {
 	global stack
-	set value [lindex $stack end]
-	set stack [lreplace $stack end end]
-	return $value
+	incr n -1
+	set values [lrange $stack end-$n end]
+	set stack [lreplace $stack end-$n end]
+	return $values
 }
 
 proc bind {args} {
-	# Bind values on stack to names given by args
-	foreach var [lreverse $args] {
-		uplevel 1 "set $var [pop]"
-	}
+	uplevel 1 [list lassign [pop [llength $args]] {*}$args]
 }
 
 proc prim {name body} {
@@ -24,7 +22,7 @@ proc prim {name body} {
 
 proc op2 {op {pre {}}} {
 	# Create a primitive body representing a binary operator
-	return "bind a b; push \[expr {${pre}(\$a$op\$b)}]"
+	return "bind a b; push \[expr {${pre}(\$a $op \$b)}]"
 }
 
 prim + [op2 +]
@@ -40,13 +38,12 @@ prim = [op2 = -]
 
 prim /MOD {
 	bind a b
-	push [expr {$a%$b}]
-	push [expr {$a/$b}]
+	push [expr {$a%$b}] [expr {$a/$b}]
 }
 
 proc op1 {pre {post {}}} {
 	# Create a primitive body representing a unary operator
-	return "bind a; push \[expr {${pre}(\$a$post)}]"
+	return "set a \[pop]; push \[expr {${pre}(\$a $post)}]"
 }
 
 prim INVERT [op1 ~]
@@ -54,16 +51,18 @@ prim NEGATE [op1 -]
 
 prim DUP {
 	bind a
-	push $a
-	push $a
+	push $a $a
 }
 prim DROP {
 	pop
 }
 prim SWAP {
 	bind a b
-	push $b
-	push $a
+	push $b $a
+}
+prim ROT {
+	bind a b c
+	push $b $c $a
 }
 
 prim . {
@@ -77,14 +76,25 @@ global line
 set line [list]
 prim REFILL {
 	set ::line [gets stdin]
+	push [expr {-[eof stdin]}]
 }
 prim PARSE-NAME {
 	global line
 	set line [lassign $line v]
 	push $v
 }
-prim START-WORD {
-	set ::colon($::state) [list]
+
+global latest
+set latest {}
+global immediate
+prim START-DEFINITION {
+	global latest
+	bind latest
+	set ::colon($latest) [list]
+	set ::immediate($latest) 0
+}
+prim IMMEDIATE {
+	set ::immediate($latest) 1
 }
 
 prim ! {
@@ -98,7 +108,7 @@ prim @ {
 	push [set $name]
 }
 prim , {
-	lappend ::colon($::state) [pop]
+	lappend ::colon($::latest) [pop]
 }
 
 prim BRANCH {
@@ -114,4 +124,7 @@ prim 0BRANCH {
 			incr i
 		}
 	}
+}
+prim EXIT {
+	return -code break
 }

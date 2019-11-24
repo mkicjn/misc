@@ -2,13 +2,13 @@
 
 source primitives.tcl
 
+proc IMMEDIATE {} {
+	set ::immediate($::latest) 1
+}
 proc : {name args} {
 	set ::colon($name) $args
+	set ::immediate($name) 0
 }
-
-: 1- 1 - ;
-: 0>= 0 < INVERT ;
-: i. DUP 0>= 0BRANCH 6 DUP . 1- BRANCH -8 ;
 
 proc dobody {body} {
 	global prim colon
@@ -29,6 +29,7 @@ proc dobody {body} {
 	}
 }
 
+if {$tcl_interactive} return
 while {![eof stdin]} {
 	dobody [gets stdin]
 	puts "ok"
