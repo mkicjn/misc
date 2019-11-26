@@ -2,12 +2,40 @@
 
 source primitives.tcl
 
-proc IMMEDIATE {} {
-	set ::immediate($::latest) 1
+global state; set state 0
+prim EXECUTE {
+	bind name
+	if {!$::state || $::imm($name)} {
+		tailcall dobody $name
+	} else {
+		compile $name
+	}
 }
-proc : {name args} {
-	set ::colon($name) $args
-	set ::immediate($name) 0
+prim : {
+	set ::latest [word]
+	set ::state 1
+}
+prim \; {
+	compile EXIT
+	set ::state 0
+}
+prim INTERPRET-LINE {
+	while {[llength $::line]} {
+		set name [word]
+		if {!$::state || $::imm($word)} {
+			dobody $name
+		} else {
+			compile $name
+		}
+	}
+}
+prim QUIT {
+	global prim
+	while {1} {
+		apply $prim(REFILL)
+		apply $prim(INTERPRET-LINE)
+		puts "ok"
+	}
 }
 
 proc dobody {body} {

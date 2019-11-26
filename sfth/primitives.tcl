@@ -1,5 +1,4 @@
-global stack
-set stack {}
+global stack; set stack {}
 proc push {args} {
 	lappend ::stack {*}$args
 }
@@ -72,21 +71,22 @@ prim CR {
 	puts {}
 }
 
-global line
-set line [list]
+global line; set line [list]
+proc word {} {
+	global line
+	set line [lassign $line word]
+	return $word
+}
 prim REFILL {
 	set ::line [gets stdin]
 	push [expr {-[eof stdin]}]
 }
 prim PARSE-NAME {
-	global line
-	set line [lassign $line v]
-	push $v
+	push [word]
 }
 
-global latest
-set latest {}
-global immediate
+global latest; set latest {}
+global imm; array set imm [list]
 prim START-DEFINITION {
 	global latest
 	bind latest
@@ -107,8 +107,11 @@ prim @ {
 	global $name
 	push [set $name]
 }
+proc compile {args} {
+	lappend ::colon($::latest) $args
+}
 prim , {
-	lappend ::colon($::latest) [pop]
+	compile [pop]
 }
 
 prim BRANCH {
@@ -127,4 +130,14 @@ prim 0BRANCH {
 }
 prim EXIT {
 	return -code break
+}
+prim DOLIT {
+	uplevel 1 {
+		push [lindex $body $i]
+		incr i
+	}
+}
+prim COMPARE {
+	bind a b
+	push [string compare $a $b]
 }
