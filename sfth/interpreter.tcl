@@ -2,6 +2,25 @@
 
 source primitives.tcl
 
+proc dobody {body} {
+	global prim colon
+	set i 0
+	while {$i < [llength $body]} {
+		set word [lindex $body $i]
+		incr i
+		if {[info exists prim($word)]} {
+			#puts "Applying primitive $word"
+			apply $prim($word)
+		} elseif {[info exists colon($word)]} {
+			#puts "Interpreting colon definition $word"
+			dobody $colon($word)
+		} else {
+			#puts "Pushing string literal $word"
+			push $word
+		}
+	}
+}
+
 global state; set state 0
 prim EXECUTE {
 	bind name
@@ -44,25 +63,6 @@ prim QUIT {
 			puts "compiled"
 		} else {
 			puts "ok"
-		}
-	}
-}
-
-proc dobody {body} {
-	global prim colon
-	set i 0
-	while {$i < [llength $body]} {
-		set word [lindex $body $i]
-		incr i
-		if {[info exists prim($word)]} {
-			#puts "Applying primitive $word"
-			apply $prim($word)
-		} elseif {[info exists colon($word)]} {
-			#puts "Interpreting colon definition $word"
-			dobody $colon($word)
-		} else {
-			#puts "Pushing string literal $word"
-			push $word
 		}
 	}
 }

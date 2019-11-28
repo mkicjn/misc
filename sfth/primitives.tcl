@@ -90,12 +90,12 @@ global latest; set latest {}
 global imm; array set imm [list]
 prim START-DEFINITION {
 	global latest
-	bind latest
+	set latest [pop]
 	set ::colon($latest) [list]
 	set ::imm($latest) 0
 }
 prim IMMEDIATE {
-	set ::imm($latest) 1
+	set ::imm($::latest) 1
 }
 
 prim ! {
