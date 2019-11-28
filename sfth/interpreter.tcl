@@ -11,6 +11,8 @@ prim EXECUTE {
 		compile $name
 	}
 }
+prim \[ {set ::state 0} immediate
+prim \] {set ::state 1}
 prim : {
 	set ::latest [word]
 	set ::state 1
@@ -18,11 +20,11 @@ prim : {
 prim \; {
 	compile EXIT
 	set ::state 0
-}
+} immediate
 prim INTERPRET-LINE {
 	while {[llength $::line]} {
 		set name [word]
-		if {!$::state || $::imm($word)} {
+		if {!$::state || ([info exists ::imm($name)] && $::imm($name))} {
 			dobody $name
 		} else {
 			compile $name
@@ -34,7 +36,11 @@ prim QUIT {
 	while {1} {
 		apply $prim(REFILL)
 		apply $prim(INTERPRET-LINE)
-		puts "ok"
+		if {$::state} {
+			puts "compiled"
+		} else {
+			puts "ok"
+		}
 	}
 }
 
@@ -58,7 +64,4 @@ proc dobody {body} {
 }
 
 if {$tcl_interactive} return
-while {![eof stdin]} {
-	dobody [gets stdin]
-	puts "ok"
-}
+apply $prim(QUIT)

@@ -14,9 +14,10 @@ proc bind {args} {
 	uplevel 1 [list lassign [pop [llength $args]] {*}$args]
 }
 
-proc prim {name body} {
+proc prim {name body {imm ""}} {
 	# Create a primitive with a given name and body
 	set ::prim($name) "{} {$body}"
+	set ::imm($name) [expr {$imm ne ""}]
 }
 
 proc op2 {op {pre {}}} {
