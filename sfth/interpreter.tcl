@@ -32,17 +32,9 @@ prim EXECUTE {
 }
 prim \[ {set ::state 0} immediate
 prim \] {set ::state 1}
-prim : {
-	set ::latest [word]
-	set ::state 1
-}
-prim \; {
-	compile EXIT
-	set ::state 0
-} immediate
-prim .S {
-	puts "<[llength $::stack]> $::stack"
-}
+prim : {set ::latest [word]; set ::state 1}
+prim \; {compile EXIT; set ::state 0} immediate
+prim .S {puts "<[llength $::stack]> $::stack"}
 prim INTERPRET-LINE {
 	while {[llength $::line]} {
 		set name [word]

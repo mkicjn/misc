@@ -36,10 +36,7 @@ prim < [op2 < -]
 prim > [op2 > -]
 prim = [op2 = -]
 
-prim /MOD {
-	bind a b
-	push [expr {$a%$b}] [expr {$a/$b}]
-}
+prim /MOD {bind a b; push [expr {$a%$b}] [expr {$a/$b}]}
 
 proc op1 {pre {post {}}} {
 	# Create a primitive body representing a unary operator
@@ -49,28 +46,13 @@ proc op1 {pre {post {}}} {
 prim INVERT [op1 ~]
 prim NEGATE [op1 -]
 
-prim DUP {
-	bind a
-	push $a $a
-}
-prim DROP {
-	pop
-}
-prim SWAP {
-	bind a b
-	push $b $a
-}
-prim ROT {
-	bind a b c
-	push $b $c $a
-}
+prim DUP {bind a; push $a $a}
+prim DROP pop
+prim SWAP {bind a b; push $b $a}
+prim ROT {bind a b c; push $b $c $a}
 
-prim . {
-	puts -nonewline "[pop] "
-}
-prim CR {
-	puts ""
-}
+prim . {puts -nonewline "[pop] "}
+prim CR {puts ""}
 
 global line; set line [list]
 proc word {} {
@@ -78,13 +60,8 @@ proc word {} {
 	set line [lassign $line word]
 	return $word
 }
-prim REFILL {
-	set ::line [gets stdin]
-	push [expr {-[eof stdin]}]
-}
-prim PARSE-NAME {
-	push [word]
-}
+prim REFILL {set ::line [gets stdin]; push [expr {-[eof stdin]}]}
+prim PARSE-NAME {push [word]}
 
 global latest; set latest {}
 global imm; array set imm [list]
@@ -94,9 +71,7 @@ prim START-DEFINITION {
 	set ::colon($latest) [list]
 	set ::imm($latest) 0
 }
-prim IMMEDIATE {
-	set ::imm($::latest) 1
-}
+prim IMMEDIATE {set ::imm($::latest) 1}
 
 prim ! {
 	bind val name
@@ -108,12 +83,8 @@ prim @ {
 	global $name
 	push [set $name]
 }
-proc compile {args} {
-	lappend ::colon($::latest) $args
-}
-prim , {
-	compile [pop]
-}
+proc compile {args} {lappend ::colon($::latest) $args}
+prim , {compile [pop]}
 
 prim BRANCH {
 	uplevel 1 {
@@ -129,19 +100,14 @@ prim 0BRANCH {
 		}
 	}
 }
-prim EXIT {
-	return -code break
-}
+prim EXIT {return -code break}
 prim DOLIT {
 	uplevel 1 {
 		push [lindex $body $i]
 		incr i
 	}
 }
-prim COMPARE {
-	bind a b
-	push [string compare $a $b]
-}
+prim COMPARE {bind a b; push [string compare $a $b]}
 prim BYE exit
 global vars; set vars [list]
 prim VARIABLE {
