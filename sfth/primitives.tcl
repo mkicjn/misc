@@ -142,3 +142,4 @@ prim COMPARE {
 	bind a b
 	push [string compare $a $b]
 }
+prim BYE exit

@@ -21,6 +21,9 @@ prim \; {
 	compile EXIT
 	set ::state 0
 } immediate
+prim .S {
+	puts "<[llength $::stack]> $::stack"
+}
 prim INTERPRET-LINE {
 	while {[llength $::line]} {
 		set name [word]
@@ -35,6 +38,7 @@ prim QUIT {
 	global prim
 	while {1} {
 		apply $prim(REFILL)
+		if {[pop]} break
 		apply $prim(INTERPRET-LINE)
 		if {$::state} {
 			puts "compiled"
