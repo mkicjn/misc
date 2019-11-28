@@ -143,3 +143,17 @@ prim COMPARE {
 	push [string compare $a $b]
 }
 prim BYE exit
+global vars; set vars [list]
+prim VARIABLE {
+	set name [word]
+	lappend ::vars $name
+	global $name
+	set $name {}
+}
+global const; array set const [list]
+prim CONSTANT {
+	set name [word]
+	set val [pop]
+	set ::constant($name) $val
+	prim $name "push $val"
+}
