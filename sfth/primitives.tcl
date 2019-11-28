@@ -69,7 +69,7 @@ prim . {
 	puts -nonewline "[pop] "
 }
 prim CR {
-	puts {}
+	puts ""
 }
 
 global line; set line [list]
@@ -92,10 +92,10 @@ prim START-DEFINITION {
 	global latest
 	bind latest
 	set ::colon($latest) [list]
-	set ::immediate($latest) 0
+	set ::imm($latest) 0
 }
 prim IMMEDIATE {
-	set ::immediate($latest) 1
+	set ::imm($latest) 1
 }
 
 prim ! {
