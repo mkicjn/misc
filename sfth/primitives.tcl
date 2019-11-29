@@ -75,15 +75,15 @@ prim IMMEDIATE {set ::imm($::latest) 1}
 
 prim ! {
 	bind val name
-	global $name
-	set $name $val
+	set i [lassign $name name]
+	lset ::colon($name) {*}$i $val
 }
 prim @ {
 	bind name
-	global $name
-	push [set $name]
+	set i [lassign $name name]
+	push [lindex $::colon($name) {*}$i]
 }
-proc compile {args} {lappend ::colon($::latest) $args}
+proc compile {args} {lappend ::colon($::latest) {*}$args}
 prim , {compile [pop]}
 
 prim BRANCH {
@@ -109,17 +109,21 @@ prim DOLIT {
 }
 prim COMPARE {bind a b; push [string compare $a $b]}
 prim BYE exit
-global vars; set vars [list]
-prim VARIABLE {
-	set name [word]
-	lappend ::vars $name
-	global $name
-	set $name {}
+
+prim GO-TO {uplevel 1 {lassign [lindex $body $i] body i}}
+prim <BUILDS {
+	apply $::prim(PARSE-NAME)
+	apply $::prim(START-DEFINITION)
+	compile DOLIT [list $::latest 4]
+	compile EXIT ""
 }
-global const; array set const [list]
-prim CONSTANT {
-	set name [word]
-	set val [pop]
-	set ::constant($name) $val
-	prim $name "push $val"
+prim DOES> {
+	uplevel 1 {
+		lset ::colon($::latest) 2 GO-TO
+		lset ::colon($::latest) 3 [list $body $i]
+		return -code break
+	}
+}
+prim SEE {
+	puts $::colon([word])
 }
