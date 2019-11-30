@@ -12,7 +12,7 @@ proc execute {name} {
 			incr i
 			set errcode [catch {execute $word} errmsg]
 			if {$errcode == 0} continue
-			if {$errcode == 3} break
+			if {[string first break $errmsg] >= 0} break
 			error "$name->$word: $errmsg"
 		}
 	} else {
