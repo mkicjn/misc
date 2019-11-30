@@ -11,11 +11,18 @@ proc pop {{n 1}} {
 }
 
 proc bind {args} {
-	uplevel 1 [list lassign [pop [llength $args]] {*}$args]
+	set vals [pop [llength $args]]
+	uplevel 1 [list lassign $vals {*}$args]
+}
+
+proc define {name} {
+	set ::latest $name
+	set ::imm($name) 0
 }
 
 proc prim {name body {imm ""}} {
 	# Create a primitive with a given name and body
+	define $name
 	set ::prim($name) "{} {$body}"
 	set ::imm($name) [expr {$imm ne ""}]
 }
@@ -65,12 +72,7 @@ prim PARSE-NAME {push [word]}
 
 global latest; set latest {}
 global imm; array set imm [list]
-prim START-DEFINITION {
-	global latest
-	set latest [pop]
-	set ::colon($latest) [list]
-	set ::imm($latest) 0
-}
+prim START-DEFINITION {define [pop]}
 prim IMMEDIATE {set ::imm($::latest) 1}
 
 prim ! {
@@ -88,42 +90,38 @@ prim , {compile [pop]}
 
 prim BRANCH {
 	uplevel 1 {
-		incr i [lindex $body $i]
+		incr i [lindex $colon($name) $i]
 	}
 }
 prim 0BRANCH {
-	uplevel 1 {
-		if {[pop] == 0} {
-			apply $::prim(BRANCH)
-		} else {
-			incr i
-		}
+	if {[pop] == 0} {
+		tailcall apply $::prim(BRANCH)
+	} else {
+		uplevel 1 {incr i}
 	}
 }
 prim EXIT {return -code break}
 prim DOLIT {
 	uplevel 1 {
-		push [lindex $body $i]
+		push [lindex $colon($name) $i]
 		incr i
 	}
 }
 prim COMPARE {bind a b; push [string compare $a $b]}
 prim BYE exit
 
-prim GO-TO {uplevel 1 {lassign [lindex $body $i] body i}}
+prim GO-TO {uplevel 1 {lassign [lindex $colon($name) $i] name i}}
 prim <BUILDS {
-	apply $::prim(PARSE-NAME)
-	apply $::prim(START-DEFINITION)
+	define [word]
 	compile DOLIT [list $::latest 4]
 	compile EXIT ""
 }
 prim DOES> {
 	uplevel 1 {
 		lset ::colon($::latest) 2 GO-TO
-		lset ::colon($::latest) 3 [list $body $i]
+		lset ::colon($::latest) 3 [list $name $i]
 		return -code break
 	}
 }
-prim SEE {
-	puts $::colon([word])
-}
+prim SEE {puts $::colon([word])}
+prim .S {puts "<[llength $::stack]> $::stack"}

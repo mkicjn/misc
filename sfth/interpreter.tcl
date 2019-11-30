@@ -2,46 +2,47 @@
 
 source primitives.tcl
 
-proc dobody {body} {
+proc execute {name} {
 	global prim colon
-	set i 0
-	while {$i < [llength $body]} {
-		set word [lindex $body $i]
-		incr i
-		if {[info exists prim($word)]} {
-			#puts "Applying primitive $word"
-			apply $prim($word)
-		} elseif {[info exists colon($word)]} {
-			#puts "Interpreting colon definition $word"
-			dobody $colon($word)
-		} else {
-			#puts "Pushing string literal $word"
-			push $word
+	if {[info exists prim($name)]} {
+		uplevel 1 [list apply $prim($name)]
+	} elseif {[info exists colon($name)]} {
+		set i 0
+		while {[set word [lindex $colon($name) $i]] ne ""} {
+			incr i
+			set errcode [catch {execute $word} errmsg]
+			if {$errcode == 0} continue
+			if {$errcode == 3} break
+			error "$name->$word: $errmsg"
 		}
+	} else {
+		error "$name?"
 	}
 }
 
 global state; set state 0
-prim EXECUTE {
-	bind name
-	if {!$::state || $::imm($name)} {
-		tailcall dobody $name
-	} else {
-		compile $name
-	}
-}
-prim \[ {set ::state 0} immediate
 prim \] {set ::state 1}
-prim : {set ::latest [word]; set ::state 1}
+prim \[ {set ::state 0} immediate
+prim : {define [word]; set ::state 1}
 prim \; {compile EXIT; set ::state 0} immediate
-prim .S {puts "<[llength $::stack]> $::stack"}
 prim INTERPRET-LINE {
+	global state imm
 	while {[llength $::line]} {
 		set name [word]
-		if {!$::state || ([info exists ::imm($name)] && $::imm($name))} {
-			dobody $name
+		if {[string is integer $name]} {
+			if {$state} {
+				compile DOLIT $name
+			} else {
+				push $name
+			}
+		} elseif {[info exists imm($name)]} {
+			if {$state && !$imm($name)} {
+				compile $name
+			} else {
+				execute $name
+			}
 		} else {
-			compile $name
+			error "$name?"
 		}
 	}
 }
@@ -60,4 +61,7 @@ prim QUIT {
 }
 
 if {$tcl_interactive} return
-apply $prim(QUIT)
+while {1} {
+	catch {apply $prim(QUIT)} err
+	puts $err
+}
