@@ -101,7 +101,7 @@ prim 0BRANCH {
 	}
 }
 prim EXIT {return -code break}
-prim DOLIT {
+prim LIT {
 	uplevel 1 {
 		push [lindex $colon($name) $i]
 		incr i
@@ -113,7 +113,7 @@ prim BYE exit
 prim GO-TO {uplevel 1 {lassign [lindex $colon($name) $i] name i}}
 prim <BUILDS {
 	define [word]
-	compile DOLIT [list $::latest 4]
+	compile LIT [list $::latest 4]
 	compile EXIT ""
 }
 prim DOES> {

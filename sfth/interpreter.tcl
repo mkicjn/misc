@@ -31,7 +31,7 @@ prim INTERPRET-LINE {
 		set name [word]
 		if {[string is integer $name]} {
 			if {$state} {
-				compile DOLIT $name
+				compile LIT $name
 			} else {
 				push $name
 			}
@@ -51,8 +51,9 @@ prim QUIT {
 	while {1} {
 		apply $prim(REFILL)
 		if {[pop]} break
-		apply $prim(INTERPRET-LINE)
-		if {$::state} {
+		if {[catch {apply $prim(INTERPRET-LINE)} err]} {
+			puts $err
+		} elseif {$::state} {
 			puts "compiled"
 		} else {
 			puts "ok"
@@ -61,7 +62,7 @@ prim QUIT {
 }
 
 if {$tcl_interactive} return
-while {1} {
-	catch {apply $prim(QUIT)} err
-	puts $err
-}
+apply $prim(QUIT)
+#foreach name [array names colon] {
+#	puts ": $name $colon($name) ; [expr {$imm($name)?"IMMEDIATE":""}]"
+#}
