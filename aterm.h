@@ -27,11 +27,8 @@
 #define CLS  "2" ED
 #define CLSB "3" ED
 
-#define EALTB "1049h"
-#define DALTB "1049l"
-
 #define SEP ";"
-#define AT_XY(X,Y) CSI #X SEP #Y CUP
+#define AT_XY(X,Y) CSI #Y SEP #X CUP
 
 #define SGR "m"
 
@@ -64,17 +61,16 @@
 #define BLUE     "4"
 #define MAGENTA  "5"
 #define CYAN     "6"
-#define GRAY     "7"
+#define WHITE    "7"
+#define CUSTOM   "8" SEP
+#define DEFAULT  "9"
 
 #define FG_COLR(S)   "3" S
-#define DEF_FG_COLR  "39"
 #define BG_COLR(S)   "4" S
-#define DEF_BG_COLR  "49"
-
 #define FG_BCOLR(S)  "9" S
 #define BG_BCOLR(S) "10" S
 
-#define RGB(R,G,B)   "8;2;" #R SEP #G SEP #B
-#define COLR_8BIT(N) "8;5;" #N
+#define RGB(R,G,B)   "2;" #R SEP #G SEP #B
+#define COLR_8BIT(N) "5;" #N
 
 #endif

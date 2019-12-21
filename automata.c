@@ -44,24 +44,27 @@ void print_binary_grid(struct grid *g)
 	for (int y = 0; y < g->height; y++) {
 		for (int x = 0; x < g->width; x++) {
 			int i = x + y * g->width;
-			putchar(g->field[i] ? '#' : ' ');
+			printf(g->field[i] ? "[]" : "  ");
 		}
 		putchar('\n');
 	}
 }
 
+#include "aterm.h"
+
 cell_t conway(struct grid *g, size_t c)
 { // Conway's Game of Life on a toroidal field
 	size_t w = g->width, h = g->height;
+	size_t x0 = c % w, y0 = c / w;
 	int alive = 0;
 	for (int dy = -1; dy <= 1; dy++)
 	for (int dx = -1; dx <= 1; dx++) {
-		int x = (c % w + dx + w) % w;
-		int y = (c / w + dy + h) % h;
-		int i = x + y * w;
+		int x1 = (x0 + dx + w) % w;
+		int y1 = (y0 + dy + h) % h;
+		int i = x1 + y1 * w;
 		if (i == c)
 			continue;
-		if (g->field[x + y * w])
+		if (g->field[i])
 			alive++;
 	}
 	if (alive == 3)
@@ -72,7 +75,28 @@ cell_t conway(struct grid *g, size_t c)
 		return 0;
 }
 
-void tsleep(clock_t n)
+cell_t erosion(struct grid *g, size_t c)
+{
+	size_t w = g->width, h = g->height;
+	size_t x0 = c % w, y0 = c / w;
+	int alive = 0;
+	if (x0 == 0 || x0 == w-1 || y0 == 0 || y0 == h-1)
+		return 1;
+	for (int dy = -1; dy <= 1; dy++)
+	for (int dx = -1; dx <= 1; dx++) {
+		int i = x0 + dx + (y0 + dy) * w;
+		if (i == c)
+			continue;
+		if (g->field[i])
+			alive++;
+	}
+	if (alive > 4)
+		return 1;
+	else
+		return 0;
+}
+
+void clksleep(clock_t n)
 {
 	clock_t s = clock();
 	for (;;)
@@ -80,27 +104,29 @@ void tsleep(clock_t n)
 			break;
 }
 
-#include "aterm.h"
-
 int main(int argc, char **argv)
 {
 	srand(time(NULL));
-	const size_t w = 80, h = 24;
+	size_t w = 50, h = 50;
+	if (argc > 2) {
+		w = atol(argv[1]);
+		h = atol(argv[2]);
+	}
+
 	struct grid *g = new_grid(w, h);
 
 	for (int i = 0; i < w * h; i++) {
-		int r = rand() % 2;
-		printf("Initializing %d to %d\n", i, r);
+		int r = (rand() % 5) > 1;
 		g->field[i] = r;
 	}
 
-	for (int i = 0; i < 100; i++) {
-		printf(CSI CUH CSI CLS CSI AT_XY(1,1));
-		print_binary_grid(g);
+	for (;;) {
 		step_grid(g, conway);
-		putchar('\n');
-		tsleep(200000);
-		printf(CSI CUS);
+
+		printf(CSI CLS AT_XY(1,1));
+		print_binary_grid(g);
+
+		clksleep(CLOCKS_PER_SEC / 20);
 	}
 
 	destroy_grid(g);
