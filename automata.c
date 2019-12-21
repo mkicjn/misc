@@ -81,20 +81,15 @@ cell_t erosion(struct grid *g, size_t c)
 	size_t w = g->width, h = g->height;
 	size_t x0 = c % w, y0 = c / w;
 	int alive = 0;
-	if (x0 == 0 || x0 == w-1 || y0 == 0 || y0 == h-1)
-		return 1;
 	for (int dy = -1; dy <= 1; dy++)
 	for (int dx = -1; dx <= 1; dx++) {
-		int i = x0 + dx + (y0 + dy) * w;
-		if (i == c)
-			continue;
+		int x1 = (x0 + dx + w) % w;
+		int y1 = (y0 + dy + h) % h;
+		int i = x1 + y1 * w;
 		if (g->field[i])
 			alive++;
 	}
-	if (alive > 4)
-		return 1;
-	else
-		return 0;
+	return alive > 5;
 }
 
 int main(int argc, char **argv)
@@ -113,13 +108,13 @@ int main(int argc, char **argv)
 		g->field[i] = r;
 	}
 
+	printf(CSI CLS);
 	for (;;) {
-		step_grid(g, conway);
-
-		printf(CSI CLS AT_XY(1,1));
+		printf(AT_XY(1,1));
 		print_binary_grid(g);
 
-		usleep(50000);
+		usleep(1000000);
+		step_grid(g, erosion);
 	}
 
 	destroy_grid(g);
