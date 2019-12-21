@@ -50,6 +50,7 @@ void print_binary_grid(struct grid *g)
 	}
 }
 
+#include <unistd.h>
 #include "aterm.h"
 
 cell_t conway(struct grid *g, size_t c)
@@ -96,14 +97,6 @@ cell_t erosion(struct grid *g, size_t c)
 		return 0;
 }
 
-void clksleep(clock_t n)
-{
-	clock_t s = clock();
-	for (;;)
-		if (clock() - s > n)
-			break;
-}
-
 int main(int argc, char **argv)
 {
 	srand(time(NULL));
@@ -126,7 +119,7 @@ int main(int argc, char **argv)
 		printf(CSI CLS AT_XY(1,1));
 		print_binary_grid(g);
 
-		clksleep(CLOCKS_PER_SEC / 20);
+		usleep(50000);
 	}
 
 	destroy_grid(g);
