@@ -13,47 +13,59 @@ proc lpop {stackvar {n 1}} {
 	return $vals
 }
 
-global stack
-set    stack [list]
-
-global forth-wordlist
-set    forth-wordlist [dict create]
-
-global context
-set    context [list forth-wordlist]
+global stack forth_wordlist context
+set    stack          [list]
+set    forth_wordlist [dict create]
+set    context        [list forth_wordlist]
 
 proc prim {name body} {
-	global   forth-wordlist
-	dict set forth-wordlist $name [list {} $body]
+	dict set ::forth_wordlist $name [list {} $body]
 }
 proc bind {name ops args} {
 	prim $name [subst {
-		global stack
-		lpush stack {*}\[$args {*}\[lpop stack $ops]]
+		lpush ::stack {*}\[$args {*}\[lpop ::stack $ops]]
 	}]
 }
 
-bind + 2 tcl::mathop::+
-bind . 1 puts -nonewline
+foreach name [list + - * / MOD AND OR XOR LSHIFT RSHIFT] \
+	op   [list + - * / %   &   |  ^   <<     >>    ] \
+	{bind $name 2 tcl::mathop::$op}
+bind .    1 apply {{a} {puts -nonewline "$a "; flush stdout}}
+bind CR   0 puts ""
+bind BYE  0 exit
+bind DUP  1 apply {{a}     {list $a $a}}
+bind DROP 1 apply {{a}     {list}}
+bind SWAP 2 apply {{a b}   {list $b $a}}
+bind ROT  3 apply {{a b c} {list $b $c $a}}
 
 proc interpret {line} {
+	if {[lindex $line 0] eq {}} {
+		if {[llength $line] == 2} {apply $line}
+		return
+	}
 	global stack
 	global context
 	foreach word $line {
 		set def ""
-		foreach wlistvar $context {
+		foreach wlistvar [lreverse $context] {
 			upvar 1 $wlistvar wlist
-			if {![catch {set def [dict get $wlist $word]}]} break
+			if {![catch {
+				set def [dict get $wlist $word]
+			}]} break
 		}
 		if {$def ne ""} {
-			apply $def
-		} elseif {[string is entier $word]} {
+			interpret $def
+		} elseif {[string is double $word]} {
 			lpush stack $word
 		} else {
 			return -code error "$word?"
 		}
 	}
-	puts " ok"
 }
 
-interpret [gets stdin]
+if {$tcl_interactive} return
+while {![eof stdin]} {
+	if {[catch {interpret [gets stdin]} err]} {
+		puts $err
+	}
+}
