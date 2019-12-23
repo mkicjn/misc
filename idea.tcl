@@ -1,3 +1,4 @@
+#!/usr/bin/tclsh
 global stack
 set stack [list]
 interp alias {} push {} lappend ::stack
@@ -8,7 +9,7 @@ proc pop {{n 1}} {
 	return $vals
 }
 
-rename unknown _unknown
+rename unknown -unknown
 proc unknown {args} {
 	set cdr [lassign $args car]
 	if {[string is double $car]} {
@@ -18,11 +19,20 @@ proc unknown {args} {
 		eval $::forth($car)
 		tailcall {*}$cdr
 	} else {
-		_unknown {*}$args
+		-unknown {*}$args
 	}
 }
 
-set forth(+) {lassign [pop 2] a b; push [expr {$a+$b}]}
-set forth(.) {puts "[pop] "}
+set forth(+) {push [tcl::mathop::+ {*}[pop 2]]}
+set forth(.) {puts -nonewline "[pop] "}
 
-return
+if {$tcl_interactive} return
+set tcl_interactive 1
+while {1} {
+	if {[catch {eval [gets stdin]} err]} {
+		set ::stack [list]
+		puts $err
+	} elseif {![eof stdin]} {
+		puts " ok"
+	} else break
+}
