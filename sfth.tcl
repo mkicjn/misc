@@ -31,6 +31,7 @@ foreach name [list + - * / MOD AND OR XOR LSHIFT RSHIFT] \
 
 prim BYE  effect {}      {exit}
 prim CR   effect {}      {puts ""}
+prim .S   effect {}      {puts "<[llength $::stack]> $::stack"}
 prim .    effect {a}     {puts -nonewline "$a "; flush stdout}
 prim DUP  effect {a}     {list $a $a}
 prim DROP effect {a}     {list}
@@ -55,7 +56,7 @@ proc find {name} {
 		global $dictvar
 		set dict [set $dictvar]
 		if {[dict exists $dict $name]} {
-			return [list [dict get $dict $name] 0] ;# TODO: Immediates
+			return [list [dict get $dict $name] -1] ;# TODO: Immediates
 			break
 		}
 	}
@@ -64,13 +65,12 @@ proc find {name} {
 
 proc execute {def} {
 	if {[lindex $def 0] in [list eval execute]} {
-		tailcall {*}$def
+		tailcall uplevel 1 {*}$def
 	}
-	global stack
-	global context
+	global stack context
 	for {set ip 0} {$ip < [llength $def]} {incr ip} {
 		set word [lindex $def $ip]
-		execute [find $word]
+		execute [lindex [find $word] 0]
 	}
 }
 
@@ -88,7 +88,7 @@ proc quit {} {
 	set ::stack [list]
 	while {1} {
 		set name [word]
-		if {![catch {lassign [find $name] def imm}]} {
+		if {![catch {lassign [find $name] def imm} err]} {
 			if {!$::state || $imm} {
 				execute $def
 			} else {
@@ -96,7 +96,7 @@ proc quit {} {
 			}
 		} elseif {[string is double $name]} {
 			if {$::state} {
-				compile LIT $name
+				compile $name
 			} else {
 				push ::stack $name
 			}
