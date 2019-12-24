@@ -18,25 +18,36 @@ set stack          [list]
 set forth_wordlist [dict create]
 set context        [list forth_wordlist]
 
-proc prim {name body} {
-	dict set ::forth_wordlist $name [list {} $body]
+proc prim {name args} {
+	dict set ::forth_wordlist $name [list eval $args]
 }
-proc bind {name ops args} {
-	prim $name [subst {
-		push ::stack {*}\[$args {*}\[pop ::stack $ops]]
-	}]
+proc effect {args body} {
+	push ::stack {*}[apply [list $args $body] {*}[pop ::stack [llength $args]]]
 }
 
 foreach name [list + - * / MOD AND OR XOR LSHIFT RSHIFT] \
 	op   [list + - * / %   &   |  ^   <<     >>    ] \
-	{bind $name 2 tcl::mathop::$op}
-bind .    1 apply {{a} {puts -nonewline "$a "; flush stdout}}
-bind BYE  0 exit
-bind CR   0 puts ""
-bind DUP  1 apply {{a}     {list $a $a}}
-bind DROP 1 apply {{a}     {list}}
-bind SWAP 2 apply {{a b}   {list $b $a}}
-bind ROT  3 apply {{a b c} {list $b $c $a}}
+	{prim $name effect {a b} "tcl::mathop::$op \$a \$b"}
+
+prim BYE  effect {}      {exit}
+prim CR   effect {}      {puts ""}
+prim .    effect {a}     {puts -nonewline "$a "; flush stdout}
+prim DUP  effect {a}     {list $a $a}
+prim DROP effect {a}     {list}
+prim SWAP effect {a b}   {list $b $a}
+prim ROT  effect {a b c} {list $b $c $a}
+
+global tib
+set    tib [list]
+proc word {} {
+	while {![llength $::tib]} {
+		if {[eof stdin]} exit
+		set ::tib [gets stdin]
+	}
+	set word  [lindex $::tib 0]
+	set ::tib [lrange $::tib 1 end]
+	return $word
+}
 
 proc find {name} {
 	global context
@@ -44,51 +55,24 @@ proc find {name} {
 		global $dictvar
 		set dict [set $dictvar]
 		if {[dict exists $dict $name]} {
-			return [dict get $dict $name]
+			return [list [dict get $dict $name] 0] ;# TODO: Immediates
 			break
 		}
 	}
 	error "$name?"
 }
-bind FIND 0 find
 
-proc interpret {line} {
-	if {[lindex $line 0] eq {}} {
-		set vals [lassign $line args body]
-		apply [list $args $body] {*}$vals
-		return
+proc execute {def} {
+	if {[lindex $def 0] in [list eval execute]} {
+		tailcall {*}$def
 	}
 	global stack
 	global context
-	for {set ip 0} {$ip < [llength $line]} {incr ip} {
-		set word [lindex $line $ip]
-		interpret [find $word]
+	for {set ip 0} {$ip < [llength $def]} {incr ip} {
+		set word [lindex $def $ip]
+		execute [find $word]
 	}
 }
-
-global source tib
-set tib ""
-set source ::tib
-proc refill {} {
-	if {$::source eq "::tib" && ![eof stdin]} {
-		set ::source ::tib
-		set ::tib [gets stdin]
-		return -1
-	} else {
-		return 0
-	}
-}
-bind REFILL 0 refill
-
-proc word {} {
-	global source
-	global $source
-	set line [set $source]
-	set name [lindex $line 0]
-	set $source [lrange $line 1 end]
-	return $name
-}
-bind WORD 0 word
 
 global latest
 set latest ""
@@ -100,35 +84,28 @@ proc compile {args} {
 
 global state
 set state 0
-proc immediate? {name} {
-	#TODO
-	return 0
-}
 proc quit {} {
-	global stack source state
-	set stack [list]
-	while {[refill]} {
-		while {[set name [word]] ne ""} {
-			if {![catch {set def [find $name]} err]} {
-				if {!$state || [immediate? $name]} {
-					interpret $def
-				} else {
-					compile $name
-				}
-			} elseif {[string is double $name]} {
-				if {$state} {
-					compile LIT $name
-				} else {
-					push stack $name
-				}
+	set ::stack [list]
+	while {1} {
+		set name [word]
+		if {![catch {lassign [find $name] def imm}]} {
+			if {!$::state || $imm} {
+				execute $def
 			} else {
-				error $err
+				compile $name
 			}
+		} elseif {[string is double $name]} {
+			if {$::state} {
+				compile LIT $name
+			} else {
+				push ::stack $name
+			}
+		} else {
+			puts $err
+			tailcall quit
 		}
-		puts " ok"
 	}
 }
-bind QUIT 0 quit
 
 if {$tcl_interactive} return
-while {[catch quit err]} {puts $err}
+while {[catch {quit} err]} {puts $err}
