@@ -65,7 +65,7 @@ proc find {name} {
 
 proc execute {def} {
 	if {[lindex $def 0] in [list eval execute]} {
-		tailcall uplevel 1 {*}$def
+		tailcall {*}$def
 	}
 	global stack context
 	for {set ip 0} {$ip < [llength $def]} {incr ip} {
