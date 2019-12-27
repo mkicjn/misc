@@ -1,111 +1,58 @@
 #!/usr/bin/tclsh
-
-proc push {stackvar args} {
-	upvar 1 $stackvar stack
-	lappend $stackvar {*}$args
-	return
-}
-proc pop {stackvar {n 1}} {
-	upvar 1 $stackvar stack
+global stack
+set stack [list]
+interp alias {} push {} lappend ::stack
+proc pop {{n 1}} {
 	incr n -1
-	set vals  [lrange   $stack end-$n end]
-	set stack [lreplace $stack end-$n end]
+	set vals    [lrange   $::stack end-$n end]
+	set ::stack [lreplace $::stack end-$n end]
 	return $vals
 }
 
-global stack forth_wordlist context
-set stack          [list]
-set forth_wordlist [dict create]
-set context        [list forth_wordlist]
-
-proc prim {name args} {
-	dict set ::forth_wordlist $name [list eval $args]
+rename unknown -unknown
+proc unknown {args} {
+	set cont [lassign $args word]
+	if {[string is double $word]} {
+		push $word
+		tailcall {*}$cont
+	} elseif {[info exists ::forth($word)]} {
+		eval $::forth($word)
+		tailcall {*}$cont
+	} else {
+		set ::stack [list]
+		-unknown {*}$args
+	}
 }
-proc effect {args body} {
-	push ::stack {*}[apply [list $args $body] {*}[pop ::stack [llength $args]]]
+
+proc prim {name args} {set ::forth($name) $args; return}
+
+proc effect {args script} {
+	push {*}[apply [list $args $script] {*}[pop [llength $args]]]
+	return
 }
 
-foreach name [list + - * / MOD AND OR XOR LSHIFT RSHIFT] \
-	op   [list + - * / %   &   |  ^   <<     >>    ] \
-	{prim $name effect {a b} "tcl::mathop::$op \$a \$b"}
-
-prim BYE  effect {}      {exit}
-prim CR   effect {}      {puts ""}
-prim .S   effect {}      {puts "<[llength $::stack]> $::stack"}
 prim .    effect {a}     {puts -nonewline "$a "; flush stdout}
+prim +    effect {a b}   {expr {$a+$b}}
+prim >    effect {a b}   {expr {-($a>$b)}}
+
 prim DUP  effect {a}     {list $a $a}
 prim DROP effect {a}     {list}
 prim SWAP effect {a b}   {list $b $a}
+prim OVER effect {a b}   {list $a $b $a}
+prim NIP  effect {a b}   {list $b}
+prim TUCK effect {a b}   {list $b $a $b}
 prim ROT  effect {a b c} {list $b $c $a}
 
-global tib
-set    tib [list]
-proc word {} {
-	while {![llength $::tib]} {
-		if {[eof stdin]} exit
-		set ::tib [gets stdin]
-	}
-	set word  [lindex $::tib 0]
-	set ::tib [lrange $::tib 1 end]
-	return $word
-}
-
-proc find {name} {
-	global context
-	foreach dictvar [lreverse $context] {
-		global $dictvar
-		set dict [set $dictvar]
-		if {[dict exists $dict $name]} {
-			return [list [dict get $dict $name] -1] ;# TODO: Immediates
-			break
-		}
-	}
-	error "$name?"
-}
-
-proc execute {def} {
-	if {[lindex $def 0] in [list eval execute]} {
-		tailcall {*}$def
-	}
-	global stack context
-	for {set ip 0} {$ip < [llength $def]} {incr ip} {
-		set word [lindex $def $ip]
-		execute [lindex [find $word] 0]
+proc interpret {words} {
+	for {set ip 0} {$ip < [llength $words]} {incr ip} {
+		eval [lindex $words $ip]
 	}
 }
 
-global latest
-set latest ""
-proc compile {args} {
-	set dictvar [lindex $::context end]
-	global $dictvar
-	dict lappend $dictvar $::latest {*}$args
-}
-
-global state
-set state 0
-proc quit {} {
-	set ::stack [list]
-	while {1} {
-		set name [word]
-		if {![catch {lassign [find $name] def imm} err]} {
-			if {!$::state || $imm} {
-				execute $def
-			} else {
-				compile $name
-			}
-		} elseif {[string is double $name]} {
-			if {$::state} {
-				compile $name
-			} else {
-				push ::stack $name
-			}
-		} else {
-			puts $err
-			tailcall quit
-		}
-	}
-}
+prim EXIT    tailcall uplevel 1 return
+prim LIT     uplevel 1 {push [lindex $words [incr ip]]}
+prim BRANCH  uplevel 1 {incr ip [lindex $words [incr ip]]; incr ip -1}
+prim 0BRANCH uplevel 1 {if {![pop]} {BRANCH} else {incr ip}}
 
 if {$tcl_interactive} return
-while {[catch {quit} err]} {puts $err}
+interpret {LIT 0 DUP . LIT 1 + DUP LIT 100 > 0BRANCH -10 DROP EXIT LIT 0 .}
