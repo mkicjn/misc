@@ -9,7 +9,7 @@ proc pop {{n 1}} {
 	return $vals
 }
 
-rename unknown -unknown
+rename unknown _unknown
 proc unknown {args} {
 	set cont [lassign $args word]
 	if {[string is double $word]} {
@@ -20,7 +20,7 @@ proc unknown {args} {
 		tailcall {*}$cont
 	} else {
 		set ::stack [list]
-		-unknown {*}$args
+		_unknown {*}$args
 	}
 }
 
@@ -43,16 +43,16 @@ prim NIP  effect {a b}   {list $b}
 prim TUCK effect {a b}   {list $b $a $b}
 prim ROT  effect {a b c} {list $b $c $a}
 
-proc interpret {words} {
-	for {set ip 0} {$ip < [llength $words]} {incr ip} {
-		eval [lindex $words $ip]
+proc docol {args} {
+	for {set ip 0} {$ip < [llength $args]} {incr ip} {
+		eval [lindex $args $ip]
 	}
 }
 
 prim EXIT    tailcall uplevel 1 return
-prim LIT     uplevel 1 {push [lindex $words [incr ip]]}
-prim BRANCH  uplevel 1 {incr ip [lindex $words [incr ip]]; incr ip -1}
+prim LIT     uplevel 1 {push [lindex $args [incr ip]]}
+prim BRANCH  uplevel 1 {incr ip [lindex $args [incr ip]]; incr ip -1}
 prim 0BRANCH uplevel 1 {if {![pop]} {BRANCH} else {incr ip}}
 
 if {$tcl_interactive} return
-interpret {LIT 0 DUP . LIT 1 + DUP LIT 100 > 0BRANCH -10 DROP EXIT LIT 0 .}
+docol LIT 0 DUP . LIT 1 + DUP LIT 100 > 0BRANCH -10 DROP EXIT LIT 0 .
