@@ -24,24 +24,24 @@ proc unknown {args} {
 	}
 }
 
-proc prim {name args} {set ::forth($name) $args; return}
+proc : {name args} {set ::forth($name) $args; return}
 
-proc effect {args script} {
-	push {*}[apply [list $args $script] {*}[pop [llength $args]]]
+proc effect {args} {
+	push {*}[apply $args {*}[pop [llength [lindex $args 0]]]]
 	return
 }
 
-prim .    effect {a}     {puts -nonewline "$a "; flush stdout}
-prim +    effect {a b}   {expr {$a+$b}}
-prim >    effect {a b}   {expr {-($a>$b)}}
+: .    effect {a}     {puts -nonewline "$a "; flush stdout}
+: +    effect {a b}   {expr {$a+$b}}
+: >    effect {a b}   {expr {-($a>$b)}}
 
-prim DUP  effect {a}     {list $a $a}
-prim DROP effect {a}     {list}
-prim SWAP effect {a b}   {list $b $a}
-prim OVER effect {a b}   {list $a $b $a}
-prim NIP  effect {a b}   {list $b}
-prim TUCK effect {a b}   {list $b $a $b}
-prim ROT  effect {a b c} {list $b $c $a}
+: DUP  effect {a}     {list $a $a}
+: DROP effect {a}     {list}
+: SWAP effect {a b}   {list $b $a}
+: OVER effect {a b}   {list $a $b $a}
+: NIP  effect {a b}   {list $b}
+: TUCK effect {a b}   {list $b $a $b}
+: ROT  effect {a b c} {list $b $c $a}
 
 proc docol {args} {
 	for {set ip 0} {$ip < [llength $args]} {incr ip} {
@@ -49,10 +49,10 @@ proc docol {args} {
 	}
 }
 
-prim EXIT    tailcall uplevel 1 return
-prim LIT     uplevel 1 {push [lindex $args [incr ip]]}
-prim BRANCH  uplevel 1 {incr ip [lindex $args [incr ip]]; incr ip -1}
-prim 0BRANCH uplevel 1 {if {![pop]} {BRANCH} else {incr ip}}
+: EXIT    tailcall uplevel 1 return
+: LIT     uplevel 1 {push [lindex $args [incr ip]]}
+: BRANCH  uplevel 1 {incr ip [lindex $args [incr ip]]; incr ip -1}
+: 0BRANCH uplevel 1 {if {![pop]} {BRANCH} else {incr ip}}
 
 if {$tcl_interactive} return
 docol LIT 0 DUP . LIT 1 + DUP LIT 100 > 0BRANCH -10 DROP EXIT LIT 0 .
