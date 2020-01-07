@@ -27,13 +27,30 @@ proc unknown {args} {
 	}
 }
 
-proc : {name args} {set ::forth($name) $args; return}
+set srcfilt {
+	BEGIN  "; while {1} \{"
+	WHILE  "; if {!\[pop]} break; "
+	UNTIL  "; if {\[pop]} break\} "
+	REPEAT "\}; "
+	AGAIN  "\}; "
 
+	IF     "; if {\[pop]} \{"
+	ELSE   "\} else \{"
+	THEN   "\}"
+}
+proc : {name args} {
+	set ::forth($name) [string map $::srcfilt $args]
+	return
+}
 
 : .    with {a}     {puts -nonewline "$a "; flush stdout}
 : .S   eval         {puts "<[llength $::stack]> $::stack"}
-: +    with {a b}   {push [expr {$a+$b}]}
-: >    with {a b}   {push [expr {-($a>$b)}]}
+: CR   eval         {puts ""}
+
+: +    with {a b}   {push [expr   {$a + $b}]}
+: -    with {a b}   {push [expr   {$a - $b}]}
+: >    with {a b}   {push [expr {-($a > $b)}]}
+: <    with {a b}   {push [expr {-($a < $b)}]}
 
 : DUP  with {a}     {push $a $a}
 : DROP with {a}     {push}
@@ -56,4 +73,5 @@ proc docol {args} {
 : 0BRANCH uplevel {if {![pop]} {BRANCH} else {incr ip}}
 
 if {$tcl_interactive} return
-docol LIT 0 DUP . LIT 1 + DUP LIT 100 > 0BRANCH -10 DROP EXIT LIT 0 .
+: TEST 0 BEGIN DUP 20 < WHILE 1 + DUP . REPEAT DROP CR EXIT 0 . ;
+TEST
