@@ -8,6 +8,9 @@ proc pop {{n 1}} {
 	set ::stack [lreplace $::stack end-$n end]
 	return $vals
 }
+proc with {varlist script} {
+	tailcall apply [list $varlist $script] {*}[pop [llength $varlist]]
+}
 
 rename unknown _unknown
 proc unknown {args} {
@@ -26,33 +29,31 @@ proc unknown {args} {
 
 proc : {name args} {set ::forth($name) $args; return}
 
-proc effect {args} {
-	push {*}[apply $args {*}[pop [llength [lindex $args 0]]]]
-	return
-}
 
-: .    effect {a}     {puts -nonewline "$a "; flush stdout}
-: +    effect {a b}   {expr {$a+$b}}
-: >    effect {a b}   {expr {-($a>$b)}}
+: .    with {a}     {puts -nonewline "$a "; flush stdout}
+: .S   eval         {puts "<[llength $::stack]> $::stack"}
+: +    with {a b}   {push [expr {$a+$b}]}
+: >    with {a b}   {push [expr {-($a>$b)}]}
 
-: DUP  effect {a}     {list $a $a}
-: DROP effect {a}     {list}
-: SWAP effect {a b}   {list $b $a}
-: OVER effect {a b}   {list $a $b $a}
-: NIP  effect {a b}   {list $b}
-: TUCK effect {a b}   {list $b $a $b}
-: ROT  effect {a b c} {list $b $c $a}
+: DUP  with {a}     {push $a $a}
+: DROP with {a}     {push}
+: SWAP with {a b}   {push $b $a}
+: OVER with {a b}   {push $a $b $a}
+: NIP  with {a b}   {push $b}
+: TUCK with {a b}   {push $b $a $b}
+: ROT  with {a b c} {push $b $c $a}
 
 proc docol {args} {
-	for {set ip 0} {$ip < [llength $args]} {incr ip} {
-		eval [lindex $args $ip]
+	foreach word $args {set [incr i] $word}
+	while {[incr ip] <= [llength $args]} {
+		eval [set $ip]
 	}
 }
 
-: EXIT    tailcall uplevel 1 return
-: LIT     uplevel 1 {push [lindex $args [incr ip]]}
-: BRANCH  uplevel 1 {incr ip [lindex $args [incr ip]]; incr ip -1}
-: 0BRANCH uplevel 1 {if {![pop]} {BRANCH} else {incr ip}}
+: EXIT    tailcall uplevel return
+: LIT     uplevel {push [set [incr ip]]}
+: BRANCH  uplevel {incr ip [set [incr ip]]; incr ip -1}
+: 0BRANCH uplevel {if {![pop]} {BRANCH} else {incr ip}}
 
 if {$tcl_interactive} return
 docol LIT 0 DUP . LIT 1 + DUP LIT 100 > 0BRANCH -10 DROP EXIT LIT 0 .
