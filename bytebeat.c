@@ -40,7 +40,6 @@ int main(int argc, char **argv)
 	int t = 0;
 	if (argc < 2)
 		return 1;
-	for (;;) {
+	for (;;)
 		putchar(interpret(argv[1], t++));
-	}
 }
