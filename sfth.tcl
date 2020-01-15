@@ -27,21 +27,43 @@ proc unknown {args} {
 	}
 }
 
-set srcfilt {
-	BEGIN  "; while {1} \{"
-	WHILE  "; if {!\[pop]} break; "
-	UNTIL  "; if {\[pop]} break\} "
-	REPEAT "\}; "
-	AGAIN  "\}; "
-
-	IF     "; if {\[pop]} \{"
-	ELSE   "\} else \{"
-	THEN   "\}"
-}
+proc compile {args} {lappend ::forth($::last) {*}$args}
 proc : {name args} {
-	set ::forth($name) [string map $::srcfilt $args]
+	set ::last $name
+	if {[lindex $args 0] in [info commands]} {
+		set ::forth($::last) $args
+		return
+	}
+	set ::forth($::last) docol
+	foreach word $args {
+		if {[string is double $word]} {
+			compile LIT $word
+		} elseif {[info exists ::imm($word)]} {
+			eval $::forth($word)
+		} else {
+			compile $word
+		}
+	}
+	compile EXIT
 	return
 }
+
+proc docol {args} {
+	foreach word $args {set [incr i] $word}
+	while {[incr ip] <= [llength $args]} {
+		eval $::forth([set $ip])
+	}
+}
+
+: EXIT    return
+: LIT     eval {push [set [incr ip]]}
+: BRANCH  eval {incr ip [set [incr ip]]; incr ip -1}
+: 0BRANCH eval {if {![pop]} {eval $::forth(BRANCH)} else {incr ip}}
+
+: IMMEDIATE eval {set ::imm($::last) 1}
+: , with {a} {compile $a}
+: HERE eval {push [llength $::forth($::last)]}
+: C! with {a b} {lset ::forth($::last) $b $a}
 
 : .    with {a}     {puts -nonewline "$a "; flush stdout}
 : .S   eval         {puts "<[llength $::stack]> $::stack"}
@@ -60,18 +82,22 @@ proc : {name args} {
 : TUCK with {a b}   {push $b $a $b}
 : ROT  with {a b c} {push $b $c $a}
 
-proc docol {args} {
-	foreach word $args {set [incr i] $word}
-	while {[incr ip] <= [llength $args]} {
-		eval [set $ip]
-	}
-}
+: MARK> HERE LIT UNRESOLVED , ;
+: MARK< HERE ;
+: >RESOLVE HERE OVER - SWAP C! ;
+: <RESOLVE HERE - , ;
 
-: EXIT    tailcall uplevel return
-: LIT     uplevel {push [set [incr ip]]}
-: BRANCH  uplevel {incr ip [set [incr ip]]; incr ip -1}
-: 0BRANCH uplevel {if {![pop]} {BRANCH} else {incr ip}}
+: IF LIT 0BRANCH , MARK> ; IMMEDIATE
+: ELSE LIT BRANCH , MARK> SWAP >RESOLVE ; IMMEDIATE
+: THEN >RESOLVE ; IMMEDIATE
+
+: BEGIN MARK< ; IMMEDIATE
+: WHILE LIT 0BRANCH , MARK> SWAP ; IMMEDIATE
+: REPEAT LIT BRANCH , <RESOLVE >RESOLVE ; IMMEDIATE
+: AGAIN LIT BRANCH , <RESOLVE ; IMMEDIATE
+: UNTIL LIT 0BRANCH , <RESOLVE ; IMMEDIATE
 
 if {$tcl_interactive} return
-: TEST 0 BEGIN DUP 20 < WHILE 1 + DUP . REPEAT DROP CR EXIT 0 . ;
-TEST
+: TEST BEGIN DUP 0 > WHILE DUP . 1 - REPEAT EXIT . ;
+puts $::forth(TEST)
+100 TEST
