@@ -1,20 +1,20 @@
+#ifndef FTHUTIL_H
+#define FTHUTIL_H
+
 #include <stddef.h>
 #include <stdbool.h>
 
-typedef long long int cell;
+/*
+ * 	Utilities for use in Forth primitives
+ */
 
-struct fthdef {
-	struct fthdef *prev;
-	char *name;
-	bool imm : 1;
-	cell len : 8*sizeof(cell)-1;
-	void *cf;
-	void **data[];
-};
+typedef long long int cell;
 
 #define COUNT(a) (sizeof(a)/sizeof(a[0]))
 
 #ifdef NO_ASM
+// NO_ASM causes an empty macro asm to be defined.
+// This removes all asm uses, including for labels.
 #define asm(...)
 #endif
 
@@ -46,3 +46,5 @@ struct fthdef {
 		(z) = tmp; \
 	} while (0)
 
+
+#endif
