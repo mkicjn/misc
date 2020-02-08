@@ -1,12 +1,9 @@
 CC = clang
-CFLAGS = -Os
-SRCS =
+CFLAGS = -Os -g
+SRCS = code/*.c
 
-a.out: main.c
+a.out: main.c *.h
 	$(CC) $(CFLAGS) $< -o $@
-
-code.c: names.c
-	find $(SRCS) | grep ".c$$" | sed 's/.*/#include "&"/' > $@
 
 .PHONY: clean
 clean:

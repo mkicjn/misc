@@ -41,8 +41,11 @@ struct fthdef cn = { \
 	X(lit_d,&bye_d,"LIT",0,&&lit_c) \
 	X(exit_d,&lit_d,"EXIT",0,&&exit_c) \
 	X(docol_d,&exit_d,"DOCOL",0,&&docol_c) \
-	X(swap_d,&docol_d,"SWAP",0,&&swap_c) \
-	X(add_d,&swap_d,"+",0,&&add_c) \
+	X(dup_d,&docol_d,"DUP",0,&&dup_c) \
+	X(drop_d,&dup_d,"DROP",0,&&drop_c) \
+	X(swap_d,&drop_d,"SWAP",0,&&swap_c) \
+	X(rot_d,&swap_d,"ROT",0,&&rot_c) \
+	X(add_d,&rot_d,"+",0,&&add_c) \
 	X(cell_d,&add_d,"CELL",0,&&docol_c, \
 		LIT(sizeof(cell)),XT(exit) \
 	) \
