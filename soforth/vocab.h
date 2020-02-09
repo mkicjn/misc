@@ -40,12 +40,24 @@ struct fthdef cn = { \
 	X(bye_d,NULL,"BYE",0,&&bye_c) \
 	X(lit_d,&bye_d,"LIT",0,&&lit_c) \
 	X(exit_d,&lit_d,"EXIT",0,&&exit_c) \
-	X(docol_d,&exit_d,"DOCOL",0,&&docol_c) \
+	X(execute_d,&exit_d,"EXECUTE",0,&&execute_c) \
+	X(branch_d,&execute_d,"BRANCH",0,&&branch_c) \
+	X(qbranch_d,&branch_d,"?BRANCH",0,&&qbranch_c) \
+\
+	X(docol_d,&qbranch_d,"DOCOL",0,&&docol_c) \
 	X(dup_d,&docol_d,"DUP",0,&&dup_c) \
 	X(drop_d,&dup_d,"DROP",0,&&drop_c) \
 	X(swap_d,&drop_d,"SWAP",0,&&swap_c) \
 	X(rot_d,&swap_d,"ROT",0,&&rot_c) \
-	X(add_d,&rot_d,"+",0,&&add_c) \
+\
+	X(over_d,&rot_d,"OVER",0,&&over_c) \
+	X(nip_d,&over_d,"NIP",0,&&nip_c) \
+	X(tuck_d,&nip_d,"TUCK",0,&&tuck_c) \
+	X(unrot_d,&tuck_d,"-ROT",0,&&unrot_c) \
+	X(qdup_d,&unrot_d,"?DUP",0,&&qdup_c) \
+\
+	X(add_d,&qdup_d,"+",0,&&add_c) \
+\
 	X(cell_d,&add_d,"CELL",0,&&docol_c, \
 		LIT(sizeof(cell)),XT(exit) \
 	) \
