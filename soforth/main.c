@@ -48,6 +48,30 @@ qbranch_c:
 		goto branch_c;
 	ip++;
 	NEXT();
+
+	// Stack manipulation
+lit_c:
+	asm("lit_c:");
+	PUSH(sp) = tos;
+	tos = *(cell *)ip++;
+	NEXT();
+dup_c:
+	asm("dup_c:");
+	PUSH(sp) = tos;
+	NEXT();
+drop_c:
+	asm("drop_c:");
+	tos = POP(sp);
+	NEXT();
+swap_c:
+	asm("swap_c:");
+	SWAP(cell, tos,sp[-1]);
+	NEXT();
+rot_c: 
+	asm("rot_c:");
+	ROT(cell,sp[-2],sp[-1],tos);
+	NEXT();
+
 over_c:
 	asm("over_c:");
 	PUSH(sp) = tos;
@@ -71,29 +95,6 @@ qdup_c:
 	asm("qdup_c:");
 	if (tos)
 		PUSH(sp) = tos;
-	NEXT();
-
-	// Stack manipulation
-lit_c:
-	asm("lit_c:");
-	PUSH(sp) = tos;
-	tos = *(cell *)ip++;
-	NEXT();
-dup_c:
-	asm("dup_c:");
-	PUSH(sp) = tos;
-	NEXT();
-drop_c:
-	asm("drop_c:");
-	tos = POP(sp);
-	NEXT();
-swap_c:
-	asm("swap_c:");
-	SWAP(cell, tos,sp[-1]);
-	NEXT();
-rot_c: 
-	asm("rot_c:");
-	ROT(cell,sp[-2],sp[-1],tos);
 	NEXT();
 
 	// Arithmetic
