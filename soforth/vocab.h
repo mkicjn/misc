@@ -48,17 +48,17 @@ struct fthdef cn = { \
 	X(dup_d,&docol_d,"DUP",0,&&dup_c) \
 	X(drop_d,&dup_d,"DROP",0,&&drop_c) \
 	X(swap_d,&drop_d,"SWAP",0,&&swap_c) \
-	X(rot_d,&swap_d,"ROT",0,&&rot_c) \
+	X(over_d,&swap_d,"OVER",0,&&over_c) \
 \
-	X(over_d,&rot_d,"OVER",0,&&over_c) \
-	X(nip_d,&over_d,"NIP",0,&&nip_c) \
-	X(tuck_d,&nip_d,"TUCK",0,&&tuck_c) \
-	X(unrot_d,&tuck_d,"-ROT",0,&&unrot_c) \
-	X(qdup_d,&unrot_d,"?DUP",0,&&qdup_c) \
+	X(store_d,&over_d,"!",0,&&store_c) \
+	X(fetch_d,&store_d,"@",0,&&fetch_c) \
+	X(cstore_c,&fetch_d,"C!",0,&&cstore_c) \
+	X(cfetch_c,&cstore_c,"C@",0,&&cfetch_c) \
 \
-	X(add_d,&qdup_d,"+",0,&&add_c) \
+	X(add_d,&cfetch_c,"+",0,&&add_c) \
+	X(zlt_d,&add_d,"0<",0,&&zlt_c) \
 \
-	X(cell_d,&add_d,"CELL",0,&&docol_c, \
+	X(cell_d,&zlt_d,"CELL",0,&&docol_c, \
 		LIT(sizeof(cell)),XT(exit) \
 	) \
 // LAST_VOC is needed for the engine to know where to start filling in code fields

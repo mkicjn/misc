@@ -19,29 +19,29 @@ cell *engine(FTHREGS)
 
 	// Control flow
 bye_c:
-	asm("bye_c:");
+	asm("bye:");
 	*sp = tos;
 	return sp;
 docol_c:
-	asm("docol_c:");
+	asm("docol:");
 	PUSH(rp) = (cell)ip;
 	ip = (void ***)&wp[1];
 	NEXT();
 exit_c:
-	asm("exit_c:");
+	asm("exit:");
 	ip = (void ***)POP(rp);
 	NEXT();
 execute_c:
-	asm("execute_c:");
+	asm("execute:");
 	wp = (void **)tos;
 	tos = POP(sp);
 	goto **wp;
 branch_c:
-	asm("branch_c:");
+	asm("branch:");
 	ip += *(cell *)ip;
 	NEXT();
 qbranch_c:
-	asm("qbranch_c:");
+	asm("qbranch:");
 	wp = (void **)tos;
 	tos = POP(sp);
 	if (!wp)
@@ -51,56 +51,56 @@ qbranch_c:
 
 	// Stack manipulation
 lit_c:
-	asm("lit_c:");
+	asm("lit:");
 	PUSH(sp) = tos;
 	tos = *(cell *)ip++;
 	NEXT();
 dup_c:
-	asm("dup_c:");
+	asm("dup:");
 	PUSH(sp) = tos;
 	NEXT();
 drop_c:
-	asm("drop_c:");
+	asm("drop:");
 	tos = POP(sp);
 	NEXT();
 swap_c:
-	asm("swap_c:");
+	asm("swap:");
 	SWAP(cell, tos,sp[-1]);
 	NEXT();
-rot_c: 
-	asm("rot_c:");
-	ROT(cell,sp[-2],sp[-1],tos);
-	NEXT();
-
 over_c:
-	asm("over_c:");
+	asm("over:");
 	PUSH(sp) = tos;
 	tos = sp[-2];
 	NEXT();
-nip_c:
-	asm("nip_c:");
-	(void)POP(sp);
+
+	// Memory access
+store_c:
+	asm("store:");
+	*(cell *)tos = POP(sp);
+	tos = POP(sp);
 	NEXT();
-tuck_c:
-	asm("tuck_c:");
-	wp = (void **)sp[-1];
-	sp[-1] = tos;
-	PUSH(sp) = (cell)wp;
+fetch_c:
+	asm("fetch:");
+	tos = *(cell *)tos;
 	NEXT();
-unrot_c:
-	asm("unrot_c:");
-	ROT(cell, tos, sp[-1], sp[-2]);
+cstore_c:
+	asm("cstore:");
+	*(char *)tos = POP(sp);
+	tos = POP(sp);
 	NEXT();
-qdup_c:
-	asm("qdup_c:");
-	if (tos)
-		PUSH(sp) = tos;
+cfetch_c:
+	asm("cfetch:");
+	tos = *(char *)tos;
 	NEXT();
 
-	// Arithmetic
+	// Numerical operations
 add_c:
-	asm("add_c:");
+	asm("add:");
 	tos += POP(sp);
+	NEXT();
+zlt_c:
+	asm("zlt:");
+	tos = (tos < 0) ? ~0 : 0;
 	NEXT();
 }
 
