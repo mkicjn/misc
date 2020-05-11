@@ -69,8 +69,11 @@ int main(int argc, char **argv)
 		if (argc > 4)
 			sscanf(argv[4], "%d", &n);
 		for (int i = 0; i < y; i++) {
-			for (int j = 0; j < x; j++)
-				printf("%d,", cbrng(++n));
+			for (int j = 0; j < x; j++) {
+				printf("%d", cbrng(++n));
+				if (j < x - 1)
+					putchar(',');
+			}
 			putchar('\n');
 		}
 		break;
