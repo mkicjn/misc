@@ -7,7 +7,7 @@ int main(int argc, char **argv)
 	if (argc > 1)
 		sscanf(argv[1], "%d", &size);
 
-	printf(CLS CUP("0","0"));
+	printf(CLS CUP("1","1"));
 
 	for (int y = 0; y < size; y++) {
 		for (int x = 0; x < size; x++) {
@@ -21,5 +21,5 @@ int main(int argc, char **argv)
 		printf(SGR(RESET) "\n");
 	}
 
-	printf(SGR(RESET) CUP("%d","1"), size + 2);
+	return 0;
 }
