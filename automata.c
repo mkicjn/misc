@@ -108,9 +108,9 @@ int main(int argc, char **argv)
 		g->field[i] = r;
 	}
 
-	printf(CSI CLS);
+	printf(CLS);
 	for (;;) {
-		printf(AT_XY(1,1));
+		printf(CUP("1","1"));
 		print_binary_grid(g);
 
 		usleep(1000000);
