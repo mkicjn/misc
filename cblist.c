@@ -76,11 +76,16 @@ val_t cbl_del(struct cblist *l, key_t k)
 	return prev;
 }
 
-void cbl_init(struct cblist *l, struct entry *m, size_t s)
+void cbl_init(struct cblist *l, void *m, size_t s)
 {
 	s /= sizeof(struct entry);
-	s >>= 1;
-	s = (1 << ffs(s)) - 1;
+        s >>= 1;
+	s |= s >>  1;
+	s |= s >>  2;
+	s |= s >>  4;
+	s |= s >>  8;
+	s |= s >> 16;
+	s |= s >> 32;
 
 	l->mem = m;
 	l->head = 0;
@@ -117,9 +122,8 @@ void cbl_print(struct cblist *l)
 
 int main()
 {
-#define SIZE 3
 	struct cblist list;
-	struct entry mem[1 << SIZE];
+	struct entry mem[15];
 
 #define DBG(x) do {puts(#x); x; cbl_print(&list);} while (0)
 	DBG(cbl_init(&list, mem, sizeof(mem)));
