@@ -21,7 +21,7 @@ bool cbl_seek(struct cblist *l, key_t k)
 	register size_t mask = l->mask;
 	if (l->mem[l->head].key == k)
 		return true;
-	int i = (l->head + 1) & l->mask;
+	size_t i = (l->head + 1) & l->mask;
 	while (i != l->tail) {
 		if (l->mem[i].key == k) {
 			// Duplicate search key's entry to head
@@ -39,22 +39,21 @@ bool cbl_seek(struct cblist *l, key_t k)
 
 bool cbl_full(struct cblist *l)
 { // Returns true if l has no more free space
-	return l->head == (l->tail + 1) & l->mask;
+	return l->head == ((l->tail + 1) & l->mask);
 }
 
-bool cbl_set(struct cblist *l, key_t k, val_t v)
-{ // Sets k to v in l, making new entry if necessary; returns success
+val_t cbl_set(struct cblist *l, key_t k, val_t v)
+{ // Sets k to v in l, making new entry if necessary; returns previous value or 0
+	val_t prev = (val_t)0;
 	if (cbl_seek(l, k)) {
+		prev = l->mem[l->head].val;
 		l->mem[l->head].val = v;
-		return true;
-	} else {
-		if (cbl_full(l))
-			return false;
+	} else if (!cbl_full(l)) {
 		l->head = (l->head - 1) & l->mask;
 		l->mem[l->head].key = k;
 		l->mem[l->head].val = v;
-		return true;
 	}
+	return prev;
 }
 
 bool cbl_found;
@@ -63,17 +62,20 @@ val_t cbl_get(struct cblist *l, key_t k)
 	if ((cbl_found = cbl_seek(l, k)))
 		return l->mem[l->head].val;
 	else
-		return (val_t)~0;
+		return (val_t)0;
 }
 
 val_t cbl_del(struct cblist *l, key_t k)
-{ // Removes entry for k from l
+{ // Removes entry for k from l, returns its value or 0
+	val_t prev = (val_t)0;
 	if (cbl_seek(l, k)) {
+		prev = l->mem[l->head].val;
 		l->head = (l->head + 1) & l->mask;
 	}
+	return prev;
 }
 
-val_t cbl_init(struct cblist *l, struct entry *m, size_t s) // s must be a power of 2!
+void cbl_init(struct cblist *l, struct entry *m, size_t s) // s must be a power of 2!
 {
 	l->mem = m;
 	l->head = 0;
@@ -97,7 +99,7 @@ key_t hash(char *s)
 
 void cbl_print(struct cblist *l)
 {
-	for (int i = 0; i <= l->mask; i++) {
+	for (size_t i = 0; i <= l->mask; i++) {
 		printf("%lu\t->\t%lu", l->mem[i].key, l->mem[i].val);
 		if (l->head == i)
 			printf("\t(head)");
@@ -108,13 +110,14 @@ void cbl_print(struct cblist *l)
 	printf("\n\n\n");
 }
 
-int main(int argc, char **argv)
+int main()
 {
-	struct entry array[1 << 3] = {0};
+#define SIZE 3
 	struct cblist list;
+	struct entry mem[1 << SIZE];
 
 #define DBG(x) do {puts(#x); x; cbl_print(&list);} while (0)
-	DBG(cbl_init(&list, array, 1 << 3));
+	DBG(cbl_init(&list, mem, 1 << SIZE));
 	DBG(cbl_set(&list, hash("a"), 1));
 	DBG(cbl_set(&list, hash("b"), 2));
 	DBG(cbl_set(&list, hash("c"), 3));
