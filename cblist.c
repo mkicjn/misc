@@ -77,7 +77,7 @@ val_t cbl_del(struct cblist *l, key_t k)
 }
 
 static inline unsigned int bsr(unsigned long int n)
-{
+{ // Clang optimizes this to a BSR instruction
 	unsigned int c = 0;
 	while (n >>= 1)
 		c++;
@@ -87,7 +87,7 @@ static inline unsigned int bsr(unsigned long int n)
 void cbl_init(struct cblist *l, void *m, size_t s)
 {
 	s /= sizeof(struct entry);
-	s = (1 << (bsr(s) - 1)) - 1;
+	s = (1 << bsr(s)) - 1;
 
 	l->mem = m;
 	l->head = 0;
