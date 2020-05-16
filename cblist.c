@@ -76,16 +76,18 @@ val_t cbl_del(struct cblist *l, key_t k)
 	return prev;
 }
 
+static inline unsigned int bsr(unsigned long int n)
+{
+	unsigned int c = 0;
+	while (n >>= 1)
+		c++;
+	return c;
+}
+
 void cbl_init(struct cblist *l, void *m, size_t s)
 {
 	s /= sizeof(struct entry);
-        s >>= 1;
-	s |= s >>  1;
-	s |= s >>  2;
-	s |= s >>  4;
-	s |= s >>  8;
-	s |= s >> 16;
-	s |= s >> 32;
+	s = (1 << (bsr(s) - 1)) - 1;
 
 	l->mem = m;
 	l->head = 0;
