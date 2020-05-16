@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 
 typedef unsigned long key_t;
 typedef unsigned long val_t;
@@ -75,12 +76,16 @@ val_t cbl_del(struct cblist *l, key_t k)
 	return prev;
 }
 
-void cbl_init(struct cblist *l, struct entry *m, size_t s) // s must be a power of 2!
+void cbl_init(struct cblist *l, struct entry *m, size_t s)
 {
+	s /= sizeof(struct entry);
+	s >>= 1;
+	s = (1 << ffs(s)) - 1;
+
 	l->mem = m;
 	l->head = 0;
 	l->tail = 0;
-	l->mask = s - 1;
+	l->mask = s;
 }
 
 /*
@@ -117,7 +122,7 @@ int main()
 	struct entry mem[1 << SIZE];
 
 #define DBG(x) do {puts(#x); x; cbl_print(&list);} while (0)
-	DBG(cbl_init(&list, mem, 1 << SIZE));
+	DBG(cbl_init(&list, mem, sizeof(mem)));
 	DBG(cbl_set(&list, hash("a"), 1));
 	DBG(cbl_set(&list, hash("b"), 2));
 	DBG(cbl_set(&list, hash("c"), 3));
