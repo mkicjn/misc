@@ -13,13 +13,6 @@ static inline int clamp(int x, int lo, int hi)
 	return max(lo, min(x, hi-1));
 }
 
-void clear(void)
-{
-	for (int i = 0; i < CANVAS_WIDTH; i++)
-		for (int j = 0; j < CANVAS_HEIGHT; j++)
-			set_pixel(i,j, 0);
-}
-
 static inline void swap(int *a, int *b)
 {
 	int c = *a;
@@ -27,18 +20,20 @@ static inline void swap(int *a, int *b)
 	*b = c;
 }
 
-void vline(int x, int y0, int y1)
+void clear(void)
 {
-	if (y1 < y0)
-		swap(&y0, &y1);
-	for (int y = y0; y <= y1; y++)
-		set_pixel(x, y, ~0);
+	for (int i = 0; i < CANVAS_WIDTH; i++)
+		for (int j = 0; j < CANVAS_HEIGHT; j++)
+			set_pixel(i, j, 0);
 }
 
 void line(int x0, int y0, int x1, int y1)
 {
 	if (x1 == x0) {
-		vline(x0, y0, y1);
+		if (y1 < y0)
+			swap(&y0, &y1);
+		for (int y = y0; y <= y1; y++)
+			set_pixel(x0, y, ~0);
 		return;
 	}
 	float m = (float)(y1-y0) / (x1-x0);
@@ -52,16 +47,14 @@ void line(int x0, int y0, int x1, int y1)
 			set_pixel(x, y, ~0);
 		}
 	} else { // |slope| > 1
-		swap(&x0, &y0);
-		swap(&x1, &y1);
-		if (x0 > x1) {
+		if (y0 > y1) {
 			swap(&x0, &x1);
 			swap(&y0, &y1);
 		}
 		m = 1.0 / m;
-		for (int x = x0; x <= x1; x++) {
-			int y = y0 + m * (x - x0);
-			set_pixel(y, x, ~0);
+		for (int y = y0; y <= y1; y++) {
+			int x = x0 + m * (y - y0);
+			set_pixel(x, y, ~0);
 		}
 	}
 }
