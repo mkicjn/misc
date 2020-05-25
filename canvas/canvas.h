@@ -12,6 +12,10 @@ enum button {
 	KEY_LSHIFT,
 	KEY_LALT,
 
+	BTN_LMOUSE,
+	BTN_RMOUSE,
+	BTN_MMOUSE,
+
 	NUM_BUTTONS
 };
 
@@ -20,7 +24,10 @@ void pixel_set(int, int, int);
 void video_update(void);
 void video_end(void);
 
-bool user_quit(void);
+int mouse_x(void);
+int mouse_y(void);
 bool button_down(enum button);
+
+bool user_quit(void);
 
 #endif

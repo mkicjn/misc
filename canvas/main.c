@@ -8,6 +8,7 @@ int main()
 	if (!video_start())
 		return 1;
 
+	// Pixel drawing test
 	double const w = 0.57735026919; // = 1.0 / tan(M_PI/3);
 	for (int y = 0; y < 480; y++) {
 		for (int x = 0; x < 640; x++) {
@@ -29,11 +30,14 @@ int main()
 	}
 	video_update();
 
+	// Mouse and keyboard test
 	while (!user_quit()) {
 		long int balance = 0;
 		while (!button_down(KEY_LCTRL) && !button_down(KEY_LALT))
 			if (user_quit())
 				break;
+		mouse_x();
+		mouse_y();
 		while (button_down(KEY_LCTRL) && !button_down(KEY_LALT))
 			balance--;
 		while (!button_down(KEY_LCTRL) && button_down(KEY_LALT))
@@ -45,6 +49,7 @@ int main()
 		while (!button_down(KEY_LCTRL) && button_down(KEY_LALT))
 			balance++;
 		printf("Balance: %ld\n", balance);
+		printf("Mouse movement since start: %d, %d\n", mouse_x(), mouse_y());
 	}
 
 	video_end();
