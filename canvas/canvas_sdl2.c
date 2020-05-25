@@ -1,7 +1,9 @@
 #include "canvas.h"
+#include <SDL2/SDL.h>
 
 static bool quitstate = false;
 static bool buttonstate[NUM_BUTTONS] = {false};
+
 static void check_events(void)
 {
 	SDL_Event ev;
