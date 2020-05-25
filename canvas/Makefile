@@ -5,17 +5,25 @@ LDFLAGS = -lm -lSDL2
 
 BACKEND = sdl2
 
-a.out: main.o canvas.o
+all: paint test
+
+paint:	paint.o canvas.o
 	$(CC) $(LDFLAGS) $^ -o $@
 
-main.o: main.c
+test:	test.o canvas.o
+	$(CC) $(LDFLAGS) $^ -o $@
+
+test.o: test.c
 	$(CC) $(CFLAGS) $< -c -o $@
 
-canvas.o: canvas_$(BACKEND).c canvas.h
+paint.o: paint.c
+	$(CC) $(CFLAGS) $< -c -o $@
+
+canvas.o: src/canvas_$(BACKEND).c src/canvas.h
 	$(CC) $(CFLAGS) $< -c -o $@
 
 .PHONY: clean
 clean:
-	rm -f a.out *.o
+	rm -f paint test *.o
 cleaner: clean
-	rm -f .*~ *~
+	rm -f rm .*~ *~ */.*~ */*~

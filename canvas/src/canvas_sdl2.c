@@ -29,9 +29,9 @@ static void check_events(void)
 		case SDL_MOUSEBUTTONUP:
 			down = ev.button.state == SDL_PRESSED;
 			switch (ev.button.button) {
-			case SDL_BUTTON_LEFT:	buttonstate[BTN_LMOUSE] = down; break;
-			case SDL_BUTTON_RIGHT:	buttonstate[BTN_RMOUSE] = down; break;
-			case SDL_BUTTON_MIDDLE:	buttonstate[BTN_MMOUSE] = down; break;
+			case SDL_BUTTON_LEFT:	buttonstate[BTN_LMOUSE]	= down; break;
+			case SDL_BUTTON_RIGHT:	buttonstate[BTN_RMOUSE]	= down; break;
+			case SDL_BUTTON_MIDDLE:	buttonstate[BTN_MMOUSE]	= down; break;
 			}
 			break;
 		case SDL_MOUSEMOTION:
@@ -50,7 +50,9 @@ static SDL_Surface *surface;
 bool video_start(void)
 {
 	SDL_Init(SDL_INIT_VIDEO);
-	window = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, 0);
+	window = SDL_CreateWindow("",
+			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+			CANVAS_WIDTH, CANVAS_HEIGHT, 0);
 	surface = SDL_GetWindowSurface(window);
 	SDL_LockSurface(surface);
 	return window != NULL;
@@ -65,7 +67,7 @@ void video_update(void)
 
 void pixel_set(int x, int y, int c)
 {
-	if (x < 0 || x >= 640 || y < 0 || y >= 480)
+	if (x < 0 || x >= CANVAS_WIDTH || y < 0 || y >= CANVAS_HEIGHT)
 		return;
 	((int *)surface->pixels)[x + y * surface->w] = c;
 }

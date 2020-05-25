@@ -1,6 +1,13 @@
 #ifndef CANVAS_H
 #define CANVAS_H
 
+#ifndef CANVAS_WIDTH
+#define CANVAS_WIDTH 640
+#endif
+#ifndef CANVAS_HEIGHT
+#define CANVAS_HEIGHT 480
+#endif
+
 #include <stdbool.h>
 
 enum button {

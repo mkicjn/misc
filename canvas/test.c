@@ -1,7 +1,5 @@
 #include <stdio.h>
-#include "canvas.h"
-
-// Test program
+#include "src/canvas.h"
 
 int main()
 {
@@ -10,10 +8,10 @@ int main()
 
 	// Pixel drawing test
 	double const w = 0.57735026919; // = 1.0 / tan(M_PI/3);
-	for (int y = 0; y < 480; y++) {
-		for (int x = 0; x < 640; x++) {
-			double xf = (2.0 *  (double)x/640 - 1.0) * w;
-			double yf =  1.0 - ((double)y/480);
+	for (int y = 0; y < CANVAS_HEIGHT; y++) {
+		for (int x = 0; x < CANVAS_WIDTH; x++) {
+			double xf = (2.0 *  (double)x/CANVAS_WIDTH - 1.0) * w;
+			double yf =  1.0 - ((double)y/CANVAS_HEIGHT);
 
 			double p_green = yf;
 			double p_blue  = 1.0 - (0.5 * (1.0 + yf + xf/w));
