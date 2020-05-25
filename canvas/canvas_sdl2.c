@@ -1,5 +1,6 @@
 #include "canvas.h"
 #include <SDL2/SDL.h>
+#include <stdint.h>
 
 static bool quitstate = false;
 static bool buttonstate[NUM_BUTTONS] = {false};
@@ -30,19 +31,35 @@ static void check_events(void)
 	}
 }
 
+static SDL_Window *window;
+static SDL_Surface *surface;
 bool video_start(void)
 {
-	SDL_Window *win;
 	SDL_Init(SDL_INIT_VIDEO);
-	win = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, 0);
-	return win != NULL;
+	window = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, 0);
+	surface = SDL_GetWindowSurface(window);
+	SDL_LockSurface(surface);
+	return window != NULL;
+}
+
+void video_update(void)
+{
+	SDL_UnlockSurface(surface);
+	SDL_UpdateWindowSurface(window);
+	SDL_LockSurface(surface);
+}
+
+void pixel_set(int x, int y, int c)
+{
+	if (x < 0 || x >= 640 || y < 0 || y >= 480)
+		return;
+	((int *)surface->pixels)[x + y * surface->w] = c;
 }
 
 void video_end(void)
 {
 	SDL_Quit();
 }
-
 
 bool user_quit(void)
 {

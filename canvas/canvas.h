@@ -16,7 +16,10 @@ enum button {
 };
 
 bool video_start(void);
+void pixel_set(int, int, int);
+void video_update(void);
 void video_end(void);
+
 bool user_quit(void);
 bool button_down(enum button);
 
