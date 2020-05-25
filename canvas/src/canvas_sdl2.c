@@ -65,7 +65,7 @@ void video_update(void)
 	SDL_LockSurface(surface);
 }
 
-void pixel_set(int x, int y, int c)
+void set_pixel(int x, int y, int c)
 {
 	if (x < 0 || x >= CANVAS_WIDTH || y < 0 || y >= CANVAS_HEIGHT)
 		return;
