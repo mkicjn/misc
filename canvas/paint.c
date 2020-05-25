@@ -15,11 +15,9 @@ static inline int clamp(int x, int lo, int hi)
 
 void clear(void)
 {
-	if (button_down(BTN_RMOUSE)) {
-		for (int i = 0; i < CANVAS_WIDTH; i++)
-			for (int j = 0; j < CANVAS_HEIGHT; j++)
-				pixel_set(i,j, 0);
-	}
+	for (int i = 0; i < CANVAS_WIDTH; i++)
+		for (int j = 0; j < CANVAS_HEIGHT; j++)
+			pixel_set(i,j, 0);
 }
 
 int main()
