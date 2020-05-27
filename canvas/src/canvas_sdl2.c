@@ -23,6 +23,7 @@ static void check_events(void)
 			case SDLK_LCTRL:	buttonstate[KEY_LCTRL]	= down; break;
 			case SDLK_LSHIFT:	buttonstate[KEY_LSHIFT]	= down; break;
 			case SDLK_LALT:		buttonstate[KEY_LALT]	= down; break;
+			case SDLK_ESCAPE:	buttonstate[KEY_ESC]	= down; break;
 			}
 			break;
 		case SDL_MOUSEBUTTONDOWN: // Fallthrough
@@ -85,7 +86,7 @@ int mouse_y(void)
 	return y;
 }
 
-void video_end(void)
+void video_stop(void)
 {
 	SDL_Quit();
 }
@@ -100,4 +101,16 @@ bool button_down(enum button b)
 {
 	check_events();
 	return buttonstate[b];
+}
+
+static uint64_t last_tick = 0;
+void tick(void)
+{
+	last_tick = SDL_GetPerformanceCounter();
+}
+
+double tock(void)
+{
+	double dt = SDL_GetPerformanceCounter() - last_tick;
+	return dt / SDL_GetPerformanceFrequency();
 }

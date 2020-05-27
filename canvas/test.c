@@ -16,7 +16,7 @@ int main()
 			double p_green = yf;
 			double p_blue  = 1.0 - (0.5 * (1.0 + yf + xf/w));
 			double p_red   = 1.0 - p_green - p_blue;
-			if (p_red < -0.0 || p_blue < 0.0) {
+			if (p_red < 0.0 || p_blue < 0.0) {
 				set_pixel(x, y, 0);
 				continue;
 			}
@@ -50,6 +50,6 @@ int main()
 		printf("Mouse movement since start: %d, %d\n", mouse_x(), mouse_y());
 	}
 
-	video_end();
+	video_stop();
 	return 0;
 }
