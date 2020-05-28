@@ -12,20 +12,20 @@
 #include <stdbool.h>
 
 enum button {
-	KEY_W,
-	KEY_A,
-	KEY_S,
-	KEY_D,
-	KEY_LCTRL,
+	KEY_ESC = '\033',
+	KEY_W = 'w',
+	KEY_A = 'a',
+	KEY_S = 's',
+	KEY_D = 'd',
+
+	KEY_LCTRL = 1 << 7, // Outside normal ascii
 	KEY_LSHIFT,
 	KEY_LALT,
-	KEY_ESC,
-
 	BTN_LMOUSE,
 	BTN_RMOUSE,
 	BTN_MMOUSE,
 
-	NUM_BUTTONS
+	NUM_BUTTONS = 255,
 };
 
 bool video_start(void);
