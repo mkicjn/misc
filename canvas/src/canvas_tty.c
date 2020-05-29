@@ -1,15 +1,13 @@
 #include "canvas.h"
 #include "aterm.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 #include <termios.h>
+#include <signal.h>
 
-enum io_state {
-	IO_INIT,
-	IO_RESET,
-};
-static void manage_io(enum io_state s)
+static void set_polling_stdin(bool b)
 {
 	static bool init = false;
 	static struct termios old, new;
@@ -21,28 +19,19 @@ static void manage_io(enum io_state s)
 		new.c_cc[VTIME] = 0;
 		init = true;
 	}
-	switch (s) {
-	case IO_INIT:
-		tcsetattr(STDIN_FILENO, TCSANOW, &new);
-		break;
-	case IO_RESET:
-		tcsetattr(STDIN_FILENO, TCSANOW, &old);
-		break;
-	}
-}
-int rx_char(void)
-{
-	char c;
-	if (read(STDIN_FILENO, &c, 1) > 0)
-		return c;
-	else
-		return -1;
+	tcsetattr(STDIN_FILENO, TCSANOW, b ? &new : &old);
 }
 
+static void video_interrupt(int sig)
+{
+	video_stop();
+	exit(sig);
+}
 bool video_start(void)
 {
-	printf(CUH CLS);
-	manage_io(IO_INIT);
+	printf(SGR(RESET) CUH CLS);
+	set_polling_stdin(true);
+	signal(SIGINT, video_interrupt);
 	return true;
 }
 
@@ -53,9 +42,9 @@ void video_update(void)
 
 void set_pixel(int x, int y, int c)
 {
-	int r = (c & 0x00FF0000) >> 16;
-	int g = (c & 0x0000FF00) >>  8;
-	int b = (c & 0x000000FF) >>  0;
+	int r = (c >> 16) & 0xFF;
+	int g = (c >>  8) & 0xFF;
+	int b = (c >>  0) & 0xFF;
 	printf(CUP("%d","%d"), y+1, (x+1)<<1);
 	printf(SGR(BG_COLR(CUSTOM RGB("%d","%d","%d"))) "  ",
 			r, g, b);
@@ -74,15 +63,16 @@ int mouse_y(void)
 
 void video_stop(void)
 {
-	printf(CLS CUP("1","1") CUS);
-	manage_io(IO_RESET);
+	printf(SGR(RESET) CLS CUP("1","1") CUS);
+	set_polling_stdin(false);
+	signal(SIGINT, SIG_DFL);
 }
 
 bool buttonstate[256] = {0};
 void update_keys(void)
 {
 	char c;
-	while ((c = rx_char()) >= 0)
+	while (read(STDIN_FILENO, &c, 1) > 0)
 		buttonstate[c] = true;
 }
 

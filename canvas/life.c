@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 
 		step_grid(g, conway);
 		display_binary_grid(g);
-		printf("Step and render took %f ms\n", 1000.0 * tock());
+		//printf("Step and render took %f ms\n", 1000.0 * tock());
 	}
 
 	destroy_grid(g);
