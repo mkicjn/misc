@@ -1,12 +1,5 @@
 #include "src/canvas.h"
 
-void clear(void)
-{
-	for (int i = 0; i < CANVAS_WIDTH; i++)
-		for (int j = 0; j < CANVAS_HEIGHT; j++)
-			set_pixel(i, j, 0);
-}
-
 int rainbow(int i)
 {
 	int mod = i & 255;
@@ -27,41 +20,25 @@ int rainbow(int i)
 	return ~0; // unreachable
 }
 
-#define SWAP(a,b) do { typeof(a) c = a; a = b; b = c; } while (0)
-
+#include <math.h>
 void line(int x0, int y0, int x1, int y1)
-{
+{ // This is a slow way to do this, but I don't care.
 	static int i = 0;
-	if (x1 == x0) {
-		if (y1 < y0)
-			SWAP(y0, y1);
-		for (int y = y0; y <= y1; y++)
-			set_pixel(x0, y, rainbow(i++));
-		return;
-	}
-	float m = (float)(y1-y0) / (x1-x0);
-	if (m < 1.0 && m > -1.0) { // |slope| < 1
-		if (x0 > x1) {
-			SWAP(x0, x1);
-			SWAP(y0, y1);
-		}
-		for (int x = x0; x <= x1; x++) {
-			int y = y0 + m * (x - x0);
-			set_pixel(x, y, rainbow(i++));
-		}
-	} else { // |slope| > 1
-		if (y0 > y1) {
-			SWAP(x0, x1);
-			SWAP(y0, y1);
-		}
-		m = 1.0 / m;
-		for (int y = y0; y <= y1; y++) {
-			int x = x0 + m * (y - y0);
-			set_pixel(x, y, rainbow(i++));
-		}
-	}
+	double dx = x1-x0, dy = y1-y0;
+	double m = sqrt(dx*dx + dy*dy);
+	dx /= m;
+	dy /= m;
+
+	for (double x=x0, y=y0; (x0<x1&&x<x1)||(x0>x1&&x>x1)||(y0<y1&&y<y1)||(y0>y1&&y>y1); x+=dx, y+=dy)
+		set_pixel(x, y, rainbow(i++));
 }
 
+void clear(void)
+{
+	for (int i = 0; i < CANVAS_WIDTH; i++)
+		for (int j = 0; j < CANVAS_HEIGHT; j++)
+			set_pixel(i, j, 0);
+}
 
 int main()
 {
