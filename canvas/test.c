@@ -34,8 +34,6 @@ int main()
 		while (!button_down(KEY_LCTRL) && !button_down(KEY_LALT))
 			if (user_quit())
 				break;
-		mouse_x();
-		mouse_y();
 		while (button_down(KEY_LCTRL) && !button_down(KEY_LALT))
 			balance--;
 		while (!button_down(KEY_LCTRL) && button_down(KEY_LALT))
@@ -47,7 +45,6 @@ int main()
 		while (!button_down(KEY_LCTRL) && button_down(KEY_LALT))
 			balance++;
 		printf("Balance: %ld\n", balance);
-		printf("Mouse movement since start: %d, %d\n", mouse_x(), mouse_y());
 	}
 
 	video_stop();

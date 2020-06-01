@@ -88,8 +88,8 @@ int main()
 	int x = 0, y = 0;
 	while (!user_quit()) {
 		int oldx = x, oldy = y;
-		x = clamp(x + mouse_x(), 0, CANVAS_WIDTH);
-		y = clamp(y + mouse_y(), 0, CANVAS_HEIGHT);
+		x = mouse_x();
+		y = mouse_y();
 		if (button_down(BTN_LMOUSE))
 			line(oldx, oldy, x, y);
 		if (button_down(BTN_RMOUSE))

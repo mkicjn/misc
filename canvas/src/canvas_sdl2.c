@@ -36,8 +36,8 @@ static void check_events(void)
 			}
 			break;
 		case SDL_MOUSEMOTION:
-			mousestate.x += ev.motion.xrel;
-			mousestate.y += ev.motion.yrel;
+			mousestate.x = ev.motion.x;
+			mousestate.y = ev.motion.y;
 			break;
 		case SDL_QUIT:
 			quitstate = true;
@@ -75,15 +75,25 @@ void set_pixel(int x, int y, int c)
 
 int mouse_x(void)
 {
-	int x = mousestate.x;
-	mousestate.x = 0;
-	return x;
+	return mousestate.x;
 }
 int mouse_y(void)
 {
-	int y = mousestate.y;
-	mousestate.y = 0;
-	return y;
+	return mousestate.y;
+}
+int mouse_xrel(void)
+{
+	static int x0 = 0;
+	int dx = mouse_x() - x0;
+	x0 += dx;
+	return dx;
+}
+int mouse_yrel(void)
+{
+	static int y0 = 0;
+	int dy = mouse_y() - y0;
+	y0 += dy;
+	return dy;
 }
 
 void video_stop(void)

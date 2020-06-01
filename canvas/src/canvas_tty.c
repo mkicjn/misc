@@ -51,12 +51,24 @@ void set_pixel(int x, int y, int c)
 	printf(CUP("%d","1") SGR(RESET), CANVAS_HEIGHT+1);
 }
 
-// TODO: Try to read /dev/input/mice?
 int mouse_x(void)
+{
+	static int x = 0;
+	x += mouse_xrel();
+	return x;
+}
+int mouse_y(void)
+{
+	static int y = 0;
+	y += mouse_yrel();
+	return y;
+}
+// TODO: Try to read /dev/input/mice?
+int mouse_xrel(void)
 {
 	return 0;
 }
-int mouse_y(void)
+int mouse_yrel(void)
 {
 	return 0;
 }
