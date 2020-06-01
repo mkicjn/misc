@@ -1,25 +1,5 @@
 #include "src/canvas.h"
 
-static inline int max(int a, int b)
-{
-	return a > b ? a : b;
-}
-static inline int min(int a, int b)
-{
-	return a < b ? a : b;
-}
-static inline int clamp(int x, int lo, int hi)
-{
-	return max(lo, min(x, hi-1));
-}
-
-static inline void swap(int *a, int *b)
-{
-	int c = *a;
-	*a = *b;
-	*b = c;
-}
-
 void clear(void)
 {
 	for (int i = 0; i < CANVAS_WIDTH; i++)
@@ -47,12 +27,14 @@ int rainbow(int i)
 	return ~0; // unreachable
 }
 
+#define SWAP(a,b) do { typeof(a) c = a; a = b; b = c; } while (0)
+
 void line(int x0, int y0, int x1, int y1)
 {
 	static int i = 0;
 	if (x1 == x0) {
 		if (y1 < y0)
-			swap(&y0, &y1);
+			SWAP(y0, y1);
 		for (int y = y0; y <= y1; y++)
 			set_pixel(x0, y, rainbow(i++));
 		return;
@@ -60,8 +42,8 @@ void line(int x0, int y0, int x1, int y1)
 	float m = (float)(y1-y0) / (x1-x0);
 	if (m < 1.0 && m > -1.0) { // |slope| < 1
 		if (x0 > x1) {
-			swap(&x0, &x1);
-			swap(&y0, &y1);
+			SWAP(x0, x1);
+			SWAP(y0, y1);
 		}
 		for (int x = x0; x <= x1; x++) {
 			int y = y0 + m * (x - x0);
@@ -69,8 +51,8 @@ void line(int x0, int y0, int x1, int y1)
 		}
 	} else { // |slope| > 1
 		if (y0 > y1) {
-			swap(&x0, &x1);
-			swap(&y0, &y1);
+			SWAP(x0, x1);
+			SWAP(y0, y1);
 		}
 		m = 1.0 / m;
 		for (int y = y0; y <= y1; y++) {

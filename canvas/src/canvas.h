@@ -35,8 +35,8 @@ void video_stop(void);
 
 int mouse_x(void);
 int mouse_y(void);
-int mouse_xrel(void);
-int mouse_yrel(void);
+int mouse_dx(void);
+int mouse_dy(void);
 bool button_down(enum button);
 
 bool user_quit(void);

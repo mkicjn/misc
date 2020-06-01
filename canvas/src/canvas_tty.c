@@ -54,21 +54,21 @@ void set_pixel(int x, int y, int c)
 int mouse_x(void)
 {
 	static int x = 0;
-	x += mouse_xrel();
+	x += mouse_dx();
 	return x;
 }
 int mouse_y(void)
 {
 	static int y = 0;
-	y += mouse_yrel();
+	y += mouse_dy();
 	return y;
 }
 // TODO: Try to read /dev/input/mice?
-int mouse_xrel(void)
+int mouse_dx(void)
 {
 	return 0;
 }
-int mouse_yrel(void)
+int mouse_dy(void)
 {
 	return 0;
 }

@@ -81,14 +81,14 @@ int mouse_y(void)
 {
 	return mousestate.y;
 }
-int mouse_xrel(void)
+int mouse_dx(void)
 {
 	static int x0 = 0;
 	int dx = mouse_x() - x0;
 	x0 += dx;
 	return dx;
 }
-int mouse_yrel(void)
+int mouse_dy(void)
 {
 	static int y0 = 0;
 	int dy = mouse_y() - y0;
