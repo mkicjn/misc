@@ -1,4 +1,5 @@
 #include "src/canvas.h"
+#include "src/line.h"
 
 int rainbow(int i)
 {
@@ -20,24 +21,18 @@ int rainbow(int i)
 	return ~0; // unreachable
 }
 
-#include <math.h>
-void line(int x0, int y0, int x1, int y1)
-{ // This is a slow way to do this, but I don't care.
-	static int i = 0;
-	double dx = x1-x0, dy = y1-y0;
-	double m = sqrt(dx*dx + dy*dy);
-	dx /= m;
-	dy /= m;
-
-	for (double x=x0, y=y0; (x0<x1&&x<x1)||(x0>x1&&x>x1)||(y0<y1&&y<y1)||(y0>y1&&y>y1); x+=dx, y+=dy)
-		set_pixel(x, y, rainbow(i++));
-}
-
 void clear(void)
 {
 	for (int i = 0; i < CANVAS_WIDTH; i++)
 		for (int j = 0; j < CANVAS_HEIGHT; j++)
 			set_pixel(i, j, 0);
+}
+
+bool rainbow_px(int x, int y)
+{
+	static int i = 0;
+	set_pixel(x, y, rainbow(i++));
+	return false;
 }
 
 int main()
@@ -50,7 +45,7 @@ int main()
 		x = mouse_x();
 		y = mouse_y();
 		if (button_down(BTN_LMOUSE))
-			line(oldx, oldy, x, y);
+			line(rainbow_px, oldx, oldy, x, y);
 		if (button_down(BTN_RMOUSE))
 			clear();
 		if (button_down(KEY_ESC))
