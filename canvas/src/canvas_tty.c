@@ -88,7 +88,6 @@ void update_keys(void)
 		.fd = STDIN_FILENO,
 		.events = POLLIN,
 	};
-	char c;
 	while (poll(&p, 1, 0) > 0) {
 		if (p.revents & POLLIN)
 			buttonstate[getchar()] = true;

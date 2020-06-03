@@ -35,8 +35,8 @@ void step_grid(struct grid *g, rule_t r)
 	size_t area = g->height * g->width;
 	cell_t *tmp = malloc(area * sizeof(cell_t));
 	#pragma omp parallel for
-	for (int y = 0; y < g->height; y++)
-	for (int x = 0; x < g->width; x++) {
+	for (size_t y = 0; y < g->height; y++)
+	for (size_t x = 0; x < g->width; x++) {
 		size_t i = x + y * g->width;
 		tmp[i] = r(g, i);
 	}
@@ -47,9 +47,9 @@ void step_grid(struct grid *g, rule_t r)
 void display_binary_grid(struct grid *g)
 {
 	#pragma omp parallel for
-	for (int y = 0; y < g->height; y++) {
-		for (int x = 0; x < g->width; x++) {
-			int i = x + y * g->width;
+	for (size_t y = 0; y < g->height; y++) {
+		for (size_t x = 0; x < g->width; x++) {
+			size_t i = x + y * g->width;
 			set_pixel(x, y, g->field[i] ? ~0 : 0);
 		}
 	}
@@ -63,9 +63,9 @@ cell_t conway(struct grid *g, size_t c)
 	int alive = 0;
 	for (int dy = -1; dy <= 1; dy++)
 	for (int dx = -1; dx <= 1; dx++) {
-		int x1 = (x0 + dx + w) % w;
-		int y1 = (y0 + dy + h) % h;
-		int i = x1 + y1 * w;
+		size_t x1 = (x0 + dx + w) % w;
+		size_t y1 = (y0 + dy + h) % h;
+		size_t i = x1 + y1 * w;
 		if (i == c)
 			continue;
 		if (g->field[i])
@@ -79,7 +79,9 @@ cell_t conway(struct grid *g, size_t c)
 		return 0;
 }
 
-int main(int argc, char **argv)
+int main(argc, argv)
+	int argc;
+	char **argv;
 {
 	double period = 1.0 / 30.0;
 	srand(time(NULL));
@@ -88,7 +90,7 @@ int main(int argc, char **argv)
 
 	struct grid *g = new_grid(CANVAS_WIDTH, CANVAS_HEIGHT);
 
-	for (int i = 0; i < CANVAS_AREA; i++) {
+	for (size_t i = 0; i < CANVAS_AREA; i++) {
 		int r = rand() & 1;
 		g->field[i] = r;
 	}

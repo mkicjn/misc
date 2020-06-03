@@ -1,5 +1,5 @@
 CC = clang
-CFLAGS = -O
+CFLAGS = -O -Wall
 LD = ld
 LDFLAGS = -lm -lSDL2
 
