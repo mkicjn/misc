@@ -6,8 +6,9 @@
 #include <unistd.h>
 #include <termios.h>
 #include <signal.h>
+#include <poll.h>
 
-static void set_polling_stdin(bool b)
+static void set_stdin_blocking(bool block)
 {
 	static bool init = false;
 	static struct termios old, new;
@@ -19,7 +20,7 @@ static void set_polling_stdin(bool b)
 		new.c_cc[VTIME] = 0;
 		init = true;
 	}
-	tcsetattr(STDIN_FILENO, TCSANOW, b ? &new : &old);
+	tcsetattr(STDIN_FILENO, TCSANOW, block ? &old : &new);
 }
 
 static void video_interrupt(int sig)
@@ -30,7 +31,7 @@ static void video_interrupt(int sig)
 bool video_start(void)
 {
 	printf(SGR(RESET) CUH CLS);
-	set_polling_stdin(true);
+	set_stdin_blocking(false);
 	signal(SIGINT, video_interrupt);
 	return true;
 }
@@ -76,16 +77,24 @@ int mouse_dy(void)
 void video_stop(void)
 {
 	printf(SGR(RESET) CLS CUP("1","1") CUS);
-	set_polling_stdin(false);
+	set_stdin_blocking(true);
 	signal(SIGINT, SIG_DFL);
 }
 
 bool buttonstate[256] = {0};
 void update_keys(void)
 {
+	static struct pollfd p = {
+		.fd = STDIN_FILENO,
+		.events = POLLIN,
+	};
 	char c;
-	while (read(STDIN_FILENO, &c, 1) > 0)
-		buttonstate[c] = true;
+	while (poll(&p, 1, 0) > 0) {
+		if (p.revents & POLLIN)
+			buttonstate[getchar()] = true;
+		else
+			break;
+	}
 }
 
 bool user_quit(void)
