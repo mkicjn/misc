@@ -28,24 +28,8 @@ int main()
 	}
 	video_update();
 
-	// Mouse and keyboard test
-	while (!user_quit()) {
-		long int balance = 0;
-		while (!button_down(KEY_LCTRL) && !button_down(KEY_LALT))
-			if (user_quit())
-				break;
-		while (button_down(KEY_LCTRL) && !button_down(KEY_LALT))
-			balance--;
-		while (!button_down(KEY_LCTRL) && button_down(KEY_LALT))
-			balance++;
-		while (button_down(KEY_LCTRL) && button_down(KEY_LALT))
-			;
-		while (button_down(KEY_LCTRL) && !button_down(KEY_LALT))
-			balance--;
-		while (!button_down(KEY_LCTRL) && button_down(KEY_LALT))
-			balance++;
-		printf("Balance: %ld\n", balance);
-	}
+	while (!user_quit())
+		;
 
 	video_stop();
 	return 0;

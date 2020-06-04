@@ -7,7 +7,7 @@ LDFLAGS = -lm -lSDL2
 
 BACKEND = sdl2
 
-ALL = test draw life
+ALL = grad draw life dot
 
 # Executables
 
@@ -19,7 +19,10 @@ life:	life.o canvas.o
 draw:	draw.o canvas.o line.o
 	$(CC) $(LDFLAGS) $^ -o $@
 
-test:	test.o canvas.o
+grad:	grad.o canvas.o
+	$(CC) $(LDFLAGS) $^ -o $@
+
+dot:	dot.o canvas.o
 	$(CC) $(LDFLAGS) $^ -o $@
 
 # Object files

@@ -12,20 +12,18 @@
 #include <stdbool.h>
 
 enum button {
+	// Special ASCII characters
 	KEY_ESC = '\033',
-	KEY_W = 'w',
-	KEY_A = 'a',
-	KEY_S = 's',
-	KEY_D = 'd',
 
-	KEY_LCTRL = 1 << 7, // Outside normal ascii
+	// Non-ASCII
+	KEY_LCTRL = 1 << 8,
 	KEY_LSHIFT,
 	KEY_LALT,
 	BTN_LMOUSE,
 	BTN_RMOUSE,
 	BTN_MMOUSE,
 
-	NUM_BUTTONS = 255,
+	NUM_BUTTONS // Max index for arrays
 };
 
 bool video_start(void);

@@ -15,11 +15,11 @@ static void check_events(void)
 		case SDL_KEYDOWN: // Fallthrough
 		case SDL_KEYUP:
 			down = ev.key.state == SDL_PRESSED;
+			if (ev.key.keysym.sym < 128) {
+				buttonstate[ev.key.keysym.sym] = down;
+				break;
+			}
 			switch (ev.key.keysym.sym) {
-			case SDLK_w:		buttonstate[KEY_W]	= down; break;
-			case SDLK_a:		buttonstate[KEY_A]	= down; break;
-			case SDLK_s:		buttonstate[KEY_S]	= down; break;
-			case SDLK_d:		buttonstate[KEY_D] 	= down; break;
 			case SDLK_LCTRL:	buttonstate[KEY_LCTRL]	= down; break;
 			case SDLK_LSHIFT:	buttonstate[KEY_LSHIFT]	= down; break;
 			case SDLK_LALT:		buttonstate[KEY_LALT]	= down; break;
