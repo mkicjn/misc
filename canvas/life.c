@@ -50,7 +50,7 @@ void display_binary_grid(struct grid *g)
 	for (size_t y = 0; y < g->height; y++) {
 		for (size_t x = 0; x < g->width; x++) {
 			size_t i = x + y * g->width;
-			set_pixel(x, y, g->field[i] ? ~0 : 0);
+			setpx(x, y, g->field[i] ? ~0 : 0);
 		}
 	}
 	video_update();

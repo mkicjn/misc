@@ -15,11 +15,11 @@ static void check_events(void)
 		case SDL_KEYDOWN: // Fallthrough
 		case SDL_KEYUP:
 			down = ev.key.state == SDL_PRESSED;
-			if (ev.key.keysym.sym < 128) {
+			if (ev.key.keysym.sym < 128) { // ASCII character keys 
 				buttonstate[ev.key.keysym.sym] = down;
 				break;
 			}
-			switch (ev.key.keysym.sym) {
+			switch (ev.key.keysym.sym) { // Non-ASCII keys
 			case SDLK_LCTRL:	buttonstate[KEY_LCTRL]	= down; break;
 			case SDLK_LSHIFT:	buttonstate[KEY_LSHIFT]	= down; break;
 			case SDLK_LALT:		buttonstate[KEY_LALT]	= down; break;
@@ -66,10 +66,8 @@ void video_update(void)
 	SDL_LockSurface(surface);
 }
 
-void set_pixel(int x, int y, int c)
+void setpx(int x, int y, int c)
 {
-	if (x < 0 || x >= CANVAS_WIDTH || y < 0 || y >= CANVAS_HEIGHT)
-		return;
 	((int *)surface->pixels)[x + y * surface->w] = c;
 }
 

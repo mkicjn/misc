@@ -25,13 +25,13 @@ void clear(void)
 {
 	for (int i = 0; i < CANVAS_WIDTH; i++)
 		for (int j = 0; j < CANVAS_HEIGHT; j++)
-			set_pixel(i, j, 0);
+			setpx(i, j, 0);
 }
 
 bool rainbow_px(int x, int y)
 {
 	static int i = 0;
-	set_pixel(x, y, rainbow(i++));
+	setpx(x, y, rainbow(i++));
 	return false;
 }
 

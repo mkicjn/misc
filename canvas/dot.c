@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "src/canvas.h"
 
+#define CLAMP(lo,n,hi) ((n)<(hi)?(lo)>(n)?(lo):(n):(hi))
+
 int main()
 {
 	video_start();
@@ -9,38 +11,36 @@ int main()
 
 	tick();
 	while (!user_quit()) {
-		double speed = 100.0;
+		double speed = CANVAS_AREA/1000;
 		double dt = tock();
 		tick();
 
-		set_pixel(px, py, 0);
+		setpx(px, py, 0);
 
-		if (button_down(KEY_LSHIFT))
-			speed *= 2;
-		if (button_down('w'))
-			py -= speed * dt;
-		if (button_down('a'))
-			px -= speed * dt;
-		if (button_down('s'))
-			py += speed * dt;
-		if (button_down('d'))
-			px += speed * dt;
+		// Collect input
+		int dx = 0, dy = 0;
+		dy -= button_down('w');
+		dx -= button_down('a');
+		dy += button_down('s');
+		dx += button_down('d');
 
-		if (button_down(BTN_LMOUSE)) {
-			px = mouse_x();
-			py = mouse_y();
+		// Apply speed and direction
+		#define R2O2 0.707107
+		if (dx && dy) {
+			px += dx * speed * dt * R2O2;
+			py += dy * speed * dt * R2O2;
+		} else if (dx) {
+			px += dx * speed * dt;
+		} else if (dy) {
+			py += dy * speed * dt;
 		}
 
-		if (px < 0)
-			px = 0;
-		else if (px >= CANVAS_WIDTH)
-			px = CANVAS_WIDTH-1;
-		if (py < 0)
-			py = 0;
-		else if (py >= CANVAS_HEIGHT)
-			py = CANVAS_HEIGHT-1;
+		// Bounds checking
+		px = CLAMP(0, px, CANVAS_WIDTH-1);
+		py = CLAMP(0, py, CANVAS_HEIGHT-1);
 
-		set_pixel(px, py, ~0);
+		setpx(px, py, ~0);
+
 		video_update();
 	}
 

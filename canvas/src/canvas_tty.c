@@ -41,7 +41,7 @@ void video_update(void)
 	// Do nothing. Updates are printed immediately.
 }
 
-void set_pixel(int x, int y, int c)
+void setpx(int x, int y, int c)
 {
 	int r = (c >> 16) & 0xFF;
 	int g = (c >>  8) & 0xFF;

@@ -27,7 +27,7 @@ enum button {
 };
 
 bool video_start(void);
-void set_pixel(int, int, int);
+void setpx(int, int, int);
 void video_update(void);
 void video_stop(void);
 
