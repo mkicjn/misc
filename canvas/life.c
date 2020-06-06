@@ -79,9 +79,7 @@ cell_t conway(struct grid *g, size_t c)
 		return 0;
 }
 
-int main(argc, argv)
-	int argc;
-	char **argv;
+int main(int argc, char **argv)
 {
 	double period = 1.0 / 30.0;
 	srand(time(NULL));

@@ -11,7 +11,7 @@ int main()
 
 	tick();
 	while (!user_quit()) {
-		double speed = CANVAS_AREA/1000;
+		double speed = 1e8/CANVAS_AREA;
 		double dt = tock();
 		tick();
 

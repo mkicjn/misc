@@ -28,6 +28,7 @@ static void video_interrupt(int sig)
 	video_stop();
 	exit(sig);
 }
+
 bool video_start(void)
 {
 	printf(SGR(RESET) CUH CLS);
@@ -38,32 +39,26 @@ bool video_start(void)
 
 void video_update(void)
 {
-	// Do nothing. Updates are printed immediately.
-}
+	static uint32_t buf[CANVAS_AREA] = {0};
 
-void setpx(int x, int y, int c)
-{
-	int r = (c >> 16) & 0xFF;
-	int g = (c >>  8) & 0xFF;
-	int b = (c >>  0) & 0xFF;
-	printf(CUP("%d","%d"), y+1, (x+1)<<1);
-	printf(SGR(BG_COLR(CUSTOM RGB("%d","%d","%d"))) "  ",
-			r, g, b);
+	for (int y = 0, i = 0; y < CANVAS_HEIGHT; y++)
+	for (int x = 0; x < CANVAS_WIDTH; x++, i++) {
+		if (pixels[i] == buf[i])
+			continue;
+		buf[i] = pixels[i];
+		int c = buf[i];
+		int r = (c >> 16) & 0xFF;
+		int g = (c >>  8) & 0xFF;
+		int b = (c >>  0) & 0xFF;
+		printf(CUP("%d","%d"), y+1, (x+1)<<1);
+		printf(SGR(BG_COLR(CUSTOM RGB("%d","%d","%d"))) "  ",
+				r, g, b);
+	}
 	printf(CUP("%d","1") SGR(RESET), CANVAS_HEIGHT+1);
 }
 
-int mouse_x(void)
-{
-	static int x = 0;
-	x += mouse_dx();
-	return x;
-}
-int mouse_y(void)
-{
-	static int y = 0;
-	y += mouse_dy();
-	return y;
-}
+uint32_t *pixels = (uint32_t [CANVAS_AREA]){0};
+
 // TODO: Try to read /dev/input/mice?
 int mouse_dx(void)
 {
