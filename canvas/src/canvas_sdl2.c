@@ -1,11 +1,9 @@
 #include "canvas.h"
 #include <SDL2/SDL.h>
-#include <stdint.h>
 
 static bool quitstate = false;
 static bool buttonstate[NUM_BUTTONS] = {false};
 static struct {int x, y;} mousestate = {.x = 0, .y = 0};
-
 static void check_events(void)
 {
 	SDL_Event ev;
@@ -15,7 +13,7 @@ static void check_events(void)
 		case SDL_KEYDOWN: // Fallthrough
 		case SDL_KEYUP:
 			down = ev.key.state == SDL_PRESSED;
-			if (ev.key.keysym.sym < 128) { // ASCII character keys 
+			if (ev.key.keysym.sym < 128) { // ASCII keys 
 				buttonstate[ev.key.keysym.sym] = down;
 				break;
 			}
@@ -36,8 +34,8 @@ static void check_events(void)
 			}
 			break;
 		case SDL_MOUSEMOTION:
-			mousestate.x = ev.motion.x;
-			mousestate.y = ev.motion.y;
+			mousestate.x = ev.motion.xrel;
+			mousestate.y = ev.motion.yrel;
 			break;
 		case SDL_QUIT:
 			quitstate = true;
@@ -48,6 +46,7 @@ static void check_events(void)
 
 static SDL_Window *window;
 static SDL_Surface *surface;
+uint32_t *pixels = NULL;
 bool video_start(void)
 {
 	SDL_Init(SDL_INIT_VIDEO);
@@ -55,48 +54,35 @@ bool video_start(void)
 			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 			CANVAS_WIDTH, CANVAS_HEIGHT, 0);
 	surface = SDL_GetWindowSurface(window);
+	SDL_SetRelativeMouseMode(SDL_TRUE);
 	SDL_LockSurface(surface);
+	pixels = surface->pixels;
 	return window != NULL;
 }
-
 void video_update(void)
 {
 	SDL_UnlockSurface(surface);
 	SDL_UpdateWindowSurface(window);
 	SDL_LockSurface(surface);
 }
-
-void setpx(int x, int y, int c)
+void video_stop(void)
 {
-	((int *)surface->pixels)[x + y * surface->w] = c;
+	SDL_Quit();
 }
 
-int mouse_x(void)
-{
-	return mousestate.x;
-}
-int mouse_y(void)
-{
-	return mousestate.y;
-}
 int mouse_dx(void)
 {
-	static int x0 = 0;
-	int dx = mouse_x() - x0;
-	x0 += dx;
+	check_events();
+	int dx = mousestate.x;
+	mousestate.x = 0;
 	return dx;
 }
 int mouse_dy(void)
 {
-	static int y0 = 0;
-	int dy = mouse_y() - y0;
-	y0 += dy;
+	check_events();
+	int dy = mousestate.y;
+	mousestate.y = 0;
 	return dy;
-}
-
-void video_stop(void)
-{
-	SDL_Quit();
 }
 
 bool user_quit(void)

@@ -1,5 +1,6 @@
 #include "src/canvas.h"
 #include "src/line.h"
+#include "src/cursor.h"
 
 int rainbow(int i)
 {
@@ -25,13 +26,13 @@ void clear(void)
 {
 	for (int i = 0; i < CANVAS_WIDTH; i++)
 		for (int j = 0; j < CANVAS_HEIGHT; j++)
-			setpx(i, j, 0);
+			PX(i, j) = 0;
 }
 
 bool rainbow_px(int x, int y)
 {
 	static int i = 0;
-	setpx(x, y, rainbow(i++));
+	PX(x, y) = rainbow(i++);
 	return false;
 }
 
@@ -48,9 +49,9 @@ int main()
 			line(rainbow_px, oldx, oldy, x, y);
 		if (button_down(BTN_RMOUSE))
 			clear();
-		if (button_down(KEY_ESC))
-			break;
+		cursor(x, y);
 		video_update();
+		cursor(x, y);
 	}
 
 	video_stop();

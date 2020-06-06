@@ -15,7 +15,7 @@ int main()
 		double dt = tock();
 		tick();
 
-		setpx(px, py, 0);
+		PX(px, py) = 0;
 
 		// Collect input
 		int dx = 0, dy = 0;
@@ -39,7 +39,7 @@ int main()
 		px = CLAMP(0, px, CANVAS_WIDTH-1);
 		py = CLAMP(0, py, CANVAS_HEIGHT-1);
 
-		setpx(px, py, ~0);
+		PX(px, py) = ~0;
 
 		video_update();
 	}

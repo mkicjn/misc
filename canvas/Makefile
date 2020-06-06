@@ -1,7 +1,7 @@
 # Parameters
 
 CC = clang
-CFLAGS = -O -Wall
+CFLAGS = -Os -Wall
 LD = ld
 LDFLAGS = -lm -lSDL2
 
@@ -16,7 +16,7 @@ all: $(ALL)
 life:	life.o canvas.o
 	$(CC) $(LDFLAGS) $^ -o $@
 
-draw:	draw.o canvas.o line.o
+draw:	draw.o canvas.o line.o cursor.o
 	$(CC) $(LDFLAGS) $^ -o $@
 
 grad:	grad.o canvas.o
@@ -31,6 +31,9 @@ canvas.o: src/canvas_$(BACKEND).c src/canvas.h
 	$(CC) $(CFLAGS) $< -c -o $@
 
 line.o: src/line.c src/line.h
+	$(CC) $(CFLAGS) $< -c -o $@
+
+cursor.o: src/cursor.c src/cursor.h
 	$(CC) $(CFLAGS) $< -c -o $@
 
 %.o: %.c
