@@ -89,12 +89,13 @@ void update_keys(void)
 		else
 			break;
 	}
+	buttonstate['\r'] = buttonstate['\n'];
 }
 
 bool user_quit(void)
 {
 	update_keys();
-	return buttonstate[KEY_ESC];
+	return buttonstate[4]; // ^D
 }
 
 bool button_down(enum button b)
@@ -102,6 +103,7 @@ bool button_down(enum button b)
 	update_keys();
 	bool ret = buttonstate[b];
 	buttonstate[b] = false;
+	buttonstate['\n'] = buttonstate['\r'];
 	return ret;
 }
 
