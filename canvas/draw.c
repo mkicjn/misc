@@ -39,13 +39,16 @@ int main()
 		newx = mouse_x();
 		newy = mouse_y();
 		if (button_down(BTN_LMOUSE))
-			LINE(oldx, oldy, newx, newy)
+			for LINE(oldx, oldy, newx, newy)
 				PX(x, y) = rainbow(i++);
 		if (button_down(BTN_RMOUSE))
 			clear();
 		cursor(newx, newy);
 		video_update();
 		cursor(newx, newy);
+		tick();
+		while (tock() < 1.0/144.0)
+			continue;
 	}
 
 	video_stop();

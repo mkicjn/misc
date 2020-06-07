@@ -25,7 +25,7 @@ int main()
 	// Benchmark old line function
 	n = 0;
 	t = 0;
-	while (!button_down(KEY_ESC)) {
+	while (!button_down(KEY_RETURN)) {
 		int x0 = rand() % CANVAS_WIDTH;
 		int y0 = rand() % CANVAS_HEIGHT;
 		int x1 = rand() % CANVAS_WIDTH;
@@ -40,13 +40,13 @@ int main()
 	}
 	printf("%d iterations\n", n);
 	printf("Average time (line1): %fms\n", 1000.0 * t / n);
-	while (button_down(KEY_ESC))
+	while (button_down(KEY_RETURN))
 		continue;
 
 	// Benchmark new line function
 	n = 0;
 	t = 0;
-	while (!button_down(KEY_ESC)) {
+	while (!button_down(KEY_RETURN)) {
 		int x0 = rand() % CANVAS_WIDTH;
 		int y0 = rand() % CANVAS_HEIGHT;
 		int x1 = rand() % CANVAS_WIDTH;
@@ -61,13 +61,13 @@ int main()
 	}
 	printf("%d iterations\n", n);
 	printf("Average time (line2): %fms\n", 1000.0 * t / n);
-	while (button_down(KEY_ESC))
+	while (button_down(KEY_RETURN))
 		continue;
 
 	// Benchmark new LINE macro
 	n = 0;
 	t = 0;
-	while (!button_down(KEY_ESC)) {
+	while (!button_down(KEY_RETURN)) {
 		int x0 = rand() % CANVAS_WIDTH;
 		int y0 = rand() % CANVAS_HEIGHT;
 		int x1 = rand() % CANVAS_WIDTH;
@@ -75,7 +75,7 @@ int main()
 		int c = rand() & 0x00ffffff;
 
 		tick();
-		LINE(x0, y0, x1, y1)
+		for LINE(x0, y0, x1, y1)
 			PX(x, y) = c;
 		t += tock();
 		video_update();
@@ -83,7 +83,7 @@ int main()
 	}
 	printf("%d iterations\n", n);
 	printf("Average time (LINE): %fms\n", 1000.0 * t / n);
-	while (button_down(KEY_ESC))
+	while (button_down(KEY_RETURN))
 		continue;
 
 

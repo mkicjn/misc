@@ -15,6 +15,7 @@
 
 enum button {
 	// Special ASCII character keys
+	KEY_RETURN = '\r',
 	KEY_ESC = '\033',
 	KEY_DEL = '\177',
 
