@@ -35,9 +35,9 @@ int main()
 		tick();
 		line1(setpx, x0, y0, x1, y1);
 		t += tock();
+		video_update();
 		n++;
 	}
-	video_update();
 	printf("%d iterations\n", n);
 	printf("Average time (line1): %fms\n", 1000.0 * t / n);
 	while (button_down(KEY_ESC))
@@ -56,9 +56,9 @@ int main()
 		tick();
 		line2(setpx, x0, y0, x1, y1);
 		t += tock();
+		video_update();
 		n++;
 	}
-	video_update();
 	printf("%d iterations\n", n);
 	printf("Average time (line2): %fms\n", 1000.0 * t / n);
 	while (button_down(KEY_ESC))
@@ -78,9 +78,9 @@ int main()
 		LINE(x0, y0, x1, y1)
 			PX(x, y) = c;
 		t += tock();
+		video_update();
 		n++;
 	}
-	video_update();
 	printf("%d iterations\n", n);
 	printf("Average time (LINE): %fms\n", 1000.0 * t / n);
 	while (button_down(KEY_ESC))
