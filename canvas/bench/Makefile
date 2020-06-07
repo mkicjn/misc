@@ -7,30 +7,24 @@ LDFLAGS = -lm -lSDL2
 
 BACKEND = sdl2
 
-ALL = grad draw life dot
+ALL = bench
 
 # Executables
 
 all: $(ALL)
 
-life:	life.o canvas.o
-	$(CC) $(LDFLAGS) $^ -o $@
-
-draw:	draw.o canvas.o cursor.o
-	$(CC) $(LDFLAGS) $^ -o $@
-
-grad:	grad.o canvas.o
-	$(CC) $(LDFLAGS) $^ -o $@
-
-dot:	dot.o canvas.o
+bench:	bench.o canvas.o line1.o line2.o
 	$(CC) $(LDFLAGS) $^ -o $@
 
 # Object files
 
-canvas.o: src/canvas_$(BACKEND).c src/canvas.h
+canvas.o: ../src/canvas_$(BACKEND).c ../src/canvas.h
 	$(CC) $(CFLAGS) $< -c -o $@
 
-cursor.o: src/cursor.c src/cursor.h
+cursor.o: ../src/cursor.c ../src/cursor.h
+	$(CC) $(CFLAGS) $< -c -o $@
+
+line%.o: src/line%.c src/line%.h
 	$(CC) $(CFLAGS) $< -c -o $@
 
 %.o: %.c

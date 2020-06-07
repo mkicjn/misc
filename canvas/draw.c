@@ -29,29 +29,23 @@ void clear(void)
 			PX(i, j) = 0;
 }
 
-bool rainbow_px(int x, int y)
-{
-	static int i = 0;
-	PX(x, y) = rainbow(i++);
-	return false;
-}
-
 int main()
 {
 	video_start();
 
-	int x = 0, y = 0;
+	int newx = 0, newy = 0, i = 0;
 	while (!user_quit()) {
-		int oldx = x, oldy = y;
-		x = mouse_x();
-		y = mouse_y();
+		int oldx = newx, oldy = newy;
+		newx = mouse_x();
+		newy = mouse_y();
 		if (button_down(BTN_LMOUSE))
-			line(rainbow_px, oldx, oldy, x, y);
+			LINE(oldx, oldy, newx, newy)
+				PX(x, y) = rainbow(i++);
 		if (button_down(BTN_RMOUSE))
 			clear();
-		cursor(x, y);
+		cursor(newx, newy);
 		video_update();
-		cursor(x, y);
+		cursor(newx, newy);
 	}
 
 	video_stop();

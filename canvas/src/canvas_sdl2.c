@@ -34,8 +34,8 @@ static void check_events(void)
 			}
 			break;
 		case SDL_MOUSEMOTION:
-			mousestate.x = ev.motion.xrel;
-			mousestate.y = ev.motion.yrel;
+			mousestate.x += ev.motion.xrel;
+			mousestate.y += ev.motion.yrel;
 			break;
 		case SDL_QUIT:
 			quitstate = true;

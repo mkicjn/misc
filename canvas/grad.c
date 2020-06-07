@@ -29,7 +29,7 @@ int main()
 	video_update();
 
 	while (!user_quit())
-		;
+		continue;
 
 	video_stop();
 	return 0;
