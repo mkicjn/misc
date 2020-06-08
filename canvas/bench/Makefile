@@ -14,21 +14,21 @@ ALL = bench
 all: $(ALL)
 
 bench:	bench.o canvas.o line1.o line2.o
-	$(CC) $(LDFLAGS) $^ -o $@
+	$(CC) $^ -o $@ $(LDFLAGS)
 
 # Object files
 
 canvas.o: ../src/canvas_$(BACKEND).c ../src/canvas.h
-	$(CC) $(CFLAGS) $< -c -o $@
+	$(CC) $< -c -o $@ $(CFLAGS)
 
 cursor.o: ../src/cursor.c ../src/cursor.h
-	$(CC) $(CFLAGS) $< -c -o $@
+	$(CC) $< -c -o $@ $(CFLAGS)
 
 line%.o: src/line%.c src/line%.h
-	$(CC) $(CFLAGS) $< -c -o $@
+	$(CC) $< -c -o $@ $(CFLAGS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) $< -c -o $@
+	$(CC) $< -c -o $@ $(CFLAGS)
 
 # Cleanup
 
