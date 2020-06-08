@@ -86,7 +86,7 @@ int main(int argc, char **argv)
 	if (argc > 1)
 		period = 1.0 / atof(argv[1]);
 
-	struct grid *g = new_grid(CANVAS_WIDTH, CANVAS_HEIGHT);
+	struct grid *g = new_grid(SPAN_X, SPAN_Y);
 
 	for (size_t i = 0; i < CANVAS_AREA; i++) {
 		int r = rand() & 1;

@@ -7,7 +7,7 @@ int main()
 {
 	video_start();
 
-	double px = CANVAS_WIDTH/2, py = CANVAS_HEIGHT/2;
+	double px = SPAN_X/2, py = SPAN_Y/2;
 
 	tick();
 	while (!user_quit()) {
@@ -36,8 +36,8 @@ int main()
 		}
 
 		// Bounds checking
-		px = CLAMP(0, px, CANVAS_WIDTH-1);
-		py = CLAMP(0, py, CANVAS_HEIGHT-1);
+		px = CLAMP(0, px, SPAN_X-1);
+		py = CLAMP(0, py, SPAN_Y-1);
 
 		PX(px, py) = ~0;
 

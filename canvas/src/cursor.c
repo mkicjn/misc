@@ -5,14 +5,14 @@ int mouse_x(void)
 {
 	static int x = 0;
 	x += mouse_dx();
-	x = CLAMP(0, x, CANVAS_WIDTH-1);
+	x = CLAMP(0, x, SPAN_X-1);
 	return x;
 }
 int mouse_y(void)
 {
 	static int y = 0;
 	y += mouse_dy();
-	y = CLAMP(0, y, CANVAS_HEIGHT-1);
+	y = CLAMP(0, y, SPAN_Y-1);
 	return y;
 }
 
@@ -29,8 +29,8 @@ void cursor(int x, int y)
 	if (x < 0 || y < 0)
 		return;
 
-	for (int i = 0; i < 4 && x+i<CANVAS_WIDTH; i++)
-	for (int j = 0; j < 4 && y+j<CANVAS_HEIGHT; j++) {
+	for (int i = 0; i < 4 && x+i<SPAN_X; i++)
+	for (int j = 0; j < 4 && y+j<SPAN_Y; j++) {
 		PX(x+i, y+j) ^= xormap[i + j*4];
 	}
 }

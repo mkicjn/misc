@@ -1,13 +1,13 @@
 #ifndef CANVAS_H
 #define CANVAS_H
 
-#ifndef CANVAS_WIDTH
-#define CANVAS_WIDTH 640
+#ifndef SPAN_X
+#define SPAN_X 640
 #endif
-#ifndef CANVAS_HEIGHT
-#define CANVAS_HEIGHT 480
+#ifndef SPAN_Y
+#define SPAN_Y 480
 #endif
-#define CANVAS_AREA ((CANVAS_WIDTH)*(CANVAS_HEIGHT))
+#define CANVAS_AREA ((SPAN_X)*(SPAN_Y))
 
 #include <stdint.h>
 #include <stddef.h>
@@ -34,7 +34,7 @@ bool video_start(void);
 void video_stop(void);
 
 extern uint32_t *pixels;
-#define PX(x, y) pixels[(size_t)(x) + (size_t)(y) * CANVAS_WIDTH]
+#define PX(x, y) pixels[(size_t)(x) + (size_t)(y) * SPAN_X]
 void video_update(void);
 
 int mouse_dx(void);

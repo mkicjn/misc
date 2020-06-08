@@ -41,8 +41,8 @@ void video_update(void)
 {
 	static uint32_t buf[CANVAS_AREA] = {0};
 
-	for (int y = 0, i = 0; y < CANVAS_HEIGHT; y++)
-	for (int x = 0; x < CANVAS_WIDTH; x++, i++) {
+	for (int y = 0, i = 0; y < SPAN_Y; y++)
+	for (int x = 0; x < SPAN_X; x++, i++) {
 		if (pixels[i] == buf[i])
 			continue;
 		buf[i] = pixels[i];
@@ -54,7 +54,7 @@ void video_update(void)
 		printf(SGR(BG_COLR(CUSTOM RGB("%d","%d","%d"))) "  ",
 				r, g, b);
 	}
-	printf(CUP("%d","1") SGR(RESET), CANVAS_HEIGHT+1);
+	printf(CUP("%d","1") SGR(RESET), SPAN_Y+1);
 }
 
 uint32_t *pixels = (uint32_t [CANVAS_AREA]){0};

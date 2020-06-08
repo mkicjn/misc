@@ -26,10 +26,10 @@ int main()
 	n = 0;
 	t = 0;
 	while (!button_down(KEY_RETURN)) {
-		int x0 = rand() % CANVAS_WIDTH;
-		int y0 = rand() % CANVAS_HEIGHT;
-		int x1 = rand() % CANVAS_WIDTH;
-		int y1 = rand() % CANVAS_HEIGHT;
+		int x0 = rand() % SPAN_X;
+		int y0 = rand() % SPAN_Y;
+		int x1 = rand() % SPAN_X;
+		int y1 = rand() % SPAN_Y;
 		color = rand() & 0x00ffffff;
 
 		tick();
@@ -47,10 +47,10 @@ int main()
 	n = 0;
 	t = 0;
 	while (!button_down(KEY_RETURN)) {
-		int x0 = rand() % CANVAS_WIDTH;
-		int y0 = rand() % CANVAS_HEIGHT;
-		int x1 = rand() % CANVAS_WIDTH;
-		int y1 = rand() % CANVAS_HEIGHT;
+		int x0 = rand() % SPAN_X;
+		int y0 = rand() % SPAN_Y;
+		int x1 = rand() % SPAN_X;
+		int y1 = rand() % SPAN_Y;
 		color = rand() & 0x00ffffff;
 
 		tick();
@@ -68,10 +68,10 @@ int main()
 	n = 0;
 	t = 0;
 	while (!button_down(KEY_RETURN)) {
-		int x0 = rand() % CANVAS_WIDTH;
-		int y0 = rand() % CANVAS_HEIGHT;
-		int x1 = rand() % CANVAS_WIDTH;
-		int y1 = rand() % CANVAS_HEIGHT;
+		int x0 = rand() % SPAN_X;
+		int y0 = rand() % SPAN_Y;
+		int x1 = rand() % SPAN_X;
+		int y1 = rand() % SPAN_Y;
 		int c = rand() & 0x00ffffff;
 
 		tick();

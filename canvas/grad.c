@@ -8,10 +8,10 @@ int main()
 
 	// Pixel drawing test
 	double const w = 0.57735026919; // = 1.0 / tan(M_PI/3);
-	for (int y = 0; y < CANVAS_HEIGHT; y++) {
-		for (int x = 0; x < CANVAS_WIDTH; x++) {
-			double xf = (2.0 *  (double)x/CANVAS_WIDTH - 1.0) * w;
-			double yf =  1.0 - ((double)y/CANVAS_HEIGHT);
+	for (int y = 0; y < SPAN_Y; y++) {
+		for (int x = 0; x < SPAN_X; x++) {
+			double xf = (2.0 *  (double)x/SPAN_X - 1.0) * w;
+			double yf =  1.0 - ((double)y/SPAN_Y);
 
 			double p_green = yf;
 			double p_blue  = 1.0 - (0.5 * (1.0 + yf + xf/w));

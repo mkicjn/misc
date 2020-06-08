@@ -24,8 +24,8 @@ int rainbow(int i)
 
 void clear(void)
 {
-	for (int i = 0; i < CANVAS_WIDTH; i++)
-		for (int j = 0; j < CANVAS_HEIGHT; j++)
+	for (int i = 0; i < SPAN_X; i++)
+		for (int j = 0; j < SPAN_Y; j++)
 			PX(i, j) = 0;
 }
 

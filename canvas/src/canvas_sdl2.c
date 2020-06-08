@@ -52,7 +52,7 @@ bool video_start(void)
 	SDL_Init(SDL_INIT_VIDEO);
 	window = SDL_CreateWindow("",
 			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-			CANVAS_WIDTH, CANVAS_HEIGHT, 0);
+			SPAN_X, SPAN_Y, 0);
 	surface = SDL_GetWindowSurface(window);
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 	SDL_LockSurface(surface);
