@@ -14,27 +14,27 @@ ALL = grad draw life dot
 all: $(ALL)
 
 life:	life.o canvas.o
-	$(CC) $(LDFLAGS) $^ -o $@
+	$(CC) $^ -o $@ $(LDFLAGS)
 
 draw:	draw.o canvas.o cursor.o
-	$(CC) $(LDFLAGS) $^ -o $@
+	$(CC) $^ -o $@ $(LDFLAGS)
 
 grad:	grad.o canvas.o
-	$(CC) $(LDFLAGS) $^ -o $@
+	$(CC) $^ -o $@ $(LDFLAGS)
 
 dot:	dot.o canvas.o
-	$(CC) $(LDFLAGS) $^ -o $@
+	$(CC) $^ -o $@ $(LDFLAGS)
 
 # Object files
 
 canvas.o: src/canvas_$(BACKEND).c src/canvas.h
-	$(CC) $(CFLAGS) $< -c -o $@
+	$(CC) $< -c -o $@ $(CFLAGS)
 
 cursor.o: src/cursor.c src/cursor.h
-	$(CC) $(CFLAGS) $< -c -o $@
+	$(CC) $< -c -o $@ $(CFLAGS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) $< -c -o $@
+	$(CC) $< -c -o $@ $(CFLAGS)
 
 # Cleanup
 
