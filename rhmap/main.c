@@ -9,13 +9,13 @@ void map_print(struct map *m)
 		printf("%d: ", i);
 		printf("[Key: %lu, ", m->buckets[i].key);
 		printf("Val: %d, ", m->buckets[i].val);
-		printf("Dist: %d]\n", m->buckets[i].dist);
+		printf("Dist: %ld]\n", m->buckets[i].dist);
 	}
 }
 
 void test_search(struct map *m, const char *s)
 {
-	printf("Lookup %s: ");
+	printf("Lookup %s: ", s);
 	int *res = map_search(m, map_hash(s, strlen(s)));
 	if (res != NULL)
 		printf("%d\n", *res);
