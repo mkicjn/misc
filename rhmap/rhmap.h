@@ -15,6 +15,7 @@ struct map {
 	struct bucket *buckets;
 	unsigned size;
 	unsigned pop;
+	unsigned max_dist;
 	val_t result;
 };
 

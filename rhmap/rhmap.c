@@ -1,18 +1,18 @@
 #include "rhmap.h"
 
-unsigned long map_hash(const char *mem, unsigned len)
+unsigned long map_hash(const char *str, unsigned n)
 {
-	unsigned long h = 5381;
-	for (unsigned i = 0; i < len; i++)
-		h = mem[i] + (h << 5) + h;
-	return h > UNUSED ? h : UNUSED+1;
-	// ^ Don't return reserved keys
+	unsigned long k = 5381;
+	while (n --> 0)
+		k = (k << 5) + k + *str++;
+	return k > UNUSED ? k : UNUSED + 1; // Avoid reserved keys
 }
 
 static struct bucket *map_index(struct map *m, unsigned long key)
 {
 	int i = key % m->size;
-	while (m->buckets[i].key != UNUSED) {
+	int c = m->max_dist;
+	while (c-- >= 0 && m->buckets[i].key != UNUSED) {
 		if (m->buckets[i].key == key)
 			return &m->buckets[i];
 		i = (i+1) % m->size;
@@ -25,6 +25,7 @@ void map_init(struct map *m, void *b, unsigned len)
 	m->buckets = b;
 	m->size = len / sizeof(struct bucket);
 	m->pop = 0;
+	m->max_dist = 0;
 	for (unsigned i = 0; i < m->size; i++)
 		m->buckets[i].key = UNUSED;
 }
@@ -43,6 +44,8 @@ bool map_insert(struct map *m, unsigned long key, val_t val)
 			struct bucket tmp;
 			if (m->buckets[i].key == TOMBSTONE)
 				break;
+			if (ins.dist+1 > m->max_dist)
+				m->max_dist = ins.dist+1;
 			tmp = ins;
 			ins = m->buckets[i];
 			m->buckets[i] = tmp;
