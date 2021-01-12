@@ -1,9 +1,9 @@
 #include "rhmap.h"
 
-unsigned long map_hash(unsigned char *mem, unsigned len)
+unsigned long map_hash(const char *mem, unsigned len)
 {
 	unsigned long h = 5381;
-	for (int i = 0; i < len; i++)
+	for (unsigned i = 0; i < len; i++)
 		h = mem[i] + (h << 5) + h;
 	return h > UNUSED ? h : UNUSED+1;
 	// ^ Don't return reserved keys
@@ -25,7 +25,7 @@ void map_init(struct map *m, void *b, unsigned len)
 	m->buckets = b;
 	m->size = len / sizeof(struct bucket);
 	m->pop = 0;
-	for (int i = 0; i < m->size; i++)
+	for (unsigned i = 0; i < m->size; i++)
 		m->buckets[i].key = UNUSED;
 }
 
@@ -66,7 +66,7 @@ bool map_remove(struct map *m, unsigned long key)
 	return false;
 }
 
-val_t *map_lookup(struct map *m, unsigned long key)
+val_t *map_search(struct map *m, unsigned long key)
 {
 	struct bucket *b = map_index(m, key);
 	if (b)

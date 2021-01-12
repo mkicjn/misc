@@ -23,4 +23,10 @@ enum reserved_key {
 	UNUSED
 };
 
+unsigned long map_hash(const char *mem, unsigned len);
+void map_init(struct map *m, void *b, unsigned len);
+bool map_insert(struct map *m, unsigned long key, val_t val);
+bool map_remove(struct map *m, unsigned long key);
+val_t *map_search(struct map *m, unsigned long key);
+
 #endif
