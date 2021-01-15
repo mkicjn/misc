@@ -18,7 +18,7 @@ int main(int argc, char **argv)
 			double p_green = yf;
 			double p_blue  = 1.0 - (0.5 * (1.0 + yf + xf/w));
 			double p_red   = 1.0 - p_green - p_blue;
-			if (p_red < -0.1 || p_blue < 0.0) {
+			if (p_red < -0.001 || p_blue < -0.001) {
 				printf(SGR(RESET) "  ");
 				continue;
 			}
