@@ -187,8 +187,9 @@ int path(int *map,int w,int h,int start,int goal)
 }
 int main(int argc,char **argv)
 {
-	static const int WIDTH=200,HEIGHT=50;
-	static const int AREA=WIDTH*HEIGHT;
+#define WIDTH 200
+#define HEIGHT 50
+#define AREA (WIDTH*HEIGHT)
 	static char map[AREA];
 	//static char disp[AREA];
 	unsigned int seed=time(NULL);
