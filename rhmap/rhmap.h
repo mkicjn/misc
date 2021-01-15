@@ -1,22 +1,24 @@
 #ifndef RHMAP_H
 #define RHMAP_H
-#include <stdbool.h>
 #include <stddef.h>
+#include <stdbool.h>
 
-typedef int val_t;
+#ifndef RHMAP_VAL
+#define RHMAP_VAL void *
+#endif
 
 struct bucket {
-	unsigned long key;
-	long dist;
-	val_t val;
+	unsigned long long key;
+	size_t dist;
+	RHMAP_VAL val;
 };
 
 struct map {
 	struct bucket *buckets;
-	unsigned size;
-	unsigned pop;
-	unsigned max_dist;
-	val_t result;
+	size_t size;
+	size_t pop;
+	size_t max_dist;
+	RHMAP_VAL result;
 };
 
 enum reserved_key {
@@ -24,10 +26,10 @@ enum reserved_key {
 	UNUSED
 };
 
-unsigned long map_hash(const char *mem, unsigned len);
-void map_init(struct map *m, void *b, unsigned len);
-bool map_insert(struct map *m, unsigned long key, val_t val);
-bool map_remove(struct map *m, unsigned long key);
-val_t *map_search(struct map *m, unsigned long key);
+unsigned long long map_hash(const char *mem, size_t len);
+void map_init(struct map *m, void *b, size_t len);
+bool map_insert(struct map *m, unsigned long long key, RHMAP_VAL val);
+bool map_remove(struct map *m, unsigned long long key);
+RHMAP_VAL *map_search(struct map *m, unsigned long long key);
 
 #endif

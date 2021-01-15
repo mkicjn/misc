@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define RHMAP_VAL int
 #include "rhmap.h"
 
 void map_print(struct map *m)
