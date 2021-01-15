@@ -94,7 +94,7 @@ static bool lex_ident(struct lexer *l)
 	return false;
 }
 
-static bool lex_lit_char(struct lexer *l)
+static bool lex_char(struct lexer *l)
 {
 	int len = 0;
 	if (l->pos[0] != '\'' || l->pos[1] == '\'')
@@ -114,7 +114,7 @@ static bool lex_lit_char(struct lexer *l)
 	return false;
 }
 
-static bool lex_lit_str(struct lexer *l)
+static bool lex_string(struct lexer *l)
 {
 	char *start, *end;
 	refill(l); // Refill may fetch rest of string
@@ -234,9 +234,9 @@ void lex_next(struct lexer *l)
 		return;
 	if (lex_int(l))
 		return;
-	if (lex_lit_char(l))
+	if (lex_char(l))
 		return;
-	if (lex_lit_str(l))
+	if (lex_string(l))
 		return;
 	// Error case: skip characters
 	l->type = TOK_ERROR;
