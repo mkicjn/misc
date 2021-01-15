@@ -1,4 +1,8 @@
 #include <stdio.h>
+
+// Try this:
+// ./a.out 't5*t7>&t3*t10>&|' | pacat --rate=8000
+
 char interpret(char *i, int t)
 {
 	long stack[100], *s = stack, n = 0, v = 0;
