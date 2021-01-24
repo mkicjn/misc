@@ -9,7 +9,7 @@ void map_print(struct map *m)
 {
 	for (unsigned i = 0; i < m->size; i++) {
 		printf("%d: ", i);
-		printf("[Key: %lu, ", m->buckets[i].key);
+		printf("[Key: %llu, ", m->buckets[i].key);
 		printf("Val: %d, ", m->buckets[i].val);
 		printf("Dist: %ld]\n", m->buckets[i].dist);
 	}
