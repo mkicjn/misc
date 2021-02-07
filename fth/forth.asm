@@ -353,10 +353,10 @@ main:
 ; | 0		<- Dict | Heap ->	<- Stack |	<- Return stack|
 ;
 
-f_heap:
-	CNTSTR '1-'	 ; Temporary
-	rq 1024
 f_dict:
 	DICTIONARY
+	rq 1024
+f_heap:
+	CNTSTR '1-'	 ; Temporary
 	rq 1024
 f_stack:
