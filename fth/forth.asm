@@ -106,9 +106,11 @@ macro INLINER macr*, lbl*, str* {
 	.end:
 }
 inliner_stub:
+	mov	rbx, rsi
 	pop	rsi
 	cld
 	rep movsb
+	mov	rsi, rbx
 	ret
 
 INLINER ENTER, f_enter, 'enter'
