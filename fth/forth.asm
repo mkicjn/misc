@@ -63,6 +63,34 @@ macro DICT_ADD lbl*, str* {
 	\}
 }
 
+lookup:	; TODO: Rewrite in Forth later
+	ENTER
+	push	rdx		; TODO: Restructure to use DUP here
+	mov	rdx, rax	; ^
+	push	rcx
+	push	rsi
+	push	rdi
+	cld
+.check_entry:
+	mov	rax, rsi
+	cmp	qword [rsi], 0
+	jz	.return
+	lea	rsi, [rsi+8]
+	movzx	ecx, byte [rsi]
+	inc	rcx
+	repe cmpsb
+	je	.return
+.advance:
+	mov	rdi, [rsp]
+	add	rsi, rcx
+	jmp	.check_entry
+.return:
+	mov	rax, [rax]
+	pop	rdi
+	pop	rsi
+	pop	rcx
+	EXIT
+
 
 ;	I N L I N E R   G E N E R A T O R
 
@@ -285,52 +313,29 @@ f_begin:
 f_until:
 	jmp	f_qbranch
 
-lookup:
-	push	rcx
-	push	rsi
-	push	rdi
-.check_entry:
-	mov	rbx, rsi
-	cmp	qword [rsi], 0
-	jz	.return
-	lea	rsi, [rsi+8]
-	movzx	ecx, byte [rsi]
-	inc	rcx
-	repe cmpsb
-	je	.return
-.advance:
-	mov	rdi, [rsp]
-	add	rsi, rcx
-	jmp	.check_entry
-.return:
-	mov	rbx, [rbx]
-	pop	rdi
-	pop	rsi
-	pop	rcx
-	ret
-
 main:
 	ENTER
 
-;	call	lookup
+	call	lookup
+	int3
 
-	FPUSH	10
-	FPUSH	rdi
-	call	f_enter
-	FPUSH	0
-	call	f_dolit
-	call	f_swap
-	call	f_begin
-	call	f_tuck
-	call	f_add
-	call	f_swap
-	call	f_dec
-	call	f_dup
-	call	f_zlt
-	call	f_qbranch
-	call	f_drop
-	call	f_exit
-	EXECUTE
+;	FPUSH	10
+;	FPUSH	rdi
+;	call	f_enter
+;	FPUSH	0
+;	call	f_dolit
+;	call	f_swap
+;	call	f_begin
+;	call	f_tuck
+;	call	f_add
+;	call	f_swap
+;	call	f_dec
+;	call	f_dup
+;	call	f_zlt
+;	call	f_qbranch
+;	call	f_drop
+;	call	f_exit
+;	EXECUTE
 
 	EXIT
 
