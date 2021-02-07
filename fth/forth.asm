@@ -16,7 +16,7 @@ start:
 ; Forth subroutines will use the following convention:
 ;
 ;	rax: volatile, cached TOS
-;	rbx: volatile, scratch reg
+;	rbx: volatile, scratch register
 ;	rdx: volatile, cached NOS
 ;
 ;	rcx: callee-saved, loop counter / compiler state
@@ -28,8 +28,18 @@ start:
 ;
 ; The volatility of other registers is undefined.
 
+;	Entering and Exiting Forth words:
+;
+; Forth requires at least two stacks. x86 only supports one.
+; Also, would like to use push/pop instructions for data stack.
+; Solution: Manually place return addresses on another stack.
+;
+; ENTER and EXIT are a subroutine prologue/epilogue pair responsible for this.
+; Note that not every subroutine needs to use ENTER and EXIT.
+; Rule of thumb:
+; * If you need to modify the data stack, use ENTER first.
+; * If you use ENTER, then you should use EXIT to return.
 
-; Enter and Exit macros for Forth words written in assembly
 macro ENTER {
 	; Push return address to stack at rbp
 	lea	rbp, [rbp-8]
