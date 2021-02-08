@@ -107,7 +107,7 @@ lookup:	; TODO: Rewrite in Forth later
 macro INLINER macr*, lbl*, str* {
 	DICT_ADD lbl, str
 	lbl:
-		mov	ecx, lbl#.end - lbl#.code
+		push	qword lbl#.end-lbl#.code
 		call	inliner_stub
 		; ^ Return address points to code.
 		; It is consumed and will not return.
@@ -116,11 +116,17 @@ macro INLINER macr*, lbl*, str* {
 	.end:
 }
 inliner_stub:
-	mov	rbx, rsi
+	; Stash preserved values under the return stack
+	mov	[rbp-8], rsi
+	mov	[rbp-16], rcx
+	; Retrieve arguments from stack and copy
 	pop	rsi
+	pop	rcx
 	cld
 	rep movsb
-	mov	rsi, rbx
+	; Retrieve stashed values
+	mov	rcx, [rbp-16]
+	mov	rsi, [rbp-8]
 	ret
 
 INLINER ENTER, f_enter, 'enter'
@@ -328,26 +334,23 @@ f_until:
 main:
 	ENTER
 
-	call	lookup
-	int3
-
-;	FPUSH	10
-;	FPUSH	rdi
-;	call	f_enter
-;	FPUSH	0
-;	call	f_dolit
-;	call	f_swap
-;	call	f_begin
-;	call	f_tuck
-;	call	f_add
-;	call	f_swap
-;	call	f_dec
-;	call	f_dup
-;	call	f_zlt
-;	call	f_qbranch
-;	call	f_drop
-;	call	f_exit
-;	EXECUTE
+	FPUSH	10
+	FPUSH	rdi
+	call	f_enter
+	FPUSH	0
+	call	f_dolit
+	call	f_swap
+	call	f_begin
+	call	f_tuck
+	call	f_add
+	call	f_swap
+	call	f_dec
+	call	f_dup
+	call	f_zlt
+	call	f_qbranch
+	call	f_drop
+	call	f_exit
+	EXECUTE
 
 	EXIT
 
@@ -365,7 +368,7 @@ main:
 ; TODO Need an interpreter
 
 
-; 	Memory map:
+; 	Memory map: (TODO?)
 ;
 ; | 0		<- Dict | Heap ->	<- Stack |	<- Return stack|
 ;
@@ -374,6 +377,5 @@ f_dict:
 	DICTIONARY
 	rq 1024
 f_heap:
-	CNTSTR '1-'	 ; Temporary
 	rq 1024
 f_stack:
