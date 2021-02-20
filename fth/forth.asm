@@ -19,9 +19,9 @@ start:
 ;	rbx: volatile, scratch register
 ;	rdx: volatile, cached NOS
 ;
-;	rcx: callee-saved, loop counter / compiler state
+;	rcx: callee-saved, loop counter / compiler state (?)
 ;	rdi: callee-saved, string dest / global compile dest
-;	rsi: callee-saved, string src / last compile src
+;	rsi: callee-saved, string src / last compile src (?)
 ;
 ;	rsp: volatile, data stack (hardware push/pop)
 ;	rbp: volatile, return stack (sub+mov / mov+add)
@@ -56,7 +56,6 @@ macro EXIT {
 
 macro DICTIONARY {
 	dq 0
-	db 0
 }
 macro CNTSTR str* {
 	local end
@@ -73,14 +72,13 @@ macro DICT_ADD lbl*, str* {
 	\}
 }
 
-lookup:	; TODO: Rewrite in Forth later
+find:
 	ENTER
-	push	rdx		; TODO: Restructure to use DUP here
+	push	rdx		; DUP
 	mov	rdx, rax	; ^
 	push	rcx
 	push	rsi
 	push	rdi
-	cld
 .check_entry:
 	mov	rax, rsi
 	cmp	qword [rsi], 0
@@ -122,7 +120,6 @@ inliner_stub:
 	; Retrieve arguments from stack and copy
 	pop	rsi
 	pop	rcx
-	cld
 	rep movsb
 	; Retrieve stashed values
 	mov	rcx, [rbp-16]
@@ -307,6 +304,56 @@ macro EXECUTE {
 INLINER EXECUTE, f_execute, 'EXECUTE'
 
 
+;	C O M P I L E R
+
+rx_byte:	; TODO: Need a system interface
+	ret
+
+parse_name:	; TODO: Test this subroutine
+	push	rax
+	push	rcx
+	xor	rcx, rcx
+.sp:	; Skip whitespace
+	call	rx_byte
+	cmp	al, 0x20
+	jle	.sp
+	; Store the word characters
+	inc	rdi
+.l:	stosb	
+	inc	rcx
+	call	rx_byte
+	cmp	al, 0x20
+	jg	.l
+	; Count the word
+	sub	rdi, rcx
+	dec	rdi
+	mov	[rdi], cl
+	; Return
+	pop	rcx
+	pop	rax
+	ret
+
+makedef:
+	; copy counted string at rdi to space under rsi
+	; preserve rdi and rcx; point rsi to copied string
+	push	rcx
+	push	rdi
+	movzx	ecx, byte [rdi]
+	inc	ecx		
+	sub	rsi, rcx
+	push	rsi
+	xchg	rdi, rsi
+	rep movsb
+	xchg	rdi, rsi
+	pop	rsi
+	pop	rdi
+	pop	rcx
+	; store current heap ptr under rsi, modifying rsi
+	lea	rsi, [rsi-8]
+	mov	[rsi], rdi
+	ret
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;	T E S T   P R O G R A M
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -334,23 +381,26 @@ f_until:
 main:
 	ENTER
 
-	FPUSH	10
-	FPUSH	rdi
-	call	f_enter
-	FPUSH	0
-	call	f_dolit
-	call	f_swap
-	call	f_begin
-	call	f_tuck
-	call	f_add
-	call	f_swap
-	call	f_dec
-	call	f_dup
-	call	f_zlt
-	call	f_qbranch
-	call	f_drop
-	call	f_exit
-	EXECUTE
+	call	makedef
+	int3
+
+;	FPUSH	10
+;	FPUSH	rdi
+;	call	f_enter
+;	FPUSH	0
+;	call	f_dolit
+;	call	f_swap
+;	call	f_begin
+;	call	f_tuck
+;	call	f_add
+;	call	f_swap
+;	call	f_dec
+;	call	f_dup
+;	call	f_zlt
+;	call	f_qbranch
+;	call	f_drop
+;	call	f_exit
+;	EXECUTE
 
 	EXIT
 
@@ -361,21 +411,24 @@ main:
 ; The whole dictionary will reside in its own memory area.
 
 ; Interpreter idea:
-; Put a sentinel value in the dictionary before compilation.
-; When the semicolon word sees it, it executes immediately and resets rdi.
+; Manipulate the return stack to decide whether to interpret or not.
+; `:` simply drops the address of the interpreted code from the stack.
+; `;` simply does RDROP to exit the interpreter and run.
+; Another return to the interpreter will be underneath.
 
 ; TODO Need an I/O mechanism
-; TODO Need an interpreter
+; TODO Need an interpreter (see interpreter.txt in notes)
 
 
-; 	Memory map: (TODO?)
+; 	Memory map
 ;
 ; | 0		<- Dict | Heap ->	<- Stack |	<- Return stack|
 ;
 
+	rq 8
 f_dict:
 	DICTIONARY
-	rq 1024
 f_heap:
+	db 4,'TEST'
 	rq 1024
 f_stack:

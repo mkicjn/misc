@@ -25,32 +25,67 @@ void test_search(struct map *m, const char *s)
 		printf("FAILED!\n");
 }
 
-struct bucket map_mem[9];
+struct bucket map_mem[32];
 int main()
 {
 	struct map m;
 	map_init(&m, map_mem, sizeof(map_mem));
 #define INS(x,y) map_insert(&m, map_hash(x, sizeof(x)-1), y)
-	INS("Adam", 12345);
-	INS("Bobby", 2787);
-	INS("Claire", 329);
-	INS("Doug", 49297);
-	INS("Eliza", 5175);
-	INS("Fred", 67439);
-	INS("Greg", 79256);
-	INS("Henry", 8468);
-	INS("Isaac", 9231);
+	INS("Alfa", 1);
+	INS("Bravo", 2);
+	INS("Charlie", 3);
+	INS("Delta", 4);
+	INS("Echo", 5);
+	INS("Foxtrot", 6);
+	INS("Golf", 7);
+	INS("Hotel", 8);
+	INS("Indigo", 9);
+	INS("Julia", 10);
+	INS("Kilo", 11);
+	INS("Lima", 12);
+	INS("Mike", 13);
+	INS("November", 14);
+	INS("Oscar", 15);
+	INS("Papa", 16);
+	INS("Quebec", 17);
+	INS("Romeo", 18);
+	INS("Sierra", 19);
+	INS("Tango", 20);
+	INS("Uniform", 21);
+	INS("Victor", 22);
+	INS("Whiskey", 23);
+	INS("X-ray", 24);
+	INS("Yankee", 25);
+	INS("Zulu", 26);
 
 	map_print(&m);
 
-	test_search(&m, "Adam");
-	test_search(&m, "Bobby");
-	test_search(&m, "Claire");
-	test_search(&m, "Doug");
-	test_search(&m, "Eliza");
-	test_search(&m, "Fred");
-	test_search(&m, "Greg");
-	test_search(&m, "Henry");
-	test_search(&m, "Isaac");
+	test_search(&m, "Alfa");
+	test_search(&m, "Bravo");
+	test_search(&m, "Charlie");
+	test_search(&m, "Delta");
+	test_search(&m, "Echo");
+	test_search(&m, "Foxtrot");
+	test_search(&m, "Golf");
+	test_search(&m, "Hotel");
+	test_search(&m, "Indigo");
+	test_search(&m, "Julia");
+	test_search(&m, "Kilo");
+	test_search(&m, "Lima");
+	test_search(&m, "Mike");
+	test_search(&m, "November");
+	test_search(&m, "Oscar");
+	test_search(&m, "Papa");
+	test_search(&m, "Quebec");
+	test_search(&m, "Romeo");
+	test_search(&m, "Sierra");
+	test_search(&m, "Tango");
+	test_search(&m, "Uniform");
+	test_search(&m, "Victor");
+	test_search(&m, "Whiskey");
+	test_search(&m, "X-ray");
+	test_search(&m, "Yankee");
+	test_search(&m, "Zulu");
+
 	return 0;
 }
