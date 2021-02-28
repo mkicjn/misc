@@ -5,6 +5,15 @@
 #define RHMAP_VAL int
 #include "rhmap.h"
 
+unsigned long long str_hash(const char *str, size_t n)
+{
+	unsigned long long k = 5381;
+	while (n --> 0)
+		k = (k << 5) + k + *str++;
+	return k > UNUSED ? k : UNUSED + 1; // Avoid reserved keys
+}
+
+
 void map_print(struct map *m)
 {
 	for (unsigned i = 0; i < m->size; i++) {
@@ -18,7 +27,7 @@ void map_print(struct map *m)
 void test_search(struct map *m, const char *s)
 {
 	printf("Lookup %s: ", s);
-	int *res = map_search(m, map_hash(s, strlen(s)));
+	int *res = map_search(m, str_hash(s, strlen(s)));
 	if (res != NULL)
 		printf("%d\n", *res);
 	else
@@ -30,7 +39,7 @@ int main()
 {
 	struct map m;
 	map_init(&m, map_mem, sizeof(map_mem));
-#define INS(x,y) map_insert(&m, map_hash(x, sizeof(x)-1), y)
+#define INS(x,y) map_insert(&m, str_hash(x, sizeof(x)-1), y)
 	INS("Alfa", 1);
 	INS("Bravo", 2);
 	INS("Charlie", 3);

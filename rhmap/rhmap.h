@@ -26,7 +26,6 @@ enum reserved_key {
 	UNUSED
 };
 
-unsigned long long map_hash(const char *mem, size_t len);
 void map_init(struct map *m, void *b, size_t len);
 bool map_insert(struct map *m, unsigned long long key, RHMAP_VAL val);
 bool map_remove(struct map *m, unsigned long long key);

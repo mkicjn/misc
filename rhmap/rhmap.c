@@ -1,13 +1,5 @@
 #include "rhmap.h"
 
-unsigned long long map_hash(const char *str, size_t n)
-{
-	unsigned long long k = 5381;
-	while (n --> 0)
-		k = (k << 5) + k + *str++;
-	return k > UNUSED ? k : UNUSED + 1; // Avoid reserved keys
-}
-
 static struct bucket *map_index(struct map *m, unsigned long long key)
 {
 	size_t i = key % m->size;
