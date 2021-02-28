@@ -11,7 +11,12 @@ struct maze {
 
 struct maze *new_maze(int w, int h)
 {
-	struct maze *m = malloc(sizeof(*m) + w*h*sizeof(m->tile[0]));
+	struct maze *m;
+	if (w % 2 == 0)
+		w--;
+	if (h % 2 == 0)
+		h--;
+	m = malloc(sizeof(*m) + w*h*sizeof(m->tile[0]));
 	m->width = w;
 	m->height = h;
 	return m;
@@ -123,8 +128,8 @@ bool snake_step(struct maze *m, int *pos)
 
 int random_point(struct maze *m)
 {
-	int x = rand() % (m->width/2 - 1);
-	int y = rand() % (m->height/2 - 1);
+	int x = rand() % (m->width/2);
+	int y = rand() % (m->height/2);
 	x = 2 * x + 1;
 	y = 2 * y + 1;
 	return x + y * m->width;
@@ -149,19 +154,67 @@ void maze_generate(struct maze *m)
 	} while (snake_continue(m, &pos));
 }
 
+char wall_char(struct maze *m, int pos)
+{
+	bool n = false, s = false, e = false, w = false;
+
+	if (pos / m->width > 0)
+		n = m->tile[pos - m->width] == '#';
+	if (pos / m->width < m->height-1)
+		s = m->tile[pos + m->width] == '#';
+	if (pos % m->width < m->width-1)
+		e = m->tile[pos + 1] == '#';
+	if (pos % m->width > 0)
+		w = m->tile[pos - 1] == '#';
+
+	if ((n || s) && !(e || w))
+		return '|';
+	else
+		return '-';
+}
+
+void maze_display_soko(struct maze *m)
+{
+	int start = 1 + 1 * m->width;
+	int end = (m->width-2) + (m->height-2) * m->width;
+	printf("%d, %d\n", m->width, m->height);
+	for (int y = 0; y < m->height; y++) {
+		for (int x = 0; x < m->width; x++) {
+			int p = x + y * m->width;
+			if (p == start)
+				putchar('@');
+			else if (p == end)
+				putchar('<');
+			else if (m->tile[p] == ' ')
+				putchar('.');
+			else if (m->tile[p] == '#')
+				putchar(wall_char(m, p));
+			else
+				putchar(' ');
+		}
+		putchar('\n');
+	}
+}
+
 int main(int argc, char **argv)
 {
 	struct maze *m;
 	int w = 80, h = 24;
+	bool soko = false;
 	srand(time(NULL));
 	if (argc > 2) {
 		w = atoi(argv[1]);
 		h = atoi(argv[2]);
 	}
-	m = new_maze(w/2, h);
+	if (argc > 3) // if >2 arguments, print sokoban output
+		soko = true;
+	m = new_maze(soko ? w : w/2, h); // normal output is 2x wide
 	maze_initialize(m);
 	maze_generate(m);
-	maze_display(m);
+	if (soko)
+		maze_display_soko(m);
+	else
+		maze_display(m);
 	free_maze(m);
 	return 0;
 }
