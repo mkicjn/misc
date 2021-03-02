@@ -28,6 +28,10 @@ void maze_initialize(struct maze *m)
 	int area = m->width * m->height;
 	for (int i = 0; i < area; i++)
 		m->tile[i] = '#';
+	// Add entrance and exit
+	// TODO? Add random entrance and exit locations
+	m->tile[1] = ' ';
+	m->tile[m->width * m->height - 2] = ' ';
 }
 
 void maze_display(struct maze *m)
@@ -111,16 +115,43 @@ static inline int wall(int p1, int p2)
 	return p1 + (p2 - p1)/2;
 }
 
+static inline int opp_wall(int p1, int p2)
+{
+	return p1 - (p2 - p1)/2;
+}
+
+bool make_step(struct maze *m, int p1, int p2)
+{
+	m->tile[p2] = ' ';
+	m->tile[wall(p1, p2)] = ' ';
+}
+
 bool snake_step(struct maze *m, int *pos)
 {
 	// Pick a neighbor who hasn't been visited yet
 	int new_pos = rand_neighbor(m, *pos, '#');
 	// Return false if there are no possible moves
-	if (new_pos < 0)
+	if (new_pos < 0) {
+		// If easy mode, don't generate a dead end.
+		#ifdef EASY
+		do
+			new_pos = rand_neighbor(m, *pos, ' ');
+		while (m->tile[wall(*pos, new_pos)] != '#');
+		make_step(m, *pos, new_pos);
+		#endif
 		return false;
+	}
+	// If hard mode, try not to step in the same direction twice
+	#ifdef HARD
+	for (int i = 0; i < HARD; i++) { // Number of possible rerolls
+		if (m->tile[opp_wall(*pos, new_pos)] == ' ')
+			new_pos = rand_neighbor(m, *pos, '#');
+		else
+			break;
+	}
+	#endif
 	// Step to the new position
-	m->tile[new_pos] = ' ';
-	m->tile[wall(*pos, new_pos)] = ' ';
+	make_step(m, *pos, new_pos);
 	// Update position
 	*pos = new_pos;
 	return true;
@@ -148,8 +179,13 @@ void maze_generate(struct maze *m)
 	// Until there are no free spaces
 	do {
 		// Walk from the space as long as possible
-		while (snake_step(m, &pos))
-			continue;
+		while (snake_step(m, &pos)) {
+			#ifdef STEP
+			maze_display(m);
+			usleep(STEP);
+			putchar('\n');
+			#endif
+		}
 		// Jump to another valid point when necessary
 	} while (snake_continue(m, &pos));
 }
