@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include "aterm.h"
+
+// TODO: Rewrite this to be faster
 
 typedef unsigned char cell_t;
 struct grid {
@@ -44,7 +47,11 @@ void print_binary_grid(struct grid *g)
 	for (int y = 0; y < g->height; y++) {
 		for (int x = 0; x < g->width; x++) {
 			int i = x + y * g->width;
-			printf(g->field[i] ? "[]" : "  ");
+			if (g->field[i])
+				printf(SGR(BG_COLR(GREEN)));
+			else
+				printf(SGR(BG_COLR(BLUE)));
+			printf("  "SGR(RESET));
 		}
 		putchar('\n');
 	}
@@ -104,7 +111,7 @@ int main(int argc, char **argv)
 	struct grid *g = new_grid(w, h);
 
 	for (int i = 0; i < w * h; i++) {
-		int r = (rand() % 5) > 1;
+		int r = (double)rand()/RAND_MAX < 0.6; // Fill factor
 		g->field[i] = r;
 	}
 

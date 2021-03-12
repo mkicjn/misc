@@ -1,39 +1,48 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-void swap(int *a,int *b)
+static inline void swap(int *a,int *b)
 {
 	int c=*a;
 	*a=*b;
 	*b=c;
 }
-void siftup(int *h,int s,int i)
+#define PARENT(x)  (((x) - 1) >> 1)
+#define LEFT(x)  (((x) << 1) + 1)
+#define RIGHT(x) (((x) + 1) << 1)
+
+void siftup(int *h, int n, int i)
 {
-	while (i>0)
-		if (h[i]>h[(i-1)>>1])
-			swap(&h[i],&h[(i-1)>>1]);
+	(void)n; // Unused arg, retained for consistency
+	while (i > 0)
+		if (h[i] > h[PARENT(i)])
+			swap(&h[i], &h[PARENT(i)]);
 }
-void siftdown(int *h,int n,int i)
+
+void siftdown(int *h, int n, int i)
 {
-	while (i<n) {
-		int l=(i<<1)+1,r=(i<<1)+2;
-		if (l>=n)
+	while (i < n) {
+		int l = LEFT(i), r = RIGHT(i), s;
+		if (l >= n)
 			break;
-		int s=r<n&&h[r]>=h[l]?r:l;
-		if (h[i]<h[s])
-			swap(&h[i],&h[s]);
+		s = r < n && h[r] >= h[l] ? r : l;
+		if (h[i] < h[s])
+			swap(&h[i], &h[s]);
 		else
 			break;
-		i=s;
+		i = s;
 	}
 }
-void heapsort(int *h,int n)
+
+void heapsort(int *h, int n)
 {
-	for (int i=(n-2)>>1;i>=0;i--)
-		siftdown(h,n,i);
-	while (n>0) {
-		swap(&h[0],&h[--n]);
-		siftdown(h,n,0);
+	// Heapify
+	for (int i = PARENT(n); i >= 0; i--)
+		siftdown(h, n, i);
+	// Sort
+	for (int i = n - 1; i >= 0; i--) {
+		swap(&h[0], &h[i]);
+		siftdown(h, i, 0);
 	}
 }
 void insertion_sort(int *a,int len)

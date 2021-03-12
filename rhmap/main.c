@@ -5,12 +5,12 @@
 #define RHMAP_VAL int
 #include "rhmap.h"
 
-unsigned long long str_hash(const char *str, size_t n)
+unsigned long long djb2(const char *str, size_t n)
 {
 	unsigned long long k = 5381;
 	while (n --> 0)
 		k = (k << 5) + k + *str++;
-	return k > UNUSED ? k : UNUSED + 1; // Avoid reserved keys
+	return k;
 }
 
 
@@ -24,22 +24,25 @@ void map_print(struct map *m)
 	}
 }
 
-void test_search(struct map *m, const char *s)
+void test_search(struct map *m, const char *s, int i)
 {
 	printf("Lookup %s: ", s);
-	int *res = map_search(m, str_hash(s, strlen(s)));
-	if (res != NULL)
-		printf("%d\n", *res);
-	else
-		printf("FAILED!\n");
+	int *res = map_search(m, djb2(s, strlen(s)));
+	if (res != NULL) {
+		printf("%d", *res);
+		if (*res != i)
+			printf(" (FAILED)");
+	} else
+		printf("FAILED!");
+	putchar('\n');
 }
 
-struct bucket map_mem[32];
 int main()
 {
+	struct bucket map_mem[50] = {0};
 	struct map m;
 	map_init(&m, map_mem, sizeof(map_mem));
-#define INS(x,y) map_insert(&m, str_hash(x, sizeof(x)-1), y)
+#define INS(x,y) map_insert(&m, djb2(x, sizeof(x)-1), y)
 	INS("Alfa", 1);
 	INS("Bravo", 2);
 	INS("Charlie", 3);
@@ -69,32 +72,32 @@ int main()
 
 	map_print(&m);
 
-	test_search(&m, "Alfa");
-	test_search(&m, "Bravo");
-	test_search(&m, "Charlie");
-	test_search(&m, "Delta");
-	test_search(&m, "Echo");
-	test_search(&m, "Foxtrot");
-	test_search(&m, "Golf");
-	test_search(&m, "Hotel");
-	test_search(&m, "Indigo");
-	test_search(&m, "Julia");
-	test_search(&m, "Kilo");
-	test_search(&m, "Lima");
-	test_search(&m, "Mike");
-	test_search(&m, "November");
-	test_search(&m, "Oscar");
-	test_search(&m, "Papa");
-	test_search(&m, "Quebec");
-	test_search(&m, "Romeo");
-	test_search(&m, "Sierra");
-	test_search(&m, "Tango");
-	test_search(&m, "Uniform");
-	test_search(&m, "Victor");
-	test_search(&m, "Whiskey");
-	test_search(&m, "X-ray");
-	test_search(&m, "Yankee");
-	test_search(&m, "Zulu");
+	test_search(&m, "Alfa", 1);
+	test_search(&m, "Bravo", 2);
+	test_search(&m, "Charlie", 3);
+	test_search(&m, "Delta", 4);
+	test_search(&m, "Echo", 5);
+	test_search(&m, "Foxtrot", 6);
+	test_search(&m, "Golf", 7);
+	test_search(&m, "Hotel", 8);
+	test_search(&m, "Indigo", 9);
+	test_search(&m, "Julia", 10);
+	test_search(&m, "Kilo", 11);
+	test_search(&m, "Lima", 12);
+	test_search(&m, "Mike", 13);
+	test_search(&m, "November", 14);
+	test_search(&m, "Oscar", 15);
+	test_search(&m, "Papa", 16);
+	test_search(&m, "Quebec", 17);
+	test_search(&m, "Romeo", 18);
+	test_search(&m, "Sierra", 19);
+	test_search(&m, "Tango", 20);
+	test_search(&m, "Uniform", 21);
+	test_search(&m, "Victor", 22);
+	test_search(&m, "Whiskey", 23);
+	test_search(&m, "X-ray", 24);
+	test_search(&m, "Yankee", 25);
+	test_search(&m, "Zulu", 26);
 
 	return 0;
 }
