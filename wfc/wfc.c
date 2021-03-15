@@ -201,25 +201,6 @@ bool possible(struct entropy *e, char c)
 	return !e->collapsed || e->states[0] == c;
 }
 
-bool causes_contradiction(struct wave *w, int x, int y, struct grid *p, int sus_x, int sus_y)
-{
-	// TODO: Refactor so that the suspect tile can be checked first
-	bool other_agrees = false;
-	for (int dy = 0; dy < p->height; dy++) {
-		for (int dx = 0; dx < p->width; dx++) {
-			if (!XY(w, x+dx, y+dy)->collapsed)
-				continue;
-			bool sus = x + dx == sus_x && y + dy == sus_y;
-			bool agrees = possible(XY(w, x+dx, y+dy), XY(p, dx, dy));
-			if (!sus && agrees)
-				other_agrees = true;
-			if (!(sus ^ agrees))
-				return false;
-		}
-	}
-	return other_agrees;
-}
-
 bool agrees(struct wave *w, int x, int y, struct grid *p)
 {
 	for (int dy = 0; dy < p->height; dy++)
