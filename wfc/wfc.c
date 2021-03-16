@@ -4,6 +4,11 @@
 #include <stdbool.h>
 #include <limits.h>
 #include <time.h>
+#include "../aterm.h"
+
+// TODO: Split this into multiple files
+// TODO: Remove redundant patterns
+// TODO: Implement mirroring and rotation
 
 struct grid {
 	int width, height;
@@ -65,7 +70,6 @@ struct grid *file2grid(const char *filename)
 
 void print_grid(struct grid *g)
 {
-	printf("~~~~~~~~~~~~~\n"); /////////////////////////
 	for (int y = 0; y < g->height; y++) {
 		for (int x = 0; x < g->width; x++) {
 			char c = XY(g, x, y);
@@ -123,7 +127,6 @@ struct wfc_gen *create_wfc_gen(struct grid *src, int m, int n)
 	struct wfc_gen *w = malloc(sizeof(*w));
 	w->m = m;
 	w->n = n;
-	w->n_states = 0;
 	w->n_patterns = patterns(&w->patterns, src, m, n);
 	for (int i = 0; i < 256; i++)
 		w->freq[i] = 0;
@@ -131,9 +134,13 @@ struct wfc_gen *create_wfc_gen(struct grid *src, int m, int n)
 		w->freq[(int)src->space[i]]++;
 	// NB. Do not refactor this loop into being done any other way.
 	// The ascending order must be preserved for entropy_equal() to work properly.
-	for (int c = 0; c < 256; c++)
-		if (w->freq[c] > 0)
-			w->states[w->n_states++] = (char)c;
+	w->n_states = 0;
+	for (int c = 0; c < 256; c++) {
+		if (w->freq[c] <= 0)
+			continue;
+		w->states[w->n_states++] = w->states[0];
+		w->states[0] = (char)c;
+	}
 	return w;
 }
 
@@ -157,7 +164,7 @@ struct entropy *create_entropy(char *states, int n_states)
 {
 	struct entropy *e = malloc(sizeof(*e));
 	e->collapsed = false;
-	e->magnitude = -1; // uncalculated
+	e->magnitude = INT_MAX;
 	e->updated = false;
 	e->n_states = n_states;
 	e->states = malloc(n_states);
@@ -197,6 +204,12 @@ void destroy_wave(struct wave *w)
 
 void print_wave(struct wave *w)
 {
+	static bool init = false;
+	if (!init) {
+		printf(CLS);
+		init = true;
+	}
+	printf(CUP("1","1"));
 	for (int y = 0; y < w->height; y++) {
 		for (int x = 0; x < w->width; x++) {
 			struct entropy *e = XY(w, x, y);
@@ -232,12 +245,12 @@ bool agrees(struct wave *w, int x, int y, struct grid *p)
 	return true;
 }
 
-int locally_correct(struct wfc_gen *gen, struct wave *w, int center_x, int center_y)
+int locally_correct(struct wfc_gen *wfc, struct wave *w, int center_x, int center_y)
 {
 	// Returns local entropy, i.e. how many patterns fit
 	// Calculate preferred loop indices
-	int x0 = center_x - (gen->m-1);
-	int y0 = center_y - (gen->n-1);
+	int x0 = center_x - (wfc->m-1);
+	int y0 = center_y - (wfc->n-1);
 	int x1 = center_x;
 	int y1 = center_y;
 	// Perform range checks and correct OOB ranges
@@ -245,17 +258,17 @@ int locally_correct(struct wfc_gen *gen, struct wave *w, int center_x, int cente
 		x0 = 0;
 	if (y0 < 0)
 		y0 = 0;
-	if (x1 + gen->m-1 >= w->width)
-		x1 = w->width - gen->m;
-	if (y1 + gen->n-1 >= w->height)
-		y1 = w->height - gen->n;
+	if (x1 + wfc->m-1 >= w->width)
+		x1 = w->width - wfc->m;
+	if (y1 + wfc->n-1 >= w->height)
+		y1 = w->height - wfc->n;
 	// Check all patterns at every index
 	int total_entropy = 0;
 	for (int y = y0; y <= y1; y++) {
 		for (int x = x0; x <= x1; x++) {
 			int offset_entropy = 0;
-			for (int i = 0; i < gen->n_patterns; i++)
-				if (agrees(w, x, y, gen->patterns[i]))
+			for (int i = 0; i < wfc->n_patterns; i++)
+				if (agrees(w, x, y, wfc->patterns[i]))
 					offset_entropy++;
 			if (offset_entropy == 0)
 				return 0;
@@ -274,22 +287,22 @@ int next_nonzero(int *arr, int max, int from)
 	return i;
 }
 
-void recalculate_entropy(struct wfc_gen *gen, struct wave *w, int x, int y)
+void recalculate_entropy(struct wfc_gen *wfc, struct wave *w, int x, int y)
 {
 	struct entropy *e = XY(w, x, y);
 	e->n_states = 0;
 	e->magnitude = 0;
-	int c = next_nonzero(gen->freq, 256, 0);
+	int c = next_nonzero(wfc->freq, 256, 0);
 	while (c < 256) {
 		e->collapsed = true;
 		e->states[e->n_states++] = e->states[0];
 		e->states[0] = (char)c;
-		int partial_entropy = locally_correct(gen, w, x, y);
+		int partial_entropy = locally_correct(wfc, w, x, y);
 		if (partial_entropy == 0)
 			e->states[0] = e->states[--e->n_states];
 		e->magnitude += partial_entropy;
 		e->collapsed = false;
-		c = next_nonzero(gen->freq, 256, c+1);
+		c = next_nonzero(wfc->freq, 256, c+1);
 	}
 	if (e->n_states == 1) // Capitalize on free observations
 		e->collapsed = true;
@@ -308,11 +321,11 @@ bool entropy_equal(struct entropy *a, struct entropy *b)
 	return true;
 }
 
-void push_neighbors(struct wfc_gen *gen, struct wave *w, int x, int y, int *stack, int *n_stack)
+void push_neighbors(struct wfc_gen *wfc, struct wave *w, int x, int y, int *stack, int *n_stack)
 {
 	int n = *n_stack;
-	for (int dy = -(gen->n-1); dy <= (gen->n-1); dy++) {
-		for (int dx = -(gen->m-1); dx <= (gen->m-1); dx++) {
+	for (int dy = -(wfc->n-1); dy <= (wfc->n-1); dy++) {
+		for (int dx = -(wfc->m-1); dx <= (wfc->m-1); dx++) {
 			if (x+dx < 0 || x+dx >= w->width)
 				continue;
 			if (y+dy < 0 || y+dy >= w->height)
@@ -330,40 +343,47 @@ void push_neighbors(struct wfc_gen *gen, struct wave *w, int x, int y, int *stac
 	*n_stack = n;
 }
 
-void propagate(struct wfc_gen *gen, struct wave *w, int x, int y)
+void propagate(struct wfc_gen *wfc, struct wave *w, int x, int y)
 {
 	int *stack = malloc(sizeof(*stack) * w->width * w->height);
 	int n_stack = 0;
-	push_neighbors(gen, w, x, y, stack, &n_stack);
+	push_neighbors(wfc, w, x, y, stack, &n_stack);
+	printf(CUD("1"));
 	while (n_stack > 0) {
+		printf(CUU("1"));
+		printf(EL("2") CHA("1") "Propagations left: %d\n", n_stack);
+		fflush(stdout);
 		int pos = stack[--n_stack];
 		struct entropy *e = w->space[pos];
-		struct entropy *tmp = create_entropy(gen->states, gen->n_states);
+		struct entropy *tmp = create_entropy(wfc->states, wfc->n_states);
 		w->space[pos] = tmp;
 		int x = pos % w->width, y = pos / w->width;
-		recalculate_entropy(gen, w, x, y);
-		/**/
-		if (tmp->magnitude < 1) {
-			printf("Contradiction detected at %d, %d\n", x, y);
+		recalculate_entropy(wfc, w, x, y);
+		if (tmp->magnitude < 1)
 			return;
-		}
-		/**/
 		if (!entropy_equal(e, tmp))
-			push_neighbors(gen, w, x, y, stack, &n_stack);
+			push_neighbors(wfc, w, x, y, stack, &n_stack);
 		destroy_entropy(e);
 	}
 	free(stack);
 }
 
-void observe(struct wave *w, int pos)
+void observe(struct wfc_gen *wfc, struct entropy *e)
 {
-	struct entropy *e = w->space[pos];
-	// TODO: Take frequency into account
-	if (e->n_states > 1) {
-		// Magnitude should never be 0 here; would be caught elsewhere
-		e->states[0] = e->states[rand() % e->n_states];
-		e->n_states = 1;
+	int i;
+	int total_freq = 0;
+	for (i = 0; i < e->n_states; i++)
+		total_freq += wfc->freq[(int)e->states[i]];
+	int chosen_freq = rand() % total_freq;
+	for (i = 0; i < e->n_states; i++) {
+		int f = wfc->freq[(int)e->states[i]];
+		if (chosen_freq < f)
+			break;
+		else
+			chosen_freq -= f;
 	}
+	e->states[0] = e->states[i];
+	e->n_states = 1;
 	e->collapsed = true;
 }
 
@@ -393,28 +413,26 @@ int find_min_entropy(struct wave *w)
 	return min;
 }
 
-bool collapse(struct wfc_gen *gen, struct wave *w)
+bool collapse(struct wfc_gen *wfc, struct wave *w)
 {
 	for (;;) {
-		print_wave(w);
 		// TODO: See if it's worth returning x, y, and entropy from find_min_entropy
+		print_wave(w);
 		int min_pos = find_min_entropy(w);
 		if (min_pos < 0)
 			break;
-		printf("Min entropy: %d @ %d\n", w->space[min_pos]->n_states, min_pos);
 		if (w->space[min_pos]->n_states < 1) // Contradiction
 			return false;
-		observe(w, min_pos);
-		// TODO: The first call to propagate seems to take a long time. Investigate.
-		propagate(gen, w, min_pos % w->width, min_pos / w->width);
+		observe(wfc, w->space[min_pos]);
+		propagate(wfc, w, min_pos % w->width, min_pos / w->width);
 	}
 	return true;
 }
 
-struct grid *proto_wfc(struct wfc_gen *gen, int width, int height)
+struct grid *proto_wfc(struct wfc_gen *wfc, int width, int height)
 {
-	struct wave *w = create_wave(width, height, gen->states, gen->n_states);
-	if (!collapse(gen, w)) {
+	struct wave *w = create_wave(width, height, wfc->states, wfc->n_states);
+	if (!collapse(wfc, w)) {
 		destroy_wave(w);
 		return NULL;
 	}
@@ -444,9 +462,7 @@ int main(int argc, char **argv)
 	struct grid *map = proto_wfc(w, width, height);
 	destroy_wfc_gen(w);
 	// Print it
-	if (map != NULL) {
-		print_grid(map);
+	if (map != NULL)
 		destroy_grid(map);
-	}
 	return 0;
 }
