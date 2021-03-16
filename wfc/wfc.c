@@ -9,9 +9,7 @@
 // TODO: Split this into multiple files
 // TODO: Remove redundant patterns
 // TODO: Implement mirroring and rotation
-// TODO: Slight vertical bias? Suspect: push_neighbors
 // TODO: Contradiction recovery
-// TODO: Try a queue instead of stack in propagate
 
 struct grid {
 	int width, height;
@@ -324,9 +322,9 @@ bool entropy_equal(struct entropy *a, struct entropy *b)
 	return true;
 }
 
-void push_neighbors(struct wfc_gen *wfc, struct wave *w, int x, int y, int *stack, int *n_stack)
+void append_neighbors(struct wfc_gen *wfc, struct wave *w, int x, int y, int *arr, int *n_arr)
 {
-	int n = *n_stack;
+	int n = *n_arr;
 	for (int dy = -(wfc->n-1); dy <= (wfc->n-1); dy++) {
 		for (int dx = -(wfc->m-1); dx <= (wfc->m-1); dx++) {
 			if (x+dx < 0 || x+dx >= w->width)
@@ -340,23 +338,25 @@ void push_neighbors(struct wfc_gen *wfc, struct wave *w, int x, int y, int *stac
 			if (e->collapsed || e->updated)
 				continue;
 			e->updated = true;
-			stack[n++] = p;
+			arr[n++] = p;
 		}
 	}
-	*n_stack = n;
+	*n_arr = n;
 }
 
 void propagate(struct wfc_gen *wfc, struct wave *w, int x, int y)
 {
-	int *stack = malloc(sizeof(*stack) * w->width * w->height);
-	int n_stack = 0;
-	push_neighbors(wfc, w, x, y, stack, &n_stack);
+	int *bag = malloc(sizeof(*bag) * w->width * w->height);
+	int n_bag = 0;
+	append_neighbors(wfc, w, x, y, bag, &n_bag);
 	printf(CUD("1"));
-	while (n_stack > 0) {
+	while (n_bag > 0) {
 		printf(CUU("1"));
-		printf(EL("2") CHA("1") "Propagations left: %d\n", n_stack);
+		printf(EL("2") CHA("1") "Propagations left: %d\n", n_bag);
 		fflush(stdout);
-		int pos = stack[--n_stack];
+		int rand_idx = rand() % n_bag;
+		int pos = bag[rand_idx];
+		bag[rand_idx] = bag[--n_bag];
 		struct entropy *e = w->space[pos];
 		struct entropy *tmp = create_entropy(wfc->states, wfc->n_states);
 		w->space[pos] = tmp;
@@ -365,10 +365,10 @@ void propagate(struct wfc_gen *wfc, struct wave *w, int x, int y)
 		if (tmp->magnitude < 1)
 			return;
 		if (!entropy_equal(e, tmp))
-			push_neighbors(wfc, w, x, y, stack, &n_stack);
+			append_neighbors(wfc, w, x, y, bag, &n_bag);
 		destroy_entropy(e);
 	}
-	free(stack);
+	free(bag);
 }
 
 void observe(struct wfc_gen *wfc, struct entropy *e)
