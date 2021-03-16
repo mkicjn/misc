@@ -9,6 +9,9 @@
 // TODO: Split this into multiple files
 // TODO: Remove redundant patterns
 // TODO: Implement mirroring and rotation
+// TODO: Slight vertical bias? Suspect: push_neighbors
+// TODO: Contradiction recovery
+// TODO: Try a queue instead of stack in propagate
 
 struct grid {
 	int width, height;
