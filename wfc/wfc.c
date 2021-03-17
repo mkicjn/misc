@@ -176,8 +176,9 @@ int patterns(struct grid ***arr_ptr, struct grid *src, int m, int n, enum src_mo
 	// Extract all m by n slices from grid; place array in *arr_ptr
 	int max_x = src->width - m + 1;
 	int max_y = src->height - n + 1;
-	struct grid **arr = malloc(sizeof(*arr_ptr) * max_x * max_y);
-	unsigned long long *hashes = malloc(sizeof(*arr_ptr) * max_x * max_y);
+	int max_i = max_x * max_y * 6;
+	struct grid **arr = malloc(sizeof(*arr_ptr) * max_i);
+	unsigned long long *hashes = malloc(sizeof(*arr_ptr) * max_i);
 	int count = 0;
 	for (int y = 0; y < max_y; y++) {
 		for (int x = 0; x < max_x; x++) {
@@ -447,8 +448,10 @@ void propagate(struct wfc_gen *wfc, struct wave *w, int x, int y)
 		w->space[pos] = tmp;
 		int x = pos % w->width, y = pos / w->width;
 		recalculate_entropy(wfc, w, x, y);
-		if (tmp->magnitude < 1)
-			return;
+		if (tmp->magnitude < 1) {
+			destroy_entropy(e);
+			break;
+		}
 		if (!entropy_equal(e, tmp))
 			append_neighbors(wfc, w, x, y, bag, &n_bag);
 		destroy_entropy(e);
