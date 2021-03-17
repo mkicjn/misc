@@ -7,8 +7,6 @@
 #include "../aterm.h"
 
 // TODO: Split this into multiple files
-// TODO: Remove redundant patterns
-// TODO: Implement mirroring and rotation
 // TODO: Contradiction recovery
 
 struct grid {
@@ -117,31 +115,92 @@ unsigned long long djb2(const char *str, size_t n)
 	return k;
 }
 
-int patterns(struct grid ***arr_ptr, struct grid *src, int m, int n)
+enum src_mode {
+	NONE = 0,
+	ROTATE = 1 << 0,
+	REFLECT = 1 << 1,
+};
+
+struct grid *rotate(struct grid *g)
 {
+	struct grid *r = create_grid(g->height, g->width);
+	int max_y = g->height-1;
+	for (int y = 0; y < g->height; y++)
+		for (int x = 0; x < g->width; x++)
+			XY(r, max_y-y, x) = XY(g, x, y);
+	return r;
+}
+
+struct grid *hflip(struct grid *g)
+{
+	struct grid *r = create_grid(g->width, g->height);
+	int max_x = g->width-1;
+	for (int y = 0; y < g->height; y++)
+		for (int x = 0; x < g->width; x++)
+			XY(r, max_x-x, y) = XY(g, x, y);
+	return r;
+}
+
+struct grid *vflip(struct grid *g)
+{
+	struct grid *r = create_grid(g->width, g->height);
+	int max_y = g->height-1;
+	for (int y = 0; y < g->height; y++)
+		for (int x = 0; x < g->width; x++)
+			XY(r, x, max_y-y) = XY(g, x, y);
+	return r;
+}
+
+void add_if_unique(struct grid **arr, unsigned long long *hashes, int *count, struct grid *g)
+{
+	unsigned long long hash = djb2(g->space, g->width * g->height);
+	int n = *count;
+	int i;
+	for (i = 0; i < n; i++)
+		if (hash == hashes[i])
+			break;
+	// ^ TODO: Might want to record frequency of duplicate patterns
+	if (i < n) {
+		destroy_grid(g);
+	} else {
+		arr[n] = g;
+		hashes[n] = hash;
+		n++;
+		*count = n;
+	}
+}
+
+int patterns(struct grid ***arr_ptr, struct grid *src, int m, int n, enum src_mode mode)
+{
+	// TODO: Refactor this somehow
 	// Extract all m by n slices from grid; place array in *arr_ptr
 	int max_x = src->width - m + 1;
 	int max_y = src->height - n + 1;
-	int max_i = max_x * max_y;
-	struct grid **arr = malloc(sizeof(*arr_ptr) * max_i);
-	unsigned long long *hashes = malloc(sizeof(*arr_ptr) * max_i);
+	struct grid **arr = malloc(sizeof(*arr_ptr) * max_x * max_y);
+	unsigned long long *hashes = malloc(sizeof(*arr_ptr) * max_x * max_y);
 	int count = 0;
 	for (int y = 0; y < max_y; y++) {
 		for (int x = 0; x < max_x; x++) {
 			struct grid *g = slice(src, x, y, m, n);
-			unsigned long long hash = djb2(g->space, m*n);
-			int i;
-			for (i = 0; i < count; i++)
-				if (hash == hashes[i])
-					break;
-			// ^ TODO: Might want to record frequency of duplicate patterns
-			if (i < count) {
-				destroy_grid(g);
-				continue;
-			}
-			arr[count] = g;
-			hashes[count] = hash;
-			count++;
+			add_if_unique(arr, hashes, &count, g);
+		}
+	}
+	if (mode & ROTATE) {
+		for (int i = 0; i < count; i++) {
+			struct grid *r90 = rotate(arr[i]);
+			struct grid *r180 = rotate(r90);
+			struct grid *r270 = rotate(r180);
+			add_if_unique(arr, hashes, &count, r90);
+			add_if_unique(arr, hashes, &count, r180);
+			add_if_unique(arr, hashes, &count, r270);
+		}
+	}
+	if (mode & REFLECT) {
+		for (int i = 0; i < count; i++) {
+			struct grid *h = hflip(arr[i]);
+			struct grid *v = vflip(arr[i]);
+			add_if_unique(arr, hashes, &count, h);
+			add_if_unique(arr, hashes, &count, v);
 		}
 	}
 	free(hashes);
@@ -149,12 +208,12 @@ int patterns(struct grid ***arr_ptr, struct grid *src, int m, int n)
 	return count;
 }
 
-struct wfc_gen *create_wfc_gen(struct grid *src, int m, int n)
+struct wfc_gen *create_wfc_gen(struct grid *src, int m, int n, enum src_mode mode)
 {
 	struct wfc_gen *w = malloc(sizeof(*w));
 	w->m = m;
 	w->n = n;
-	w->n_patterns = patterns(&w->patterns, src, m, n);
+	w->n_patterns = patterns(&w->patterns, src, m, n, mode);
 	for (int i = 0; i < 256; i++)
 		w->freq[i] = 0;
 	for (int i = 0; i < src->width * src->height; i++)
@@ -485,7 +544,7 @@ int main(int argc, char **argv)
 	if (src == NULL)
 		return 1;
 	// Create model
-	struct wfc_gen *w = create_wfc_gen(src, 3, 3);
+	struct wfc_gen *w = create_wfc_gen(src, 3, 3, REFLECT);
 	destroy_grid(src);
 	// Generate map
 	struct grid *map = proto_wfc(w, width, height);
