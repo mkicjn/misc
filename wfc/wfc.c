@@ -109,18 +109,44 @@ struct grid *slice(struct grid *g, int x0, int y0, int w, int h)
 	return s;
 }
 
+unsigned long long djb2(const char *str, size_t n)
+{
+	unsigned long long k = 5381;
+	while (n --> 0)
+		k = (k << 5) + k + *str++;
+	return k;
+}
+
 int patterns(struct grid ***arr_ptr, struct grid *src, int m, int n)
 {
 	// Extract all m by n slices from grid; place array in *arr_ptr
 	int max_x = src->width - m + 1;
 	int max_y = src->height - n + 1;
-	struct grid **arr = malloc(sizeof(*arr_ptr) * (max_x * max_y));
-	int i = 0;
-	for (int y = 0; y < max_y; y++)
-		for (int x = 0; x < max_x; x++)
-			arr[i++] = slice(src, x, y, m, n);
+	int max_i = max_x * max_y;
+	struct grid **arr = malloc(sizeof(*arr_ptr) * max_i);
+	unsigned long long *hashes = malloc(sizeof(*arr_ptr) * max_i);
+	int count = 0;
+	for (int y = 0; y < max_y; y++) {
+		for (int x = 0; x < max_x; x++) {
+			struct grid *g = slice(src, x, y, m, n);
+			unsigned long long hash = djb2(g->space, m*n);
+			int i;
+			for (i = 0; i < count; i++)
+				if (hash == hashes[i])
+					break;
+			// ^ TODO: Might want to record frequency of duplicate patterns
+			if (i < count) {
+				destroy_grid(g);
+				continue;
+			}
+			arr[count] = g;
+			hashes[count] = hash;
+			count++;
+		}
+	}
+	free(hashes);
 	*arr_ptr = arr;
-	return i;
+	return count;
 }
 
 struct wfc_gen *create_wfc_gen(struct grid *src, int m, int n)
