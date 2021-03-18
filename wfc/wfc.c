@@ -7,7 +7,6 @@
 #include "../aterm.h"
 
 // TODO: Split this into multiple files
-// TODO: Contradiction recovery
 
 struct grid {
 	int width, height;
@@ -187,6 +186,7 @@ int patterns(struct grid ***arr_ptr, struct grid *src, int m, int n, enum src_mo
 		}
 	}
 	if (mode & ROTATE) {
+		// FIXME: This code assumes m == n
 		for (int i = 0; i < count; i++) {
 			struct grid *r90 = rotate(arr[i]);
 			struct grid *r180 = rotate(r90);
@@ -240,9 +240,9 @@ void destroy_wfc_gen(struct wfc_gen *w)
 }
 
 struct entropy {
-	bool collapsed;
+	bool final;
 	int magnitude;
-	bool updated;
+	bool queued;
 	int n_states;
 	char *states;
 };
@@ -250,9 +250,9 @@ struct entropy {
 struct entropy *create_entropy(char *states, int n_states)
 {
 	struct entropy *e = malloc(sizeof(*e));
-	e->collapsed = false;
+	e->final = false;
 	e->magnitude = INT_MAX;
-	e->updated = false;
+	e->queued = false;
 	e->n_states = n_states;
 	e->states = malloc(n_states);
 	memcpy(e->states, states, n_states);
@@ -300,7 +300,7 @@ void print_wave(struct wave *w)
 	for (int y = 0; y < w->height; y++) {
 		for (int x = 0; x < w->width; x++) {
 			struct entropy *e = XY(w, x, y);
-			if (e->collapsed)
+			if (e->final)
 				putchar(e->states[0]);
 			else if (e->n_states < 1)
 				printf("\033[31mX\033[m");
@@ -313,9 +313,9 @@ void print_wave(struct wave *w)
 
 bool possible(struct entropy *e, char c)
 {
-	if (e->n_states < 0) // i.e. uncalculated
-		return true;
-	if (e->collapsed)
+	if (e->n_states < 1)
+		return true; // Don't limit by contradictions
+	if (e->final)
 		return c == e->states[0];
 	for (int i = 0; i < e->n_states; i++)
 		if (c == e->states[i])
@@ -381,18 +381,18 @@ void recalculate_entropy(struct wfc_gen *wfc, struct wave *w, int x, int y)
 	e->magnitude = 0;
 	int c = next_nonzero(wfc->freq, 256, 0);
 	while (c < 256) {
-		e->collapsed = true;
+		e->final = true;
 		e->states[e->n_states++] = e->states[0];
 		e->states[0] = (char)c;
 		int partial_entropy = locally_correct(wfc, w, x, y);
 		if (partial_entropy == 0)
 			e->states[0] = e->states[--e->n_states];
 		e->magnitude += partial_entropy;
-		e->collapsed = false;
+		e->final = false;
 		c = next_nonzero(wfc->freq, 256, c+1);
 	}
 	if (e->n_states == 1) // Capitalize on free observations
-		e->collapsed = true;
+		e->final = true;
 }
 
 bool entropy_equal(struct entropy *a, struct entropy *b)
@@ -421,9 +421,9 @@ void append_neighbors(struct wfc_gen *wfc, struct wave *w, int x, int y, int *ar
 				continue;
 			int p = (x+dx) + (y+dy) * w->width;
 			struct entropy *e = w->space[p];
-			if (e->collapsed || e->updated)
+			if (e->queued || e->final)
 				continue;
-			e->updated = true;
+			e->queued = true;
 			arr[n++] = p;
 		}
 	}
@@ -448,11 +448,7 @@ void propagate(struct wfc_gen *wfc, struct wave *w, int x, int y)
 		w->space[pos] = tmp;
 		int x = pos % w->width, y = pos / w->width;
 		recalculate_entropy(wfc, w, x, y);
-		if (tmp->magnitude < 1) {
-			destroy_entropy(e);
-			break;
-		}
-		if (!entropy_equal(e, tmp))
+		if (tmp->magnitude > 1 && !entropy_equal(e, tmp))
 			append_neighbors(wfc, w, x, y, bag, &n_bag);
 		destroy_entropy(e);
 	}
@@ -475,7 +471,7 @@ void observe(struct wfc_gen *wfc, struct entropy *e)
 	}
 	e->states[0] = e->states[i];
 	e->n_states = 1;
-	e->collapsed = true;
+	e->final = true;
 }
 
 int find_min_entropy(struct wave *w)
@@ -485,9 +481,8 @@ int find_min_entropy(struct wave *w)
 	int *mins = malloc(sizeof(*mins) * w->width * w->height);
 	for (int i = 0; i < w->width * w->height; i++) {
 		struct entropy *e = w->space[i];
-		if (e->collapsed)
+		if (e->final)
 			continue;
-		e->updated = false;
 		if (e->magnitude < min) {
 			min = e->magnitude;
 			num_mins = 0;
@@ -504,18 +499,44 @@ int find_min_entropy(struct wave *w)
 	return min;
 }
 
+void unset_neighbors(struct wfc_gen *wfc, struct wave *w, int x, int y, int n)
+{
+	int r = wfc->m > wfc->n ? wfc->m : wfc->n;
+	r += n;
+	int i = 0;
+	for (int dy = -r; dy <= r; dy++) {
+		for (int dx = -r; dx <= r; dx++) {
+			if (x+dx < 0 || x+dx >= w->width)
+				continue;
+			if (y+dy < 0 || y+dy >= w->height)
+				continue;
+			int pos = (x+dx) + (y+dy) * w->width;
+			destroy_entropy(w->space[pos]);
+			w->space[pos] = create_entropy(wfc->states, wfc->n_states);
+			i++;
+		}
+	}
+	print_wave(w);
+}
+
 bool collapse(struct wfc_gen *wfc, struct wave *w)
 {
+	int contra = 0;
 	for (;;) {
 		// TODO: See if it's worth returning x, y, and entropy from find_min_entropy
 		print_wave(w);
-		int min_pos = find_min_entropy(w);
-		if (min_pos < 0)
+		int pos = find_min_entropy(w);
+		int x = pos % w->width, y = pos / w->width;
+		if (pos < 0)
 			break;
-		if (w->space[min_pos]->n_states < 1) // Contradiction
-			return false;
-		observe(wfc, w->space[min_pos]);
-		propagate(wfc, w, min_pos % w->width, min_pos / w->width);
+		if (w->space[pos]->n_states < 1) {
+			unset_neighbors(wfc, w, x, y, contra);
+			contra++;
+		} else {
+			observe(wfc, w->space[pos]);
+			contra = 0;
+		}
+		propagate(wfc, w, x, y);
 	}
 	return true;
 }
