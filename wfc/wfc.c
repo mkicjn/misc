@@ -499,11 +499,8 @@ int find_min_entropy(struct wave *w)
 	return min;
 }
 
-void unset_neighbors(struct wfc_gen *wfc, struct wave *w, int x, int y, int n)
+void unset_neighbors(struct wfc_gen *wfc, struct wave *w, int x, int y, int r)
 {
-	int r = wfc->m > wfc->n ? wfc->m : wfc->n;
-	r += n;
-	int i = 0;
 	for (int dy = -r; dy <= r; dy++) {
 		for (int dx = -r; dx <= r; dx++) {
 			if (x+dx < 0 || x+dx >= w->width)
@@ -513,7 +510,6 @@ void unset_neighbors(struct wfc_gen *wfc, struct wave *w, int x, int y, int n)
 			int pos = (x+dx) + (y+dy) * w->width;
 			destroy_entropy(w->space[pos]);
 			w->space[pos] = create_entropy(wfc->states, wfc->n_states);
-			i++;
 		}
 	}
 	print_wave(w);
@@ -521,7 +517,7 @@ void unset_neighbors(struct wfc_gen *wfc, struct wave *w, int x, int y, int n)
 
 bool collapse(struct wfc_gen *wfc, struct wave *w)
 {
-	int contra = 0;
+	int contra = 0; // # of consecutive contradictions
 	for (;;) {
 		// TODO: See if it's worth returning x, y, and entropy from find_min_entropy
 		print_wave(w);
@@ -530,11 +526,11 @@ bool collapse(struct wfc_gen *wfc, struct wave *w)
 		if (pos < 0)
 			break;
 		if (w->space[pos]->n_states < 1) {
-			unset_neighbors(wfc, w, x, y, contra);
 			contra++;
+			unset_neighbors(wfc, w, x, y, contra);
 		} else {
-			observe(wfc, w->space[pos]);
 			contra = 0;
+			observe(wfc, w->space[pos]);
 		}
 		propagate(wfc, w, x, y);
 	}
