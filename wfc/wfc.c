@@ -526,11 +526,11 @@ bool collapse(struct wfc_gen *wfc, struct wave *w)
 		if (pos < 0)
 			break;
 		if (w->space[pos]->n_states < 1) {
-			contra++;
 			unset_neighbors(wfc, w, x, y, contra);
+			contra <<= 1;
 		} else {
-			contra = 0;
 			observe(wfc, w->space[pos]);
+			contra = 1;
 		}
 		propagate(wfc, w, x, y);
 	}
