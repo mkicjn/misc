@@ -305,9 +305,9 @@ void print_wave(struct wave *w)
 			if (e->final)
 				putchar(e->states[0]);
 			else if (e->n_states < 1)
-				printf("\033[31mX\033[m");
+				printf(SGR(FG_COLR(RED)) "X" SGR(RESET));
 			else
-				printf("\033[34m?\033[m");
+				printf(SGR(FG_COLR(BLUE)) "?" SGR(RESET));
 		}
 		putchar('\n');
 	}
