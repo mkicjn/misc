@@ -175,7 +175,7 @@ int patterns(struct grid ***arr_ptr, struct grid *src, int m, int n, enum src_mo
 	// Extract all m by n slices from grid; place array in *arr_ptr
 	int max_x = src->width - m + 1;
 	int max_y = src->height - n + 1;
-	int max_i = max_x * max_y * 6;
+	int max_i = max_x * max_y * 7;
 	struct grid **arr = malloc(sizeof(*arr_ptr) * max_i);
 	unsigned long long *hashes = malloc(sizeof(*arr_ptr) * max_i);
 	int count = 0;
@@ -200,8 +200,10 @@ int patterns(struct grid ***arr_ptr, struct grid *src, int m, int n, enum src_mo
 		for (int i = 0; i < count; i++) {
 			struct grid *h = hflip(arr[i]);
 			struct grid *v = vflip(arr[i]);
+			struct grid *t = hflip(v);
 			add_if_unique(arr, hashes, &count, h);
 			add_if_unique(arr, hashes, &count, v);
+			add_if_unique(arr, hashes, &count, t);
 		}
 	}
 	free(hashes);
