@@ -306,8 +306,7 @@ INLINER EXECUTE, f_execute, 'EXECUTE'
 
 ;	C O M P I L E R
 
-rx_byte:	; TODO: Need a system interface
-	ret
+include 'lin64io.asm'
 
 parse_name:	; TODO: Test this subroutine
 	push	rax
@@ -381,8 +380,8 @@ f_until:
 main:
 	ENTER
 
-	call	makedef
-	int3
+	call	rx_byte
+	call	tx_byte
 
 ;	FPUSH	10
 ;	FPUSH	rdi
@@ -416,6 +415,7 @@ main:
 ; `;` simply does RDROP to exit the interpreter and run.
 ; Another return to the interpreter will be underneath.
 
+; TODO Need a macro to compile a function call. I.e. pop rbx; call put_offset
 ; TODO Need an I/O mechanism
 ; TODO Need an interpreter (see interpreter.txt in notes)
 
@@ -429,6 +429,5 @@ main:
 f_dict:
 	DICTIONARY
 f_heap:
-	db 4,'TEST'
 	rq 1024
 f_stack:
