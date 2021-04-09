@@ -2,8 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define RHMAP_VAL int
 #include "rhmap.h"
+
+DECLARE_RHMAP(map, int)
 
 unsigned long long djb2(const char *str, size_t n)
 {
@@ -39,7 +40,7 @@ void test_search(struct map *m, const char *s, int i)
 
 int main()
 {
-	struct bucket map_mem[50] = {0};
+	struct map_bucket map_mem[50] = {0};
 	struct map m;
 	map_init(&m, map_mem, sizeof(map_mem));
 #define INS(x,y) map_insert(&m, djb2(x, sizeof(x)-1), y)
