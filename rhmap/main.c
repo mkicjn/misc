@@ -17,11 +17,11 @@ unsigned long long djb2(const char *str, size_t n)
 
 void map_print(struct map *m)
 {
-	for (unsigned i = 0; i < m->size; i++) {
+	for (int i = 0; i < m->size; i++) {
 		printf("%d: ", i);
 		printf("[Key: %llu, ", m->buckets[i].key);
 		printf("Val: %d, ", m->buckets[i].val);
-		printf("Dist: %ld]\n", m->buckets[i].dist);
+		printf("Dist: %d]\n", m->buckets[i].dist);
 	}
 }
 
@@ -40,7 +40,8 @@ void test_search(struct map *m, const char *s, int i)
 
 int main()
 {
-	struct map_bucket map_mem[50] = {0};
+	//struct map_bucket map_mem[32] = {0};
+	char map_mem[512] = {0};
 	struct map m;
 	map_init(&m, map_mem, sizeof(map_mem));
 #define INS(x,y) map_insert(&m, djb2(x, sizeof(x)-1), y)
