@@ -18,10 +18,11 @@ unsigned long long djb2(const char *str, size_t n)
 void map_print(struct map *m)
 {
 	for (int i = 0; i < m->size; i++) {
+		struct map_bucket *b = &m->buckets[i];
 		printf("%d: ", i);
-		printf("[Key: %llu, ", m->buckets[i].key);
-		printf("Val: %d, ", m->buckets[i].val);
-		printf("Dist: %d]\n", m->buckets[i].dist);
+		printf("[Key: %llu, ", b->key);
+		printf("Val: %d, ", b->val);
+		printf("Dist: %d]\n", b->dist);
 	}
 }
 
