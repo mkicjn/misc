@@ -415,9 +415,12 @@ main:
 ; `;` simply does RDROP to exit the interpreter and run.
 ; Another return to the interpreter will be underneath.
 
-; TODO Need a macro to compile a function call. I.e. pop rbx; call put_offset
+; TODO Need a macro to compile a function call.
+; TODO Need a function to compile the above macro into memory
 ; TODO Need an I/O mechanism
 ; TODO Need an interpreter (see interpreter.txt in notes)
+; TODO Tail recursion check by `;` (last instruction: call -> jmp)
+; TODO Rewrite as much of this in Forth as possible, hopefully most :)
 
 
 ; 	Memory map
