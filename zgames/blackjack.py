@@ -1,5 +1,8 @@
 import random
 
+suit = ['A'] + [str(n) for n in range(2, 11)] + ['J', 'Q', 'K']
+deck = suit * 4
+
 
 def count_cards(cards):
     total = 0
@@ -15,9 +18,6 @@ def count_cards(cards):
             total += 10
     return total
 
-
-suit = ['A'] + [str(n) for n in range(2, 11)] + ['J', 'Q', 'K']
-deck = suit * 4
 
 random.shuffle(deck)
 
