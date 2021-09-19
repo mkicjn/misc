@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import random
 
 suit = ['A'] + [str(n) for n in range(2, 11)] + ['J', 'Q', 'K']
