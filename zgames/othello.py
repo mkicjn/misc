@@ -15,7 +15,7 @@ def new_board():
 
 
 def clear_screen():
-    print("\033[2J\033[1;1H")
+    print("\033[2J\033[1;1H", end='')
 
 def green_bg(string):
     return "\033[42m" + string + "\033[49m"
