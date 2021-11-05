@@ -13,9 +13,9 @@ last_word = None
 vocab = {last_word: {}}
 
 # Build a list of input words
-input_words = re.findall(r"[\w]+|[\.!?;]", sys.stdin.read())
+input_words = re.findall(r'\s+|[\w]+\s?|[^\w]\s?', re.sub(r'\s+', ' ', sys.stdin.read()))
 
-# Construct the vocabulary (including weights)
+# Construct the vocabulary and weights
 for word in input_words:
     if word not in vocab:
         vocab[word] = {}
@@ -34,8 +34,8 @@ for i in range(0, gen_count):
     except IndexError:
         word = None
         continue
-    if re.match('\w+', word) is not None:
-        print(' ', end='')
+    #if re.match('\w+', word) is not None:
+    #    print(' ', end='')
     print(word, end='')
     last_word = word
 print()
