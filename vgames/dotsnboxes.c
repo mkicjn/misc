@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include "/home/mark/Projects/test/aterm.h"
+#include "/home/mark/test/aterm.h"
 
 char player[2][4];
 bool *horizontal_lines;

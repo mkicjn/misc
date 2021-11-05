@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include "/home/mark/Projects/test/aterm.h"
+#include "/home/mark/test/aterm.h"
 
 #ifndef WIDTH
 #define WIDTH 8

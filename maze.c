@@ -181,6 +181,7 @@ void maze_generate(struct maze *m)
 		// Walk from the space as long as possible
 		while (snake_step(m, &pos)) {
 			#ifdef STEP
+			printf("\033[2H\n");
 			maze_display(m);
 			usleep(STEP);
 			putchar('\n');
