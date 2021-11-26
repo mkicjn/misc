@@ -29,6 +29,13 @@ int *grid_at(struct grid *g, int x, int y)
 	return &g->spots[x + y * g->width];
 }
 
+void grid_randomize(struct grid *g, double fill_factor)
+{
+	for (int y = 0; y < g->height; y++)
+		for (int x = 0; x < g->width; x++)
+			*grid_at(g, x, y) = ((double)rand() / RAND_MAX < fill_factor);
+}
+
 #define MIN(X,Y) ((X)<(Y)?(X):(Y))
 #define MAX(X,Y) ((X)>(Y)?(X):(Y))
 
@@ -52,35 +59,8 @@ void grid_erode(struct grid *g)
 	grid_destroy(tmp);
 }
 
-void grid_randomize(struct grid *g, double fill_factor)
-{
-	for (int y = 0; y < g->height; y++)
-		for (int x = 0; x < g->width; x++)
-			*grid_at(g, x, y) = ((double)rand() / RAND_MAX < fill_factor);
-}
 
-
-void grid_cond_add(struct grid *dst, struct grid *src)
-{
-	int w = MIN(dst->width, src->width);
-	int h = MIN(dst->height, src->height);
-	for (int y = 0; y < h; y++)
-		for (int x = 0; x < w; x++)
-			if (*grid_at(dst, x, y) > 0) // TODO Should this be conditional?
-				*grid_at(dst, x, y) += *grid_at(src, x, y);
-}
-
-void grid_cond_sub(struct grid *dst, struct grid *src)
-{
-	int w = MIN(dst->width, src->width);
-	int h = MIN(dst->height, src->height);
-	for (int y = 0; y < h; y++)
-		for (int x = 0; x < w; x++)
-			if (*grid_at(dst, x, y) <= 0) // TODO Should this be conditional?
-				*grid_at(dst, x, y) -= *grid_at(src, x, y);
-}
-
-void grid_print(struct grid *g)
+void land_print(struct grid *g)
 {
 	printf(ED("2") CUP("1","1"));
 	for (int y = 0; y < g->height; y++) {
@@ -98,13 +78,13 @@ void grid_print(struct grid *g)
 				printf(SGR(BG_BCOLR(GREEN)));
 				break;
 			case 3:
-				printf(SGR(BG_BCOLR(BLACK)));
+				printf(SGR(BG_COLR(GREEN)));
 				break;
 			default:
 				if (val < 0)
 					printf(SGR(BG_COLR(BLUE)));
 				else
-					printf(SGR(BG_BCOLR(WHITE)));
+					printf(SGR(BG_BCOLR(BLACK)));
 				break;
 			}
 			printf("  ");
@@ -114,15 +94,30 @@ void grid_print(struct grid *g)
 	}
 }
 
-
-struct grid *new_land(double fill_rate, int width, int height)
+struct grid *land_new(double fill_rate, int width, int height)
 {
 	struct grid *g = grid_new(width, height);
 	grid_randomize(g, fill_rate);
-	for (int i = 0; i < 2; i++) // TODO This number is tinkerable, but 2 is good
+	for (int i = 0; i < 3; i++) {
 		grid_erode(g);
+		//land_print(g);
+		//usleep(500000);
+	}
 	return g;
 }
+
+void land_compose(struct grid *dst, struct grid *src)
+{
+	int w = MIN(dst->width, src->width);
+	int h = MIN(dst->height, src->height);
+	for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+			if (*grid_at(dst, x, y) > 0)
+				*grid_at(dst, x, y) += *grid_at(src, x, y);
+			else
+				*grid_at(dst, x, y) -= *grid_at(src, x, y);
+}
+
 
 #define COUNT(X) (sizeof(X)/sizeof(*(X)))
 
@@ -130,19 +125,16 @@ int main()
 {
 	srand(time(NULL));
 
-	struct grid *lands[1]; // TODO Change number to > 1 to activate remaining logic
-	lands[0] = new_land(0.5, 64, 64);
-	grid_cond_add(lands[0], lands[0]);
+	struct grid *lands[8]; // TODO Change number to > 1 to activate remaining logic
+	lands[0] = land_new(0.5, 64, 64);
+	//land_compose(lands[0], lands[0]);
 	for (int i = 1; i < COUNT(lands); i++)
-		lands[i] = new_land(0.5 / ((i+1)/2), 64, 64); // TODO: Find good heuristic for first argument
+		lands[i] = land_new(0.5 / ((i+1)/2), 64, 64); // TODO: Find good heuristic for first argument
 
 	for (int i = 1; i < COUNT(lands); i++)
-		if (i % 2 != 0) // TODO Terrain printing is biased towards mountains; would 3 be better?
-			grid_cond_add(lands[0], lands[i]);
-		else
-			grid_cond_sub(lands[0], lands[i]);
+		land_compose(lands[0], lands[i]);
 	
-	grid_print(lands[0]);
+	land_print(lands[0]);
 
 	return 0;
 }
