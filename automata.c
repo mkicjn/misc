@@ -48,9 +48,9 @@ void print_binary_grid(struct grid *g)
 		for (int x = 0; x < g->width; x++) {
 			int i = x + y * g->width;
 			if (g->field[i])
-				printf(SGR(BG_COLR(GREEN)));
+				printf(SGR(BG_BCOLR(WHITE)));
 			else
-				printf(SGR(BG_COLR(BLUE)));
+				printf(SGR(BG_COLR(BLACK)));
 			printf("  "SGR(RESET));
 		}
 		putchar('\n');
@@ -120,8 +120,8 @@ int main(int argc, char **argv)
 		printf(CUP("1","1"));
 		print_binary_grid(g);
 
-		usleep(1000000);
-		step_grid(g, erosion);
+		usleep(500000);
+		step_grid(g, conway);
 	}
 
 	destroy_grid(g);

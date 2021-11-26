@@ -18,7 +18,7 @@ int apply(int a, char op, int b)
 int main(int argc, char **argv)
 {
 	srand(time(NULL));
-	char ops[] = {'+', '-'};
+	char ops[] = {'*'};
 	for (;;) {
 		char op = CHOOSE(ops);
 		int a = RRAND(0, 20), b = RRAND(0, 20), ans;

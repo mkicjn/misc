@@ -566,7 +566,7 @@ int main(int argc, char **argv)
 	if (src == NULL)
 		return 1;
 	// Create model
-	struct wfc_gen *w = create_wfc_gen(src, 3, 3, REFLECT);
+	struct wfc_gen *w = create_wfc_gen(src, 2, 2, REFLECT);
 	destroy_grid(src);
 	// Generate map
 	struct grid *map = proto_wfc(w, width, height);
