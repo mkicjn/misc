@@ -1,7 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
-typedef unsigned long val_t;
+struct thing {
+	int val_a;
+	double val_b;
+	char *str;
+};
+
+typedef struct thing val_t;
 // ^ TODO: If this will be its own project, it needs a macro like rhmap
 
 union pool_entry {
@@ -12,12 +19,18 @@ union pool_entry {
 struct pool {
 	union pool_entry *free;
 	union pool_entry *mem;
+	struct pool *next;
 };
 
 void pool_destroy(struct pool *p)
 {
-	free(p->mem);
-	free(p);
+	struct pool *n;
+	while (p != NULL) {
+		n = p->next;
+		free(p->mem);
+		free(p);
+		p = n;
+	}
 }
 
 struct pool *pool_new(int num_entries)
@@ -26,10 +39,20 @@ struct pool *pool_new(int num_entries)
 	union pool_entry *a = malloc(num_entries * sizeof(*a));
 	p->mem = a;
 	p->free = a;
+	p->next = NULL;
 	for (int i = 0; i < num_entries-1; i++)
 		a[i].next = &a[i+1];
 	a[num_entries-1].next = NULL;
 	return p;
+}
+
+void pool_expand(struct pool *p, int num_entries)
+{
+	struct pool *new = pool_new(num_entries);
+	new->next = p->next;
+	p->next = new;
+	new->mem[num_entries-1].next = p->free;
+	p->free = new->free;
 }
 
 val_t *pool_alloc(struct pool *p)
@@ -47,14 +70,54 @@ void pool_free(struct pool *p, val_t *v)
 	p->free = e;
 }
 
+#define POOL_SIZE 1000000
+
+#define OBJ_COUNT 10000000
+
+val_t *arr[OBJ_COUNT];
+
 int main()
 {
 	struct pool *p = pool_new(100);
 
-	unsigned long *ptr = pool_alloc(p);
-	pool_free(p, ptr);
-	// TODO: Write a benchmark test
 
+	clock_t tick, tock;
+
+	tock = clock();
+	for (int i = 0; i < OBJ_COUNT; i++) {
+		val_t *v = pool_alloc(p);
+		if (v == NULL) {
+			pool_expand(p, POOL_SIZE);
+			v = pool_alloc(p);
+		}
+		arr[i] = v;
+	}
+	tick = clock();
+	printf("(pool) Time to alloc: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC);
+
+	tock = clock();
+	for (int i = 0; i < OBJ_COUNT; i++) {
+		pool_free(p, arr[i]);
+	}
+	tick = clock();
+	printf("(pool) Time to free: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC);
+
+	tock = clock();
+	for (int i = 0; i < OBJ_COUNT; i++) {
+		val_t *v = malloc(sizeof(*v));
+		arr[i] = v;
+	}
+	tick = clock();
+	printf("(malloc) Time to alloc: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC);
+
+	tock = clock();
+	for (int i = 0; i < OBJ_COUNT; i++) {
+		free(arr[i]);
+	}
+	tick = clock();
+	printf("(malloc) Time to free: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC);
+	
+	
 	pool_destroy(p);
 	return 0;
 }
