@@ -1,15 +1,33 @@
-\ Object pools in 4 lines of Forth
-
 : TAKE  DUP @ DUP @ ROT ! ;
 : GIVE  2DUP @ SWAP ! ! ;
-: POOL: ( cap size -- ) CELL MIN  CREATE HERE 0 ,  OVER ALLOT
-  ROT OVER + OVER CELL+  DO  I OVER GIVE  OVER +LOOP 2DROP ;
+\ Note: ^ These could be used as generic linked list operators
+: POOL: ( cap size -- ) CELL MAX CREATE HERE 0 , ROT DUP ALLOT
+        OVER CELL+ TUCK + SWAP DO I OVER GIVE OVER +LOOP 2DROP ;
+: AVAILABLE  -1 BEGIN 1+ SWAP @ TUCK 0= UNTIL ;
 
 \ e.g.
 
-\ : KiB  10 LSHIFT ;
-\ 10 KiB CELL POOL: OBJECTS
-\ OBJECTS TAKE  INIT-OBJECT ...
+: KB  10 LSHIFT ;
+: MB  20 LSHIFT ;
 
-\ TODO Consider adding an origin pointer to each region
-\ in each pool to make free operations more universal
+1 KB CONSTANT CONS-SPACE
+CONS-SPACE 2 CELLS POOL: CONS-CELLS
+
+: CAR  @ ;
+: CDR  CELL+ @ ;
+: CONS  CONS-CELLS TAKE  TUCK CELL+ !  TUCK ! ;
+
+: ATOM?  CONS-CELLS DUP CONS-SPACE + WITHIN INVERT ;
+
+: LISP-FREE DUP ATOM? IF  DROP  EXIT THEN
+            DUP CAR OVER CDR RECURSE RECURSE
+	    CONS-CELLS GIVE ;
+
+CONS-CELLS AVAILABLE . CR
+
+3 2 1 0 CONS CONS CONS
+LISP-FREE
+
+CONS-CELLS AVAILABLE . CR
+
+BYE
