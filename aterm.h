@@ -66,8 +66,8 @@
 #define FG_BCOLR(S)  "9" S
 #define BG_BCOLR(S) "10" S
 
-#define CUSTOM       "8" AND
-#define RGB(R,G,B)   "2;" R AND G AND B
-#define COLR_8BIT(N) "5;" N
+#define CUSTOM           "8" AND
+#define COLR_RGB(R,G,B)  "2;" R AND G AND B
+#define COLR_8BIT(N)     "5;" N
 
 #endif

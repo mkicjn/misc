@@ -83,6 +83,30 @@ cell_t conway(struct grid *g, size_t c)
 		return 0;
 }
 
+cell_t bosco(struct grid *g, size_t c)
+{
+	size_t w = g->width, h = g->height;
+	size_t x0 = c % w, y0 = c / w;
+	int alive = 0;
+	for (int dy = -5; dy <= 5; dy++)
+	for (int dx = -5; dx <= 5; dx++) {
+		int x1 = (x0 + dx + w) % w;
+		int y1 = (y0 + dy + h) % h;
+		int i = x1 + y1 * w;
+		if (i == c)
+			continue;
+		if (g->field[i])
+			alive++;
+	}
+	if (g->field[c]) {
+		// Survival
+		return alive >= 33 && alive <= 57;
+	} else {
+		// Birth
+		return alive >= 34 && alive <= 45;
+	}
+}
+
 cell_t erosion(struct grid *g, size_t c)
 {
 	size_t w = g->width, h = g->height;
@@ -99,10 +123,20 @@ cell_t erosion(struct grid *g, size_t c)
 	return alive > 5;
 }
 
+int get_dim(int x_factor, int y_factor)
+{
+	int x, y;
+	printf(CUP("999", "999") DSR);
+	printf("\nPress enter to continue\n");
+	printf("%d\n", scanf(CSI "%d" AND "%d" "R", &y, &x));
+	return (x-1) * x_factor + (y-1) * y_factor;
+}
+
 int main(int argc, char **argv)
 {
 	srand(time(NULL));
-	size_t w = 50, h = 50;
+	size_t w = get_dim(1, 0) / 2;
+	size_t h = get_dim(0, 1);
 	if (argc > 2) {
 		w = atol(argv[1]);
 		h = atol(argv[2]);
@@ -111,7 +145,7 @@ int main(int argc, char **argv)
 	struct grid *g = new_grid(w, h);
 
 	for (int i = 0; i < w * h; i++) {
-		int r = (double)rand()/RAND_MAX < 0.6; // Fill factor
+		int r = (double)rand()/RAND_MAX < 0.5; // Fill factor
 		g->field[i] = r;
 	}
 
@@ -120,8 +154,8 @@ int main(int argc, char **argv)
 		printf(CUP("1","1"));
 		print_binary_grid(g);
 
-		usleep(500000);
-		step_grid(g, conway);
+		usleep(100000);
+		step_grid(g, bosco);
 	}
 
 	destroy_grid(g);
