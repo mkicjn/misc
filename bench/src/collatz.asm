@@ -1,4 +1,3 @@
-; Assemble with fasm
 format elf64 executable
 entry start
 
@@ -34,7 +33,7 @@ putn: ; clobbers rax, rdx
 	call	.rec
 	pop	rbx
 	ret
-.rec:	xor	rdx, rdx
+.rec:	xor	edx, edx
 	div	rbx
 	push	rdx
 	cmp	rax, 0
@@ -47,7 +46,7 @@ putn: ; clobbers rax, rdx
 
 collatz: ; clobbers rax, rdx
 	push	rcx
-	xor	rcx, rcx
+	xor	ecx, ecx
 .loop:	cmp	rax, 1
 	jle	.done
 	lea	rdx, [2*rax + rax + 1]
@@ -62,7 +61,7 @@ collatz: ; clobbers rax, rdx
 maxlen: ; clobbers rax
 	push	rbx
 	mov	rcx, rax
-	xor	rbx, rbx
+	xor	ebx, ebx
 .loop:	mov	rax, rcx
 	call	collatz
 	cmp	rbx, rax
@@ -76,4 +75,5 @@ start:
 	mov	rax, 1000000
 	call	maxlen
 	call	putn
+	xor	eax, eax
 	call	sys_exit

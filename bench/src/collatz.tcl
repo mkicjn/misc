@@ -1,5 +1,3 @@
-#!/usr/bin/tclsh
-
 proc collatz {n} {
 	set l 0
 	while {$n > 1} {

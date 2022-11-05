@@ -1,4 +1,3 @@
-; sbcl --script collatz.lisp
 (defun collatz (n)
   (declare (optimize (speed 3) (safety 0)) (fixnum n))
   (loop for i fixnum from 0

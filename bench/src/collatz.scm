@@ -1,4 +1,3 @@
-; csc -O5 collatz.scm
 (define (collatz n)
   (let collatz-rec ((n n) (i 0))
     (cond ((<= n 1)           i)
