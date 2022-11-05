@@ -1,0 +1,8 @@
+\ gforth-fast -e "1000000" collatz.fth
+
+: ITER  DUP 1 AND 0= IF  2/  ELSE  DUP 2* + 1+  THEN ;
+: COLLATZ  0 >R  BEGIN  DUP 1 >  WHILE  R> 1+ >R  ITER  REPEAT  DROP R> ;
+: MAXLEN  0 TUCK  DO  I COLLATZ MAX  LOOP ;
+
+1000000 MAXLEN .
+BYE
