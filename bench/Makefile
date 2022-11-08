@@ -1,4 +1,4 @@
-ALL = collatz_fasm collatz_gcc collatz_gforth-fast collatz_gforth collatz_sbcl collatz_pypy collatz_python3 collatz_tclsh collatz_csc collatz_csi
+ALL = collatz_fasm collatz_gcc collatz_gforth-fast collatz_gforth collatz_gforth-itc collatz_sbcl collatz_pypy collatz_python3 collatz_tclsh collatz_csc collatz_csi
 
 all: $(ALL)
 
@@ -24,6 +24,10 @@ collatz_gforth-fast: src/collatz.fth
 	chmod +x $@
 collatz_gforth: src/collatz.fth
 	echo "#! /usr/bin/gforth" > $@
+	cat $^ >> $@
+	chmod +x $@
+collatz_gforth-itc: src/collatz.fth
+	echo "#! /usr/bin/gforth-itc" > $@
 	cat $^ >> $@
 	chmod +x $@
 
