@@ -1,4 +1,17 @@
-ALL = collatz_fasm collatz_gcc collatz_gforth-fast collatz_gforth collatz_gforth-itc collatz_sbcl collatz_pypy collatz_python3 collatz_tclsh collatz_csc collatz_csi
+ALL = \
+	collatz_fasm \
+	collatz_gcc \
+	collatz_gforth-fast \
+	collatz_gforth \
+	collatz_gforth-itc \
+	collatz_sbcl \
+	collatz_pypy \
+	collatz_python3 \
+	collatz_tclsh \
+	collatz_csc \
+	collatz_csi \
+	collatz_lua \
+	collatz_luajit
 
 all: $(ALL)
 
@@ -54,5 +67,16 @@ collatz_csi: src/collatz.scm
 
 collatz_tclsh: src/collatz.tcl
 	echo "#!/usr/bin/tclsh" > $@
+	cat $^ >> $@
+	chmod +x $@
+
+
+collatz_lua: src/collatz.lua
+	echo "#!/usr/bin/lua" > $@
+	cat $^ >> $@
+	chmod +x $@
+
+collatz_luajit: src/collatz.lua
+	echo "#!/usr/bin/luajit" > $@
 	cat $^ >> $@
 	chmod +x $@
