@@ -1,3 +1,4 @@
+// This is the old version I used to play with
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
