@@ -1,10 +1,42 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
+
+void std_seed(uint64_t s)
+{
+	srand(s);
+}
+
+uint32_t std_next(void)
+{
+	return rand();
+}
+
+
+
+void rdrand_seed(uint64_t s)
+{
+}
+
+uint32_t rdrand_next(void)
+{
+	uint64_t a;
+	asm __volatile__ (
+			"rdrand %0"
+			: "=r"(a));
+	return a;
+}
+
+
 
 uint32_t cbrng(uint64_t n)
 { // Inspired by the middle square Weyl sequence and Squares
-	static uint64_t const s = 0xB5AD4ECEDA1CE2A9UL;
+#ifndef CBRNG_CONST
+#define CBRNG_CONST 0xba2c2cab
+	// ^ This is the best constant I've seen against PractRand
+#endif
+	static uint64_t const s = CBRNG_CONST;
 	
 	uint64_t x = n * s;
 	x *= x ^ s;
@@ -12,9 +44,9 @@ uint32_t cbrng(uint64_t n)
 }
 
 uint64_t state = 0;
-uint32_t cbrng_seed(uint64_t s)
+void cbrng_seed(uint64_t s)
 {
-	state = cbrng(s);
+	state = cbrng(cbrng(s));
 }
 uint64_t cbrng_next_state()
 {
@@ -37,7 +69,7 @@ uint32_t lfsr(uint64_t state)
 }
 
 uint64_t lfsr_state = 1;
-uint32_t lfsr_seed(uint64_t s)
+void lfsr_seed(uint64_t s)
 {
 	lfsr_state = s;
 }
@@ -78,7 +110,7 @@ uint32_t pcg32_random_r(pcg32_random_t* rng)
 }
 
 pcg32_random_t pcg_state = PCG32_INITIALIZER;
-uint32_t pcg_seed(uint64_t s)
+void pcg_seed(uint64_t s)
 {
 	pcg_state.state = s;
 }
@@ -88,14 +120,23 @@ uint32_t pcg_next(void)
 }
 
 
-// From here, can do :.,$s/cbrng/pcg/g etc. to change which algorithm is used.
-// TODO: Make this a compile time option, or something like that.
+
+#ifndef RNG
+#define RNG cbrng
+#endif
+
+#define CONCAT(x,y) x##y
+#define CONCAT2(x,y) CONCAT(x,y)
+#define RNGF(x) CONCAT2(RNG,x)
+
+#define rng_seed RNGF(_seed)
+#define rng_next RNGF(_next)
 
 void random_pbm(int width, int height, int i)
 {
-	cbrng_seed(i);
-	uint32_t buf = cbrng_next();
-	int b = 32;
+	rng_seed(i);
+	uint64_t buf = rng_next();
+	int b = sizeof(buf) * 8;
 	printf("P1\n%d %d\n", width, height);
 	for (int x = 0; x < width; x++) {
 		for (int y = 0; y < height; y++) {
@@ -103,8 +144,8 @@ void random_pbm(int width, int height, int i)
 			buf >>= 1;
 			b--;
 			if (b == 0) {
-				buf = cbrng_next();
-				b = 32;
+				buf = rng_next();
+				b = sizeof(buf) * 8;
 			}
 		}
 		printf("\n");
@@ -113,8 +154,8 @@ void random_pbm(int width, int height, int i)
 
 void random_pgm(int width, int height, int i)
 {
-	cbrng_seed(i);
-	uint32_t buf = cbrng_next();
+	rng_seed(i);
+	uint32_t buf = rng_next();
 	int b = 32;
 	printf("P2\n%d %d\n", width, height);
 	printf("255\n");
@@ -124,7 +165,7 @@ void random_pgm(int width, int height, int i)
 			buf >>= 8;
 			b -= 8;
 			if (b == 0) {
-				buf = cbrng_next();
+				buf = rng_next();
 				b = 32;
 			}
 		}
@@ -162,11 +203,11 @@ int main(int argc, char **argv)
 		sscanf(argv[2], "%d", &x);
 		if (argc > 3) {
 			sscanf(argv[3], "%d", &n);
-			cbrng_seed(n);
+			rng_seed(n);
 		}
 		for (unsigned i = 0; i != x; i++) {
-			unsigned u = cbrng_next();
-			fwrite(&u, sizeof(unsigned), 1, stdout);
+			uint32_t u = rng_next();
+			fwrite(&u, sizeof(uint32_t), 1, stdout);
 		}
 		break;
 	case CSV:
@@ -178,11 +219,11 @@ int main(int argc, char **argv)
 		sscanf(argv[3], "%d", &y);
 		if (argc > 4) {
 			sscanf(argv[4], "%d", &n);
-			cbrng_seed(n);
+			rng_seed(n);
 		}
 		for (int i = 0; i < y; i++) {
 			for (int j = 0; j < x; j++) {
-				printf("%d", cbrng_next());
+				printf("%d", rng_next());
 				if (j < x - 1)
 					putchar(',');
 			}
