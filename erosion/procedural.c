@@ -23,9 +23,9 @@ int get_depth(int origin, int x, int y, int erosion)
 	int sum = 0;
 	if (erosion == 0) {
 		/*
-		// Clamping
+		// Soft clamping
 		if (x <= 0 || x >= WIDTH-1 || y <= 0 || y >= HEIGHT-1)
-			return 0;
+			return 0x40;
 		*/
 		return cbrng(origin + x + y * VIRT_WIDTH) % 256;
 	}
@@ -35,13 +35,28 @@ int get_depth(int origin, int x, int y, int erosion)
 	return sum / 9;
 }
 
+void shade(int height)
+{
+	if (height < 0x78) {
+		printf(SGR(BG_COLR(BLUE)));
+	} else if (height < 0x80) {
+		printf(SGR(BG_BCOLR(BLUE)));
+	} else if (height < 0x88) {
+		printf(SGR(BG_BCOLR(YELLOW)));
+	} else if (height < 0x98) {
+		printf(SGR(BG_COLR(GREEN)));
+	} else {
+		printf(SGR(BG_BCOLR(BLACK)));
+	}
+}
+
 void print_depth(int origin, int erosion)
 {
 	for (int y = 0; y < HEIGHT; y++) {
 		for (int x = 0; x < WIDTH; x++) {
-			int shade = get_depth(origin, x, y, erosion);
-			shade = (shade > 128 ? 255 : 0); // Comment out to print raw depth map
-			printf(SGR(BG_COLR(CUSTOM COLR_RGB("%d","%d","%d"))) " ", shade, shade, shade);
+			int depth = get_depth(origin, x, y, erosion);
+			shade(depth);
+			putchar(' ');
 		}
 		printf(SGR(RESET) "\n\r");
 	}
@@ -51,7 +66,8 @@ int main(int argc, char **argv)
 {
 	int origin = cbrng(time(NULL));
 	char c;
-	print_depth(origin, 2);
+	int depth = 3;
+	print_depth(origin, depth);
 	if (argc > 1)
 		return 0;
 
@@ -60,7 +76,7 @@ int main(int argc, char **argv)
 	system("stty raw -echo isig");
 	for (;;) {
 		printf(ED("2") CUP("1","1"));
-		print_depth(origin, 2);
+		print_depth(origin, depth);
 		c = getchar();
 		switch (c) {
 		case 'h':

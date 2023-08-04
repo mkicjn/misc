@@ -61,7 +61,7 @@ collatz_sbcl: src/collatz.lisp
 collatz_csc: src/collatz.scm
 	csc -O5 $^ -o $@
 collatz_csi: src/collatz.scm
-	echo "#!/usr/bin/csi" > $@
+	echo "#!/usr/bin/csi -q" > $@
 	cat $^ >> $@
 	chmod +x $@
 
