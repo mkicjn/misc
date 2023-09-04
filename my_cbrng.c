@@ -3,33 +3,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-void std_seed(uint64_t s)
-{
-	srand(s);
-}
-
-uint32_t std_next(void)
-{
-	return rand();
-}
-
-
-
-void rdrand_seed(uint64_t s)
-{
-}
-
-uint32_t rdrand_next(void)
-{
-	uint64_t a;
-	asm __volatile__ (
-			"rdrand %0"
-			: "=r"(a));
-	return a;
-}
-
-
-
 uint32_t cbrng(uint64_t n)
 { // Inspired by the middle square Weyl sequence and Squares
 #ifndef CBRNG_CONST
@@ -56,6 +29,33 @@ uint32_t cbrng_next(void)
 {
 	state = cbrng_next_state();
 	return cbrng(state);
+}
+
+
+
+void std_seed(uint64_t s)
+{
+	srand(s);
+}
+
+uint32_t std_next(void)
+{
+	return rand();
+}
+
+
+
+void rdrand_seed(uint64_t s)
+{
+}
+
+uint32_t rdrand_next(void)
+{
+	uint64_t a;
+	asm __volatile__ (
+			"rdrand %0"
+			: "=r"(a));
+	return a;
 }
 
 
