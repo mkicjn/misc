@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <limits.h>
 
+#ifndef TABLE_SIZE
 #define TABLE_SIZE (1 << 16)
+#endif
 
 void lzp_encode(FILE *in, FILE *out)
 {

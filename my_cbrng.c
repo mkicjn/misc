@@ -3,17 +3,21 @@
 #include <string.h>
 #include <stdlib.h>
 
-uint32_t cbrng(uint64_t n)
-{ // Inspired by the middle square Weyl sequence and Squares
+uint64_t cbrng(uint64_t n)
+{ // Initially inspired by the middle square Weyl sequence and Squares
 #ifndef CBRNG_CONST
-#define CBRNG_CONST 0xba2c2cab
-	// ^ This is the best constant I've seen against PractRand
+#define CBRNG_CONST 0xdeadbeef
+	// ^ This constant's exact value doesn't even seem to matter much
+	//   as long as it's big and not too repetitive in binary.
 #endif
 	static uint64_t const s = CBRNG_CONST;
 	
 	uint64_t x = n * s;
 	x *= x ^ s;
-	return x >> 32;
+	// Tacking on some elements from xorshift+ seems to result in strong qualities, even using the full 64-bits
+	x ^= x << 13;
+	x ^= x >> 7;
+	return x + (x >> 31);
 }
 
 uint64_t state = 0;
@@ -25,7 +29,7 @@ uint64_t cbrng_next_state()
 {
 	return state+1;
 }
-uint32_t cbrng_next(void)
+uint64_t cbrng_next(void)
 {
 	state = cbrng_next_state();
 	return cbrng(state);
@@ -49,7 +53,7 @@ void rdrand_seed(uint64_t s)
 {
 }
 
-uint32_t rdrand_next(void)
+uint64_t rdrand_next(void)
 {
 	uint64_t a;
 	asm __volatile__ (
@@ -60,36 +64,35 @@ uint32_t rdrand_next(void)
 
 
 
-uint32_t lfsr(uint64_t state)
+uint64_t xorshift(uint64_t state)
 {
-	state ^= state << 1;
-	state ^= state >> 3;
-	state ^= state << 10;
-	return state;
+	state ^= state << 13;
+	state ^= state >> 7;
+	return state * CBRNG_CONST;
 }
 
-uint64_t lfsr_state = 1;
-void lfsr_seed(uint64_t s)
+uint64_t xorshift_state = 1;
+void xorshift_seed(uint64_t s)
 {
-	lfsr_state = s;
+	xorshift_state = s;
 }
-uint64_t lfsr_next_state()
+uint64_t xorshift_next_state()
 {
-	return lfsr(lfsr_state);
+	return xorshift(xorshift_state);
 }
-uint32_t lfsr_next(void)
+uint32_t xorshift_next(void)
 {
-	lfsr_state = lfsr_next_state();
-	return lfsr(lfsr_state);
+	xorshift_state = xorshift_next_state();
+	return xorshift(xorshift_state) >> 32;
 }
 
-void lfsr_test(void)
+void xorshift_test(void)
 {
-	lfsr_seed(0xdeadbeef);
-	lfsr_next();
+	xorshift_seed(0xdeadbeef);
+	xorshift_next();
 	uint64_t n = 0;
-	while (lfsr_state != 0xdeadbeef) {
-		lfsr_next();
+	while (xorshift_state != 0xdeadbeef) {
+		xorshift_next();
 		n++;
 	}
 	printf("deadbeef cycle: %lu\n", n);
@@ -205,9 +208,10 @@ int main(int argc, char **argv)
 			sscanf(argv[3], "%d", &n);
 			rng_seed(n);
 		}
+		fprintf(stderr, "sizeof(rng_next()): %lu\n", sizeof(rng_next()));
 		for (unsigned i = 0; i != x; i++) {
-			uint32_t u = rng_next();
-			fwrite(&u, sizeof(uint32_t), 1, stdout);
+			uint64_t u = rng_next();
+			fwrite(&u, sizeof(rng_next()), 1, stdout);
 		}
 		break;
 	case CSV:

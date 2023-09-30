@@ -1,41 +1,41 @@
-: TAKE  DUP @ DUP @ ROT ! ;
-: GIVE  2DUP @ SWAP ! ! ;
+: take  dup @ dup @ rot ! ;
+: give  2dup @ swap ! ! ;
 \ Note: ^ These could be used as generic linked list operators
-: POOL: ( cap size -- ) CELL MAX CREATE HERE 0 , ROT DUP ALLOT
-        OVER CELL+ TUCK + SWAP DO I OVER GIVE OVER +LOOP 2DROP ;
-: AVAILABLE  -1 BEGIN 1+ SWAP @ TUCK 0= UNTIL ;
+: pool: ( cap size -- ) cell max create here 0 , rot dup allot
+        over cell+ tuck + swap do i over give over +loop 2drop ;
+: available  -1 begin 1+ swap @ tuck 0= until ;
 
 \ e.g., a toy example of a cons cell pool below
 
-: KB  10 LSHIFT ;
-: MB  20 LSHIFT ;
+: kb  10 lshift ;
+: mb  20 lshift ;
 
-1 KB CONSTANT CONS-SPACE
-CONS-SPACE 2 CELLS POOL: CONS-CELLS
+1 kb constant cons-space
+cons-space 2 cells pool: cons-cells
 
-: CAR  @ ;
-: CDR  CELL+ @ ;
-: CONS  CONS-CELLS TAKE  TUCK CELL+ !  TUCK ! ;
+: car  @ ;
+: cdr  cell+ @ ;
+: cons  cons-cells take  tuck cell+ !  tuck ! ;
 
-: ATOM?  CONS-CELLS DUP CONS-SPACE + WITHIN INVERT ;
+: atom?  cons-cells dup cons-space + within invert ;
 
-: DISPLAY  DUP ATOM? IF . EXIT THEN
+: display  dup atom? if . exit then
            ." ( "
-           BEGIN DUP CAR RECURSE CDR DUP ATOM? UNTIL
+           begin dup car recurse cdr dup atom? until
            ." . "
-	   RECURSE
+	   recurse
            ." )" ;
 
-: LISP-FREE DUP ATOM? IF  DROP  EXIT THEN
-            DUP CAR OVER CDR RECURSE RECURSE
-	    CONS-CELLS GIVE ;
+: lisp-free dup atom? if  drop  exit then
+            dup car over cdr recurse recurse
+	    cons-cells give ;
 
-CONS-CELLS AVAILABLE . CR
+cons-cells available . cr
 
-3 2 1 0 CONS CONS CONS
-DUP DISPLAY CR
-LISP-FREE
+3 2 1 0 cons cons cons
+dup display cr
+lisp-free
 
-CONS-CELLS AVAILABLE . CR
+cons-cells available . cr
 
-BYE
+bye
