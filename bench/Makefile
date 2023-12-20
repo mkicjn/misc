@@ -10,8 +10,10 @@ ALL = \
 	collatz_tclsh \
 	collatz_csc \
 	collatz_csi \
+	collatz_scheme \
 	collatz_lua \
-	collatz_luajit
+	collatz_luajit \
+	collatz_swipl
 
 all: $(ALL)
 
@@ -64,6 +66,10 @@ collatz_csi: src/collatz.scm
 	echo "#!/usr/bin/csi -q" > $@
 	cat $^ >> $@
 	chmod +x $@
+collatz_scheme: src/collatz.scm
+	echo "#!/usr/bin/scheme -q" > $@
+	cat $^ >> $@
+	chmod +x $@
 
 collatz_tclsh: src/collatz.tcl
 	echo "#!/usr/bin/tclsh" > $@
@@ -78,5 +84,10 @@ collatz_lua: src/collatz.lua
 
 collatz_luajit: src/collatz.lua
 	echo "#!/usr/bin/luajit" > $@
+	cat $^ >> $@
+	chmod +x $@
+
+collatz_swipl: src/collatz.pl
+	echo "#!/usr/bin/swipl" > $@
 	cat $^ >> $@
 	chmod +x $@
