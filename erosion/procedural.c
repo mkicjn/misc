@@ -10,23 +10,21 @@ uint32_t cbrng(uint64_t n)
 
 	uint64_t x = n * s;
 	x *= x ^ s;
-	return x >> 32;
+	return x + (x >> 32);
 }
 
 #define VIRT_WIDTH 1000
-#define WIDTH 80
-#define HEIGHT 24
+#define WIDTH 50
+#define HEIGHT 50
 
 int get_depth(int origin, int x, int y, int erosion)
 {
 	// Here's the interesting idea: Procedurally generate in one step with recursion and counter-based RNG
 	int sum = 0;
-	if (erosion == 0) {
-		/*
+	if (erosion <= 0) {
 		// Soft clamping
 		if (x <= 0 || x >= WIDTH-1 || y <= 0 || y >= HEIGHT-1)
 			return 0x40;
-		*/
 		return cbrng(origin + x + y * VIRT_WIDTH) % 256;
 	}
 	for (int dy = -1; dy <= 1; dy++)
@@ -37,25 +35,32 @@ int get_depth(int origin, int x, int y, int erosion)
 
 void shade(int height)
 {
-	if (height < 0x78) {
+	if (height < 0x60) {
+		printf(SGR(BG_COLR(BLACK)));
+	} else if (height < 0x78) {
 		printf(SGR(BG_COLR(BLUE)));
 	} else if (height < 0x80) {
 		printf(SGR(BG_BCOLR(BLUE)));
 	} else if (height < 0x88) {
 		printf(SGR(BG_BCOLR(YELLOW)));
+	} else if (height < 0x90) {
+		printf(SGR(BG_BCOLR(GREEN)));
 	} else if (height < 0x98) {
 		printf(SGR(BG_COLR(GREEN)));
-	} else {
+	} else if (height < 0xa0) {
 		printf(SGR(BG_BCOLR(BLACK)));
+	} else {
+		printf(SGR(BG_BCOLR(WHITE)));
 	}
 }
 
-void print_depth(int origin, int erosion)
+void print_depth(int origin, int erosion, int offset)
 {
 	for (int y = 0; y < HEIGHT; y++) {
 		for (int x = 0; x < WIDTH; x++) {
 			int depth = get_depth(origin, x, y, erosion);
-			shade(depth);
+			shade(depth + offset);
+			putchar(' ');
 			putchar(' ');
 		}
 		printf(SGR(RESET) "\n\r");
@@ -66,8 +71,8 @@ int main(int argc, char **argv)
 {
 	int origin = cbrng(time(NULL));
 	char c;
-	int depth = 3;
-	print_depth(origin, depth);
+	int depth = 4, offset = 0;
+	print_depth(origin, depth, offset);
 	if (argc > 1)
 		return 0;
 
@@ -76,24 +81,36 @@ int main(int argc, char **argv)
 	system("stty raw -echo isig");
 	for (;;) {
 		printf(ED("2") CUP("1","1"));
-		print_depth(origin, depth);
+		print_depth(origin, depth, offset);
 		c = getchar();
 		switch (c) {
+		case '[':
+			depth -= 1;
+			break;
+		case ']':
+			depth += 1;
+			break;
+		case '-':
+			offset -= 1;
+			break;
+		case '+':
+			offset += 1;
+			break;
 		case 'h':
 		case '4':
-			origin--;
+			origin -= 4;
 			break;
 		case 'j':
 		case '2':
-			origin += VIRT_WIDTH;
+			origin += 4 * VIRT_WIDTH;
 			break;
 		case 'k':
 		case '8':
-			origin -= VIRT_WIDTH;
+			origin -= 4 * VIRT_WIDTH;
 			break;
 		case 'l':
 		case '6':
-			origin++;
+			origin += 4;
 			break;
 		case 'q':
 			system("stty -raw echo");
