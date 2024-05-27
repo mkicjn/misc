@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include "../aterm.h"
 
+
+/* ******** COUNTER BASED PRNG ******** */
+
 uint32_t cbrng(uint64_t n)
 { // Custom counter-based PRNG
 	static uint64_t const s = 0xba2c2cab;
@@ -13,59 +16,135 @@ uint32_t cbrng(uint64_t n)
 	return x + (x >> 32);
 }
 
-#define VIRT_WIDTH 1000
-#define WIDTH 50
-#define HEIGHT 50
 
-int get_depth(int origin, int x, int y, int erosion)
+/* ******** NOISE GENERATION ******** */
+
+#define VIRT_WIDTH 10000
+#define WIDTH 80
+#define HEIGHT 24
+
+#define LOD_FAC 8
+#define LOD_IMPACT 64
+
+#define SOFT_CLAMP 64
+
+int get_noise(int origin, int x, int y, int smoothing)
 {
 	// Here's the interesting idea: Procedurally generate in one step with recursion and counter-based RNG
-	int sum = 0;
-	if (erosion <= 0) {
-		// Soft clamping
+	if (smoothing <= 0) {
+		// Soft clamp around map edges
+#ifdef SOFT_CLAMP
 		if (x <= 0 || x >= WIDTH-1 || y <= 0 || y >= HEIGHT-1)
-			return 0x40;
-		return cbrng(origin + x + y * VIRT_WIDTH) % 256;
+			return SOFT_CLAMP;
+#endif
+		// Get high frequency noise
+		int noise = cbrng(origin + x + y * VIRT_WIDTH) % 256;
+		// Apply low frequency noise
+		noise += (cbrng((origin/LOD_FAC) + (x/LOD_FAC) + (y/LOD_FAC) * VIRT_WIDTH) % LOD_IMPACT) - (LOD_IMPACT/2);
+		return noise;
 	}
+	// Calculate average recursively based on smoothing level
+	int sum = 0;
 	for (int dy = -1; dy <= 1; dy++)
 		for (int dx = -1; dx <= 1; dx++)
-			sum += get_depth(origin, x + dx, y + dy, erosion - 1);
+			sum += get_noise(origin, x + dx, y + dy, smoothing - 1);
 	return sum / 9;
 }
 
-void shade(int height)
+
+/* ******** TERRAIN CLASSIFICATION ******** */
+
+enum terrain_type {
+	ABYSS,
+	OCEAN,
+	SHALLOW,
+	SAND,
+	GRASS,
+	WOODS,
+	MOUNTAIN,
+	PEAK,
+	NUM_TERRAIN_TYPES
+};
+
+enum terrain_type classify_altitude(int height)
 {
-	if (height < 0x60) {
-		printf(SGR(BG_COLR(BLACK)));
-	} else if (height < 0x78) {
-		printf(SGR(BG_COLR(BLUE)));
-	} else if (height < 0x80) {
-		printf(SGR(BG_BCOLR(BLUE)));
-	} else if (height < 0x88) {
-		printf(SGR(BG_BCOLR(YELLOW)));
-	} else if (height < 0x90) {
-		printf(SGR(BG_BCOLR(GREEN)));
-	} else if (height < 0x98) {
-		printf(SGR(BG_COLR(GREEN)));
-	} else if (height < 0xa0) {
-		printf(SGR(BG_BCOLR(BLACK)));
+#define SEA_LEVEL 128
+#define OCEAN_BAND 30
+#define SHALLOW_BAND 8
+#define SAND_BAND 5
+#define GRASS_BAND 10
+#define WOODS_BAND 8
+#define MOUNTAIN_BAND 12
+
+#define BAND_CASE(type) \
+	if (height < type##_BAND) \
+		return type; \
+	height -= type##_BAND;
+
+	if (height < SEA_LEVEL) {
+		height = SEA_LEVEL - height;
+		// Water
+		BAND_CASE(SHALLOW)
+		BAND_CASE(OCEAN)
+		return ABYSS;
 	} else {
-		printf(SGR(BG_BCOLR(WHITE)));
+		height -= SEA_LEVEL;
+		// Land
+		BAND_CASE(SAND)
+		BAND_CASE(GRASS)
+		BAND_CASE(WOODS)
+		BAND_CASE(MOUNTAIN)
+		return PEAK;
 	}
 }
+
+
+/* ******** TILE DISPLAY ******** */
+
+char tile_char[NUM_TERRAIN_TYPES] = {
+	[PEAK] = '^',
+	[MOUNTAIN] = '=',
+	[WOODS] = '%',
+	[GRASS] = '"',
+	[SAND] = '~',
+	[SHALLOW] = '~',
+	[OCEAN] = '~',
+	[ABYSS] = ' '
+};
+
+const char *tile_color[NUM_TERRAIN_TYPES] = {
+	[PEAK] = FG_BCOLR(WHITE),
+	[MOUNTAIN] = FG_BCOLR(BLACK),
+	[WOODS] = FG_COLR(GREEN),
+	[GRASS] = FG_BCOLR(GREEN),
+	[SAND] = FG_BCOLR(YELLOW),
+	[SHALLOW] = FG_BCOLR(BLUE),
+	[OCEAN] = FG_COLR(BLUE),
+	[ABYSS] = FG_COLR(BLACK)
+};
+
+void print_tile(int height)
+{
+	enum terrain_type t = classify_altitude(height);
+	printf(SGR("%s") "%c", tile_color[t], tile_char[t]);
+}
+
+
+/* ******** WORLD DISPLAY ******** */
 
 void print_depth(int origin, int erosion, int offset)
 {
 	for (int y = 0; y < HEIGHT; y++) {
 		for (int x = 0; x < WIDTH; x++) {
-			int depth = get_depth(origin, x, y, erosion);
-			shade(depth + offset);
-			putchar(' ');
-			putchar(' ');
+			int depth = get_noise(origin, x, y, erosion);
+			print_tile(depth + offset);
 		}
 		printf(SGR(RESET) "\n\r");
 	}
 }
+
+
+/* ******** MAIN AND INPUT LOOP ******** */
 
 int main(int argc, char **argv)
 {
