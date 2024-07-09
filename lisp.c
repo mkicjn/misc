@@ -240,7 +240,7 @@ void *evlis(void *l, void *env)
 	if (IN(l, cells))
 		return cons(eval(car(l), env), evlis(cdr(l), env));
 	else
-		return l;
+		return eval(l, env);
 }
 
 void *pairlis(void *ks, void *vs, void *env)
@@ -248,9 +248,10 @@ void *pairlis(void *ks, void *vs, void *env)
 	// Pair keys (ks) with values (vs) in environment env
 	if (!ks)
 		return env;
-	else
-		return cons(cons(car(ks), car(vs)),
-		         pairlis(cdr(ks), cdr(vs), env));
+	if (!IN(ks, cells))
+		return cons(cons(ks, vs), env);
+	return cons(cons(car(ks), car(vs)),
+	         pairlis(cdr(ks), cdr(vs), env));
 }
 
 void *apply(void *f, void *args, void *env)
