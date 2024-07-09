@@ -17,58 +17,71 @@
 #include <string.h>
 #include <stdlib.h>
 
-// TODO list
-// * More primitives
-//   * `define`
-// * Garbage collection for cons cells
-// * TCO in some form or another
-// * More error codes and typechecks (low priority)
-// * Numeric types (low priority)
-
-// **************** Memory regions ****************
-
 #ifndef MAX_CELL_SPACE
 #define MAX_CELL_SPACE 100000
 #endif
-
-void *cells[MAX_CELL_SPACE]; // car, cdr; alternating
-void **next_cell = cells;
 
 #ifndef MAX_SYM_SPACE
 #define MAX_SYM_SPACE 100000
 #endif
 
-char syms[MAX_SYM_SPACE]; // counted strings; consecutive
-char *next_sym = syms;
 
+// TODO list
+// * Eliminate prim() (and struct prim?)
+// * Single quote parsing ('x)
+// * Top-level environment (define)
+// * Garbage collection for cons cells
+// * TCO in some form or another
+// * More error codes and typechecks (low priority)
+// * Numeric types (low priority)
+
+
+// **************** Top-level definitions ****************
+
+#define ERROR ((void *)-1LL)
+
+// Built-in symbols for which a primitive will be defined
 #define FOREACH_PRIM(X) \
 	X("\004cons", l_cons) \
 	X("\003car", l_car) \
-	X("\003cdr", l_cdr)
+	X("\003cdr", l_cdr) \
+	X("\004atom", l_atom) \
+	X("\002eq", l_eq)
 
-#define FOREACH_SYMVAR(X) \
-	FOREACH_PRIM(X) \
-	X("\005quote", l_quote) \
-	X("\004cond", l_cond) \
-	X("\006lambda", l_lambda)
+#define DECLARE_FUNC(SYM,ID) void *ID(void *args, void *env);
+FOREACH_PRIM(DECLARE_FUNC)
 
-#define DECLARE_SYMVAR(N,F) char *F##_sym;
-FOREACH_SYMVAR(DECLARE_SYMVAR)
-
+// Primitive function structure
 struct prim {
 	char **name;
 	void *(*func)(void *args, void *env);
 };
 
-#define DECLARE_FUNC(N,F) void *F(void *args, void *env);
-FOREACH_PRIM(DECLARE_FUNC)
+
+// All built-in symbols
+#define FOREACH_SYMVAR(X) \
+	X("\001t", l_t) \
+	X("\005quote", l_quote) \
+	X("\004cond", l_cond) \
+	X("\006lambda", l_lambda) \
+	FOREACH_PRIM(X)
+
+#define DECLARE_SYMVAR(SYM,ID) char *ID##_sym;
+FOREACH_SYMVAR(DECLARE_SYMVAR)
+
+
+// Memory regions
+
+void *cells[MAX_CELL_SPACE]; // car, cdr; alternating
+void **next_cell = cells;
+
+char syms[MAX_SYM_SPACE]; // counted strings; consecutive
+char *next_sym = syms;
 
 struct prim prims[] = { // fixed size array of structs
-#define DEFINE_STRUCT(N,F) {.name = &F##_sym, .func = F},
+#define DEFINE_STRUCT(SYM,ID) {.name = &ID##_sym, .func = ID},
 	FOREACH_PRIM(DEFINE_STRUCT)
 };
-
-#define ERROR ((void *)-1LL)
 
 
 // **************** Region-based type inference ****************
@@ -90,11 +103,15 @@ void *cons(void *x, void *y)
 
 static inline void *car(void *l)
 {
+	if (!IN(l, cells))
+		return ERROR;
 	return *(void **)l;
 }
 
 static inline void *cdr(void *l)
 {
+	if (!IN(l, cells))
+		return ERROR;
 	return *((void **)l+1);
 }
 
@@ -318,30 +335,37 @@ void *l_cons(void *args, void *env)
 
 void *l_car(void *args, void *env)
 {
-	if (!IN(car(args), cells))
-		return ERROR;
 	return car(car(args));
 }
 
 void *l_cdr(void *args, void *env)
 {
-	if (!IN(car(args), cells))
-		return ERROR;
 	return cdr(car(args));
 }
 
-// TODO: More primitives are necessary
+void *l_atom(void *args, void *env)
+{
+	if (IN(car(args), cells))
+		return NULL;
+	return l_t_sym;
+}
+
+void *l_eq(void *args, void *env)
+{
+	if (car(args) == car(cdr(args)))
+		return l_t_sym;
+	return NULL;
+}
 
 
 // **************** REPL/Testing ****************
 
 int main()
 {
-	// Setup: copy built-in symbols into symbol space and save references for comparison
-#define COPY_SYM(N,F) \
-		F##_sym = next_sym; \
-		memcpy(next_sym, N, N[0] + 1); \
-		next_sym += N[0] + 1;
+#define COPY_SYM(SYM,ID) \
+		ID##_sym = next_sym; \
+		memcpy(next_sym, SYM, SYM[0] + 1); \
+		next_sym += SYM[0] + 1;
 	FOREACH_SYMVAR(COPY_SYM)
 
 	for (;;) {
