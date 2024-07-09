@@ -21,12 +21,11 @@
 // TODO list
 // * More primitives
 //   * `define`
-//   * Built-in symbols (`#t`)
-// * Garbage collection
-// * String interning
+//   * Built-in symbols (could simplify things)
+// * Garbage collection for cons cells
 // * TCO in some form or another
-// * More error codes and typechecks
-// * Numbers
+// * More error codes and typechecks (low priority)
+// * Numeric types (low priority)
 
 // **************** Memory regions ****************
 
@@ -34,20 +33,20 @@
 #define MAX_CELL_SPACE 100000
 #endif
 
-void *cells[MAX_CELL_SPACE];
+void *cells[MAX_CELL_SPACE]; // car, cdr; alternating
 void **next_cell = cells;
 
 #ifndef MAX_SYM_SPACE
 #define MAX_SYM_SPACE 100000
 #endif
 
-char syms[MAX_SYM_SPACE];
+char syms[MAX_SYM_SPACE]; // counted strings; consecutive
 char *next_sym = syms;
 
 #define FOREACH_PRIM(X) \
-	X("cons", l_cons) \
-	X("car", l_car) \
-	X("cdr", l_cdr)
+	X("\004cons", l_cons) \
+	X("\003car", l_car) \
+	X("\003cdr", l_cdr)
 
 struct prim {
 	const char *name;
@@ -57,7 +56,7 @@ struct prim {
 #define DECLARE_FUNC(N,F) void *F(void *args, void *env);
 FOREACH_PRIM(DECLARE_FUNC)
 
-struct prim prims[] = {
+struct prim prims[] = { // fixed size array of structs
 #define DEFINE_STRUCT(N,F) {.name = N, .func = F},
 	FOREACH_PRIM(DEFINE_STRUCT)
 };
@@ -96,26 +95,15 @@ static inline void *cdr(void *l)
 	return ERROR;
 }
 
-bool eq(void *x, void *y)
+bool sym_eq(void *x, const char *sym)
 {
-	// Check equality between objects
-	if (x == y)
-		return true;
-	if (IN(x, syms) && IN(y, syms))
-		return (strcmp(x, y) == 0);
-	else
-		return false;
-}
-
-bool is_sym(void *x, const char *sym)
-{
-	return IN(x, syms) && strcmp(x, sym) == 0;
+	return IN(x, syms) && memcmp(x, sym, *sym + 1) == 0;
 }
 
 void display(void *x)
 {
 	if (!x) {
-		printf("nil");
+		printf("()");
 	} else if (IN(x, cells)) {
 		// For lists, first print the head
 		printf("(");
@@ -132,9 +120,12 @@ void display(void *x)
 		}
 		printf(")");
 	} else if (IN(x, syms)) {
-		printf("%s", (char *)x);
+		char *s = x;
+		for (int i = 0; i < s[0]; i++)
+			putchar(s[i+1]);
 	} else if (IN(x, prims)) {
-		printf("{primitive: %s}", ((struct prim *)x)->name);
+		struct prim *p = x;
+		printf("{primitive: %s}", p->name);
 	} else {
 		printf("\033[31m{error}\033[m");
 	}
@@ -185,16 +176,29 @@ void *list(void)
 	}
 }
 
+char *intern(char *s)
+{
+	// Intern the newest symbol, pointed at by s
+	// (i.e., return a pointer to a pre-existing equivalent symbol and free down to s if one exists)
+	for (char *cmp = syms; cmp < s; cmp += *cmp + 1) { // For each symbol (consecutive counted strings)
+		if (memcmp(cmp, s, *s + 1) == 0) { // if equal (memcmp checks length byte first)
+			next_sym = s; // Free s
+			return cmp;
+		}
+	}
+	return s;
+}
+
 void *symbol(void)
 {
 	// Parse a symbol
-	char *s = next_sym;
+	char *s = next_sym++;
 	while (peek > ' ' && peek != '(' && peek != ')')
 		*(next_sym++) = next();
-	if (s == next_sym) // Disallow empty symbols
+	if (next_sym == s+1) // Disallow empty symbols
 		return ERROR;
-	*(next_sym++) = '\0';
-	return s;
+	*s = next_sym - (s+1); // Store length in first byte
+	return intern(s);
 }
 
 void *s_exp(void)
@@ -219,7 +223,7 @@ void *prim(void *s)
 	if (!IN(s, syms))
 		return NULL;
 	for (int i = 0; i < sizeof(prims)/sizeof(*prims); i++) {
-		if (strcmp(s, prims[i].name) == 0)
+		if (sym_eq(s, prims[i].name))
 			return &prims[i];
 	}
 	return NULL;
@@ -229,8 +233,8 @@ void *assoc(void *k, void *l)
 {
 	// Search for value of key k in assoc list l
 	if (!l)
-		return prim(k);
-	else if (eq(k, car(car(l))))
+		return prim(k); // if not defined, see if it refers to a primitive
+	else if (k == car(car(l))) // string interning allows ==
 		return cdr(car(l));
 	else
 		return assoc(k, cdr(l));
@@ -294,11 +298,11 @@ void *eval(void *x, void *env)
 		return assoc(x, env);
 	} else if (IN(x, cells)) {
 		// Check for special forms
-		if (is_sym(car(x), "quote"))
+		if (sym_eq(car(x), "\005quote"))
 			return car(cdr(x));
-		else if (is_sym(car(x), "cond"))
+		else if (sym_eq(car(x), "\004cond"))
 			return evcon(cdr(x), env);
-		else if (is_sym(car(x), "lambda"))
+		else if (sym_eq(car(x), "\006lambda"))
 			return lambda(car(cdr(x)), car(cdr(cdr(x))), env);
 		else
 			return apply(eval(car(x), env), evlis(cdr(x), env), env);
