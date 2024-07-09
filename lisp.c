@@ -16,12 +16,10 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
-#include <time.h>
 
 // TODO list
 // * More primitives
 //   * `define`
-//   * Built-in symbols (eliminate string comparisons via sym_eq)
 // * Garbage collection for cons cells
 // * TCO in some form or another
 // * More error codes and typechecks (low priority)
@@ -48,8 +46,17 @@ char *next_sym = syms;
 	X("\003car", l_car) \
 	X("\003cdr", l_cdr)
 
+#define FOREACH_SYMVAR(X) \
+	FOREACH_PRIM(X) \
+	X("\005quote", l_quote) \
+	X("\004cond", l_cond) \
+	X("\006lambda", l_lambda)
+
+#define DECLARE_SYMVAR(N,F) char *F##_sym;
+FOREACH_SYMVAR(DECLARE_SYMVAR)
+
 struct prim {
-	const char *name;
+	char **name;
 	void *(*func)(void *args, void *env);
 };
 
@@ -57,7 +64,7 @@ struct prim {
 FOREACH_PRIM(DECLARE_FUNC)
 
 struct prim prims[] = { // fixed size array of structs
-#define DEFINE_STRUCT(N,F) {.name = N, .func = F},
+#define DEFINE_STRUCT(N,F) {.name = &F##_sym, .func = F},
 	FOREACH_PRIM(DEFINE_STRUCT)
 };
 
@@ -89,11 +96,6 @@ static inline void *car(void *l)
 static inline void *cdr(void *l)
 {
 	return *((void **)l+1);
-}
-
-bool sym_eq(void *x, const char *sym)
-{
-	return IN(x, syms) && memcmp(x, sym, *sym + 1) == 0;
 }
 
 char *intern(char *s)
@@ -217,7 +219,7 @@ void *prim(void *s)
 	if (!IN(s, syms))
 		return NULL;
 	for (int i = 0; i < sizeof(prims)/sizeof(*prims); i++) {
-		if (sym_eq(s, prims[i].name))
+		if (s == *(prims[i].name))
 			return &prims[i];
 	}
 	return NULL;
@@ -293,11 +295,11 @@ void *eval(void *x, void *env)
 		return assoc(x, env);
 	} else if (IN(x, cells)) {
 		// Check for special forms
-		if (sym_eq(car(x), "\005quote"))
+		if (car(x) == l_quote_sym)
 			return car(cdr(x));
-		else if (sym_eq(car(x), "\004cond"))
+		else if (car(x) == l_cond_sym)
 			return evcon(cdr(x), env);
-		else if (sym_eq(car(x), "\006lambda"))
+		else if (car(x) == l_lambda_sym)
 			return lambda(car(cdr(x)), car(cdr(cdr(x))), env);
 		else
 			return apply(eval(car(x), env), evlis(cdr(x), env), env);
@@ -335,6 +337,13 @@ void *l_cdr(void *args, void *env)
 
 int main()
 {
+	// Setup: copy built-in symbols into symbol space and save references for comparison
+#define COPY_SYM(N,F) \
+		F##_sym = next_sym; \
+		memcpy(next_sym, N, N[0] + 1); \
+		next_sym += N[0] + 1;
+	FOREACH_SYMVAR(COPY_SYM)
+
 	for (;;) {
 		print(eval(read(), NULL));
 		printf("\n");
