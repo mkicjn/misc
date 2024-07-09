@@ -236,11 +236,11 @@ void *assoc(void *k, void *l)
 
 void *evlis(void *l, void *env)
 {
-	// Map eval over list l
+	// Map eval over list l (i.e., to form an argument list)
 	if (IN(l, cells))
 		return cons(eval(car(l), env), evlis(cdr(l), env));
-	else
-		return eval(l, env);
+	else // Support currying/variadicty by allowing dangling terms to be appended to an argument list
+		return eval(l, env); // Currying support
 }
 
 void *pairlis(void *ks, void *vs, void *env)
@@ -248,7 +248,7 @@ void *pairlis(void *ks, void *vs, void *env)
 	// Pair keys (ks) with values (vs) in environment env
 	if (!ks)
 		return env;
-	if (!IN(ks, cells))
+	if (!IN(ks, cells)) // Support currying/variadicity by binding remaining args to a dangling atom
 		return cons(cons(ks, vs), env);
 	return cons(cons(car(ks), car(vs)),
 	         pairlis(cdr(ks), cdr(vs), env));
