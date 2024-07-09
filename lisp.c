@@ -21,7 +21,7 @@
 // TODO list
 // * More primitives
 //   * `define`
-//   * Built-in symbols (could simplify things)
+//   * Built-in symbols (eliminate string comparisons via sym_eq)
 // * Garbage collection for cons cells
 // * TCO in some form or another
 // * More error codes and typechecks (low priority)
@@ -96,23 +96,36 @@ bool sym_eq(void *x, const char *sym)
 	return IN(x, syms) && memcmp(x, sym, *sym + 1) == 0;
 }
 
-void display(void *x)
+char *intern(char *s)
+{
+	// Intern the newest symbol, pointed at by s
+	// (i.e., return a pointer to a pre-existing equivalent symbol and free down to s if one exists)
+	for (char *cmp = syms; cmp < s; cmp += *cmp + 1) { // For each symbol (consecutive counted strings)
+		if (memcmp(cmp, s, *s + 1) == 0) { // if equal (memcmp checks length byte first)
+			next_sym = s; // Free s
+			return cmp;
+		}
+	}
+	return s;
+}
+
+void print(void *x)
 {
 	if (!x) {
 		printf("()");
 	} else if (IN(x, cells)) {
 		// For lists, first print the head
 		printf("(");
-		display(car(x));
+		print(car(x));
 		// Then print successive elements until encountering NIL or atom
 		for (x = cdr(x); x && IN(x, cells); x = cdr(x)) {
 			printf(" ");
-			display(car(x));
+			print(car(x));
 		}
 		// If encountering an atom, print with dot notation
 		if (x) {
 			printf(" . ");
-			display(x);
+			print(x);
 		}
 		printf(")");
 	} else if (IN(x, syms)) {
@@ -120,7 +133,7 @@ void display(void *x)
 		printf("%.*s", *s, s + 1);
 	} else if (IN(x, prims)) {
 		struct prim *p = x;
-		printf("{primitive: %s}", p->name);
+		printf("{primitive: %.*s}", *p->name, p->name + 1);
 	} else {
 		printf("\033[31m{error}\033[m");
 	}
@@ -129,7 +142,7 @@ void display(void *x)
 
 // **************** Parser ****************
 
-void *s_exp(void);
+void *read(void);
 
 char peek = '\0';
 char next(void)
@@ -150,38 +163,19 @@ void space(void)
 	}
 }
 
-void *list(void)
+void *body(void)
 {
-	// Parse a list body after the opening parenthesis
+	// Parse a list body (i.e., without parentheses)
 	space();
 	if (peek == ')') {
-		next(); // Discard )
 		return NULL;
 	} else if (peek == '.') {
 		next(); // Discard .
-		void *x = s_exp();
-		space();
-		if (peek != ')')
-			return ERROR;
-		next(); // Discard )
-		return x;
+		return read();
 	} else {
-		void *x = s_exp();
-		return cons(x, list());
+		void *x = read();
+		return cons(x, body());
 	}
-}
-
-char *intern(char *s)
-{
-	// Intern the newest symbol, pointed at by s
-	// (i.e., return a pointer to a pre-existing equivalent symbol and free down to s if one exists)
-	for (char *cmp = syms; cmp < s; cmp += *cmp + 1) { // For each symbol (consecutive counted strings)
-		if (memcmp(cmp, s, *s + 1) == 0) { // if equal (memcmp checks length byte first)
-			next_sym = s; // Free s
-			return cmp;
-		}
-	}
-	return s;
 }
 
 void *symbol(void)
@@ -196,12 +190,17 @@ void *symbol(void)
 	return intern(s);
 }
 
-void *s_exp(void)
+void *read(void)
 {
 	space();
 	if (peek == '(') {
 		next(); // Discard (
-		return list();
+		void *list = body();
+		space();
+		if (peek != ')')
+			return ERROR;
+		next(); // Discard )
+		return list;
 	} else {
 		return symbol();
 	}
@@ -226,7 +225,7 @@ void *prim(void *s)
 
 void *assoc(void *k, void *l)
 {
-	// Search for value of key k in assoc list l
+	// Search for value of key k in association list l
 	if (!l)
 		return prim(k); // if not defined, see if it refers to a primitive
 	else if (k == car(car(l))) // string interning allows ==
@@ -336,7 +335,7 @@ void *l_cdr(void *args, void *env)
 int main()
 {
 	for (;;) {
-		display(eval(s_exp(), NULL));
+		print(eval(read(), NULL));
 		printf("\n");
 	}
 }
