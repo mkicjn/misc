@@ -44,7 +44,7 @@
 	X("\004atom", l_atom) \
 	X("\002eq", l_eq)
 
-// X macro: All built-in symbols
+// X macro: All built-in symbols (with or without a corresponding primitive)
 #define FOREACH_SYMVAR(X) \
 	X("\001t", l_t) \
 	X("\005quote", l_quote) \
@@ -55,7 +55,6 @@
 // Declare a function for each primitive
 #define DECLARE_FUNC(SYM,ID) void *ID(void *args, void *env);
 FOREACH_PRIM(DECLARE_FUNC)
-typedef void *(*l_prim_t)(void *args, void *env); // Lisp primitive function pointer type
 
 // Declare character pointer variables for each built-in symbol
 #define DECLARE_SYMVAR(SYM,ID) char *ID##_sym;
@@ -83,6 +82,7 @@ char syms[MAX_SYM_SPACE];
 char *next_sym = syms;
 
 // Space for pointers to primitive functions
+typedef void *(*l_prim_t)(void *args, void *env); // Function pointer type for Lisp primitives
 l_prim_t prims[NUM_PRIMS] = {
 #define DEFINE_PRIM_VAL(SYM,ID) ID,
 	FOREACH_PRIM(DEFINE_PRIM_VAL)
@@ -110,19 +110,31 @@ void *cons(void *x, void *y)
 	return car;
 }
 
-static inline void *car(void *l)
+// Convenience macros for cons
+#define list1(x) cons(x, NULL)
+#define list2(x, y) cons(x, list1(y))
+#define list3(x, y, z) cons(x, list2(y, z))
+
+void *car(void *l)
 {
 	if (!IN(l, cells))
 		return ERROR;
 	return *(void **)l;
 }
 
-static inline void *cdr(void *l)
+void *cdr(void *l)
 {
 	if (!IN(l, cells))
 		return ERROR;
 	return *((void **)l+1);
 }
+
+// Convenience macros for car/cdr
+#define caar(x) car(car(x))
+#define cdar(x) cdr(car(x))
+#define cadr(x) car(cdr(x))
+#define caddr(x) car(cdr(cdr(x)))
+#define cadar(x) car(cdr(car(x)))
 
 void print(void *x)
 {
@@ -225,7 +237,7 @@ void *read(void)
 	if (peek == '\'') { // Quoted expression
 		next();
 		space();
-		return cons(l_quote_sym, cons(read(), NULL));
+		return list2(l_quote_sym, read());
 	} else if (peek == '(') { // List
 		next();
 		void *list = body();
@@ -249,8 +261,8 @@ void *assoc(void *k, void *l)
 	// Search for value of key k in association list l
 	if (!l)
 		return ERROR;
-	else if (k == car(car(l))) // string interning allows ==
-		return cdr(car(l));
+	else if (k == caar(l)) // string interning allows ==
+		return cdar(l);
 	else
 		return assoc(k, cdr(l));
 }
@@ -260,8 +272,8 @@ void *evlis(void *l, void *env)
 	// Map eval over list l (i.e., to form an argument list)
 	if (IN(l, cells))
 		return cons(eval(car(l), env), evlis(cdr(l), env));
-	else // Support currying/variadicty by allowing dangling terms to be appended to an argument list
-		return eval(l, env); // Currying support
+	else
+		return eval(l, env);
 }
 
 void *pairlis(void *ks, void *vs, void *env)
@@ -282,9 +294,8 @@ void *apply(void *f, void *args, void *env)
 		l_prim_t *fp = f;
 		return (*fp)(args, env);
 	} else if (IN(f, cells)) {
-		// Closures (via lambda) are structured as:
-		// ((args) (body) (env))
-		return eval(car(cdr(f)), pairlis(car(f), args, car(cdr(cdr(f)))));
+		// Closures (via lambda) structured as (args body env)
+		return eval(cadr(f), pairlis(car(f), args, caddr(f)));
 	} else {
 		return ERROR;
 	}
@@ -295,16 +306,9 @@ void *evcon(void *xs, void *env)
 	// Evaluate cond expressions xs in environment env
 	if (!xs)
 		return NULL;
-	if (eval(car(car(xs)), env))
-		return eval(car(cdr(car(xs))), env);
+	if (eval(caar(xs), env))
+		return eval(cadar(xs), env);
 	return evcon(cdr(xs), env);
-}
-
-void *lambda(void *args, void *body, void *env)
-{
-	// Closures (via lambda) are structured as:
-	// ((args) (body) (env))
-	return cons(args, cons(body, cons(env, NULL)));
 }
 
 void *eval(void *x, void *env)
@@ -314,13 +318,13 @@ void *eval(void *x, void *env)
 		return assoc(x, env);
 	} else if (IN(x, cells)) {
 		// Check for special forms
-		if (car(x) == l_quote_sym)
-			return car(cdr(x));
-		else if (car(x) == l_cond_sym)
+		if (car(x) == l_quote_sym) // quote -> (do not eval)
+			return cadr(x);
+		else if (car(x) == l_cond_sym) // cond -> call evcon
 			return evcon(cdr(x), env);
-		else if (car(x) == l_lambda_sym)
-			return lambda(car(cdr(x)), car(cdr(cdr(x))), env);
-		else
+		else if (car(x) == l_lambda_sym) // lambda -> return (list args body env)
+			return list3(cadr(x), caddr(x), env);
+		else // Lisp function application
 			return apply(eval(car(x), env), evlis(cdr(x), env), env);
 	} else {
 		return x;
@@ -332,17 +336,17 @@ void *eval(void *x, void *env)
 
 void *l_cons(void *args, void *env)
 {
-	return cons(car(args), car(cdr(args)));
+	return cons(car(args), cadr(args));
 }
 
 void *l_car(void *args, void *env)
 {
-	return car(car(args));
+	return caar(args);
 }
 
 void *l_cdr(void *args, void *env)
 {
-	return cdr(car(args));
+	return cdar(args);
 }
 
 void *l_atom(void *args, void *env)
@@ -354,7 +358,7 @@ void *l_atom(void *args, void *env)
 
 void *l_eq(void *args, void *env)
 {
-	if (car(args) == car(cdr(args)))
+	if (car(args) == cadr(args))
 		return l_t_sym;
 	return NULL;
 }
