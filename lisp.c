@@ -27,7 +27,6 @@
 
 
 // TODO list
-// * Eliminate prim() (and struct prim?)
 // * Single quote parsing ('x)
 // * Top-level environment (define)
 // * Garbage collection for cons cells
@@ -38,9 +37,7 @@
 
 // **************** Top-level definitions ****************
 
-#define ERROR ((void *)-1LL)
-
-// Built-in symbols for which a primitive will be defined
+// X macro: Built-in symbols for which a primitive will be defined
 #define FOREACH_PRIM(X) \
 	X("\004cons", l_cons) \
 	X("\003car", l_car) \
@@ -48,17 +45,7 @@
 	X("\004atom", l_atom) \
 	X("\002eq", l_eq)
 
-#define DECLARE_FUNC(SYM,ID) void *ID(void *args, void *env);
-FOREACH_PRIM(DECLARE_FUNC)
-
-// Primitive function structure
-struct prim {
-	char **name;
-	void *(*func)(void *args, void *env);
-};
-
-
-// All built-in symbols
+// X macro: All built-in symbols
 #define FOREACH_SYMVAR(X) \
 	X("\001t", l_t) \
 	X("\005quote", l_quote) \
@@ -66,26 +53,49 @@ struct prim {
 	X("\006lambda", l_lambda) \
 	FOREACH_PRIM(X)
 
+// Declare a function for each primitive
+#define DECLARE_FUNC(SYM,ID) void *ID(void *args, void *env);
+FOREACH_PRIM(DECLARE_FUNC)
+typedef void *(*l_prim_t)(void *args, void *env); // Lisp primitive function pointer type
+
+// Declare character pointer variables for each built-in symbol
 #define DECLARE_SYMVAR(SYM,ID) char *ID##_sym;
 FOREACH_SYMVAR(DECLARE_SYMVAR)
 
-
-// Memory regions
-
-void *cells[MAX_CELL_SPACE]; // car, cdr; alternating
-void **next_cell = cells;
-
-char syms[MAX_SYM_SPACE]; // counted strings; consecutive
-char *next_sym = syms;
-
-struct prim prims[] = { // fixed size array of structs
-#define DEFINE_STRUCT(SYM,ID) {.name = &ID##_sym, .func = ID},
-	FOREACH_PRIM(DEFINE_STRUCT)
+// Declare a compile-time numeric index for each primitive
+enum l_prim_e {
+#define DEFINE_ENUM_VAL(SYM,ID) ID##_e,
+	FOREACH_PRIM(DEFINE_ENUM_VAL)
+	NUM_PRIMS
 };
 
+// Designated sentinel value for errors
+#define ERROR ((void *)-1LL)
 
-// **************** Region-based type inference ****************
 
+// **************** Memory regions and region-based type inference ****************
+
+// Space for cons cells in the form of [cell 0 car, cell 0 cdr, cell 1 car, cell 1 cdr, ...]
+void *cells[MAX_CELL_SPACE];
+void **next_cell = cells;
+
+// Space for interned symbols in the form of counted strings (first char is length), stored consecutively
+char syms[MAX_SYM_SPACE];
+char *next_sym = syms;
+
+// Space for pointers to primitive functions
+l_prim_t prims[NUM_PRIMS] = {
+#define DEFINE_PRIM_VAL(SYM,ID) ID,
+	FOREACH_PRIM(DEFINE_PRIM_VAL)
+};
+
+// Space for pointers to primitive function names
+char *prim_syms[NUM_PRIMS] = {
+#define DEFINE_PRIM_NAME(SYM,ID) SYM,
+	FOREACH_PRIM(DEFINE_PRIM_NAME)
+};
+
+// Macro for determining whether a pointer lies within a given array
 #define IN(X,T) ((intptr_t)(X) >= (intptr_t)(T) \
 		&& (intptr_t)(X) < (intptr_t)(T) + sizeof(T))
 
@@ -115,19 +125,6 @@ static inline void *cdr(void *l)
 	return *((void **)l+1);
 }
 
-char *intern(char *s)
-{
-	// Intern the newest symbol, pointed at by s
-	// (i.e., return a pointer to a pre-existing equivalent symbol and free down to s if one exists)
-	for (char *cmp = syms; cmp < s; cmp += *cmp + 1) { // For each symbol (consecutive counted strings)
-		if (memcmp(cmp, s, *s + 1) == 0) { // if equal (memcmp checks length byte first)
-			next_sym = s; // Free s
-			return cmp;
-		}
-	}
-	return s;
-}
-
 void print(void *x)
 {
 	if (!x) {
@@ -151,8 +148,8 @@ void print(void *x)
 		char *s = x;
 		printf("%.*s", *s, s + 1);
 	} else if (IN(x, prims)) {
-		struct prim *p = x;
-		printf("{primitive: %.*s}", *p->name, p->name + 1);
+		char *s = prim_syms[(void **)x - (void **)prims];
+		printf("{primitive: %.*s}", *s, s + 1);
 	} else {
 		printf("\033[31m{error}\033[m");
 	}
@@ -197,9 +194,22 @@ void *body(void)
 	}
 }
 
+char *intern(char *s)
+{
+	// Intern the newest symbol, pointed at by s
+	// (i.e., return a pointer to a duplicate symbol and free down to s if one exists)
+	for (char *cmp = syms; cmp < s; cmp += *cmp + 1) { // For each symbol (consecutive counted strings)
+		if (memcmp(cmp, s, *s + 1) == 0) { // memcmp checks length byte first
+			next_sym = s; // i.e., free s
+			return cmp;
+		}
+	}
+	return s;
+}
+
 void *symbol(void)
 {
-	// Parse a symbol
+	// Parse a symbol (and intern it)
 	char *s = next_sym++;
 	while (peek > ' ' && peek != '(' && peek != ')')
 		*(next_sym++) = next();
@@ -211,6 +221,7 @@ void *symbol(void)
 
 void *read(void)
 {
+	// Parse a Lisp expression
 	space();
 	if (peek == '(') {
 		next(); // Discard (
@@ -230,23 +241,11 @@ void *read(void)
 
 void *eval(void *x, void *env);
 
-void *prim(void *s)
-{
-	// Search for a primitive by the name s
-	if (!IN(s, syms))
-		return NULL;
-	for (int i = 0; i < sizeof(prims)/sizeof(*prims); i++) {
-		if (s == *(prims[i].name))
-			return &prims[i];
-	}
-	return NULL;
-}
-
 void *assoc(void *k, void *l)
 {
 	// Search for value of key k in association list l
 	if (!l)
-		return prim(k); // if not defined, see if it refers to a primitive
+		return ERROR;
 	else if (k == car(car(l))) // string interning allows ==
 		return cdr(car(l));
 	else
@@ -277,8 +276,8 @@ void *apply(void *f, void *args, void *env)
 {
 	// Apply function f to args in environment env
 	if (IN(f, prims)) {
-		struct prim *p = f;
-		return p->func(args, env);
+		l_prim_t *fp = f;
+		return (*fp)(args, env);
 	} else if (IN(f, cells)) {
 		// Closures (via lambda) are structured as:
 		// ((args) (body) (env))
@@ -362,14 +361,21 @@ void *l_eq(void *args, void *env)
 
 int main()
 {
+	// Set up symbols and bindings for built-ins
 #define COPY_SYM(SYM,ID) \
 		ID##_sym = next_sym; \
 		memcpy(next_sym, SYM, SYM[0] + 1); \
 		next_sym += SYM[0] + 1;
 	FOREACH_SYMVAR(COPY_SYM)
 
+	void *env = NULL;
+#define DEFINE_PRIM(SYM,ID) \
+		env = cons(cons(ID##_sym, &prims[ID##_e]), env);
+	FOREACH_PRIM(DEFINE_PRIM)
+
+	// Read-eval-print loop
 	for (;;) {
-		print(eval(read(), NULL));
+		print(eval(read(), env));
 		printf("\n");
 	}
 }
