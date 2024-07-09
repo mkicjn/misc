@@ -83,16 +83,12 @@ void *cons(void *x, void *y)
 
 static inline void *car(void *l)
 {
-	if (IN(l, cells))
-		return *(void **)l;
-	return ERROR;
+	return *(void **)l;
 }
 
 static inline void *cdr(void *l)
 {
-	if (IN(l, cells))
-		return *((void **)l+1);
-	return ERROR;
+	return *((void **)l+1);
 }
 
 bool sym_eq(void *x, const char *sym)
@@ -121,8 +117,7 @@ void display(void *x)
 		printf(")");
 	} else if (IN(x, syms)) {
 		char *s = x;
-		for (int i = 0; i < s[0]; i++)
-			putchar(s[i+1]);
+		printf("%.*s", *s, s + 1);
 	} else if (IN(x, prims)) {
 		struct prim *p = x;
 		printf("{primitive: %s}", p->name);
@@ -321,11 +316,15 @@ void *l_cons(void *args, void *env)
 
 void *l_car(void *args, void *env)
 {
+	if (!IN(car(args), cells))
+		return ERROR;
 	return car(car(args));
 }
 
 void *l_cdr(void *args, void *env)
 {
+	if (!IN(car(args), cells))
+		return ERROR;
 	return cdr(car(args));
 }
 
