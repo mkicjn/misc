@@ -27,7 +27,6 @@
 
 
 // TODO list
-// * Single quote parsing ('x)
 // * Top-level environment (define)
 // * Garbage collection for cons cells
 // * TCO in some form or another
@@ -223,15 +222,19 @@ void *read(void)
 {
 	// Parse a Lisp expression
 	space();
-	if (peek == '(') {
-		next(); // Discard (
+	if (peek == '\'') { // Quoted expression
+		next();
+		space();
+		return cons(l_quote_sym, cons(read(), NULL));
+	} else if (peek == '(') { // List
+		next();
 		void *list = body();
 		space();
 		if (peek != ')')
 			return ERROR;
-		next(); // Discard )
+		next();
 		return list;
-	} else {
+	} else { // Everything else
 		return symbol();
 	}
 }
