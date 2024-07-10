@@ -40,7 +40,8 @@
 	X("\003car", l_car) \
 	X("\003cdr", l_cdr) \
 	X("\004atom", l_atom) \
-	X("\002eq", l_eq)
+	X("\002eq", l_eq) \
+	X("\004null", l_null)
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
 #define FOREACH_SYMVAR(X) \
@@ -65,6 +66,9 @@ enum l_prim_e {
 	FOREACH_PRIM(DEFINE_ENUM_VAL)
 	NUM_PRIMS
 };
+
+// Global Lisp environment (populated at runtime)
+void *defines = NULL;
 
 // Designated sentinel value for errors
 #define ERROR ((void *)-1LL)
@@ -254,7 +258,7 @@ void *read(void)
 // **************** Garbage collection ****************
 
 // The concept for this comes directly from the second SectorLISP writeup - full credit to them for that
-// It has been reimplemented here from scratch based on my own understanding of the concept
+// It has been implemented from scratch here and commented based on my own understanding of the idea
 
 void *copy(void *x, void *pre_eval, intptr_t cell_offset)
 {
@@ -326,8 +330,12 @@ void *apply(void *f, void *args, void *env)
 		l_prim_t *fp = f;
 		return (*fp)(args, env);
 	} else if (IN(f, cells)) {
-		// Closures (via lambda) structured as (args body env)
-		return eval(cadr(f), pairlis(car(f), args, caddr(f)));
+		// Closures are structured as (args body env)
+		// `env` is set to nil if there is no meaningful environment to close over
+		// This signals for us to reference the global environment instead, permitting recursive function definitions
+		// (Credit goes entirely to tinylisp for this idea)
+		env = caddr(f);
+		return eval(cadr(f), pairlis(car(f), args, env ? env : defines));
 	} else {
 		return ERROR;
 	}
@@ -358,8 +366,8 @@ void *eval(void *x, void *env)
 			return cadr(x);
 		else if (car(x) == l_cond_sym) // cond -> call evcon
 			ret = evcon(cdr(x), env);
-		else if (car(x) == l_lambda_sym) // lambda -> return (args body env)
-			return list3(cadr(x), caddr(x), env);
+		else if (car(x) == l_lambda_sym) // lambda -> return (args body env); see apply() for env caveat
+			return list3(cadr(x), caddr(x), env == defines ? NULL : env);
 		else // No special form -> apply function
 			ret = apply(eval(car(x), env), evlis(cdr(x), env), env);
 	} else {
@@ -402,17 +410,24 @@ void *l_eq(void *args, void *env)
 	return NULL;
 }
 
+void *l_null(void *args, void *env)
+{
+	if (car(args))
+		return NULL;
+	return l_t_sym;
+}
+
 
 // **************** REPL ****************
 
-void *evald(void *x, void **env)
+void *evald(void *x)
 {
-	// eval() with `define` permitted
+	// eval() with global definitions and permitting `define`
 	if (IN(x, cells) && car(x) == l_define_sym) {
-		*env = cons(cons(cadr(x), eval(caddr(x), *env)), *env);
+		defines = cons(cons(cadr(x), eval(caddr(x), defines)), defines);
 		return cadr(x);
 	} else {
-		return eval(x, *env);
+		return eval(x, defines);
 	}
 }
 
@@ -425,16 +440,15 @@ int main()
 		next_sym += SYM[0] + 1;
 	FOREACH_SYMVAR(COPY_SYM)
 
-	void *env = NULL;
 #define DEFINE_PRIM(SYM,ID) \
-		env = cons(cons(ID##_sym, &prims[ID##_e]), env);
+		defines = cons(cons(ID##_sym, &prims[ID##_e]), defines);
 	FOREACH_PRIM(DEFINE_PRIM)
 
 	// Read-eval-print loop
 	for (;;) {
 		void *pre_eval = next_cell;
-		print(evald(read(), &env));
+		print(evald(read()));
 		printf("\n");
-		env = gc(env, pre_eval);
+		defines = gc(defines, pre_eval);
 	}
 }
