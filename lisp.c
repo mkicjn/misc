@@ -27,8 +27,6 @@
 
 
 // TODO list
-// * Top-level environment (define)
-// * Garbage collection for cons cells
 // * TCO in some form or another
 // * More error codes and typechecks (low priority)
 // * Numeric types (low priority)
@@ -50,6 +48,7 @@
 	X("\005quote", l_quote) \
 	X("\004cond", l_cond) \
 	X("\006lambda", l_lambda) \
+	X("\006define", l_define) \
 	FOREACH_PRIM(X)
 
 // Declare a function for each primitive
@@ -252,6 +251,37 @@ void *read(void)
 }
 
 
+// **************** Garbage collection ****************
+
+// The concept for this comes directly from the second SectorLISP writeup - full credit to them for that
+// It has been reimplemented here from scratch based on my own understanding of the concept
+
+void *copy(void *x, void *pre_eval, intptr_t cell_offset)
+{
+	// Copy an object, offsetting all cell pointers above pre_eval
+	if (!IN(x, cells) || x < pre_eval)
+		return x;
+	void *a = copy(car(x), pre_eval, cell_offset);
+	void *d = copy(cdr(x), pre_eval, cell_offset);
+	return cons(a, d) + cell_offset;
+}
+
+void *gc(void *ret, void *pre_eval)
+{
+	// Collect garbage by copying a return value to the pre-eval next_cell position
+	// Create a fresh copy of the return value elsewhere, offsetting cells to match their post-GC position
+	void *pre_copy = next_cell;
+	intptr_t diff = (intptr_t)pre_copy - (intptr_t)pre_eval;
+	void *post_gc_ret = copy(ret, pre_eval, -diff);
+	// Move the copy directly to the pre-eval position
+	size_t ret_size = (intptr_t)next_cell - (intptr_t)pre_copy;
+	memcpy(pre_eval, pre_copy, ret_size);
+	// Correct next_cell to account for GC
+	next_cell = pre_eval + ret_size;
+	return post_gc_ret;
+}
+
+
 /* **************** Interpreter **************** */
 
 void *eval(void *x, void *env);
@@ -270,10 +300,12 @@ void *assoc(void *k, void *l)
 void *evlis(void *l, void *env)
 {
 	// Map eval over list l (i.e., to form an argument list)
-	if (IN(l, cells))
+	if (!l)
+		return NULL;
+	else if (IN(l, cells))
 		return cons(eval(car(l), env), evlis(cdr(l), env));
 	else
-		return eval(l, env);
+		return eval(l, env); // Append value of dangling atom to list
 }
 
 void *pairlis(void *ks, void *vs, void *env)
@@ -281,10 +313,10 @@ void *pairlis(void *ks, void *vs, void *env)
 	// Pair keys (ks) with values (vs) in environment env
 	if (!ks)
 		return env;
-	if (!IN(ks, cells)) // Support currying/variadicity by binding remaining args to a dangling atom
-		return cons(cons(ks, vs), env);
-	return cons(cons(car(ks), car(vs)),
-	         pairlis(cdr(ks), cdr(vs), env));
+	else if (IN(ks, cells))
+		return cons(cons(car(ks), car(vs)), pairlis(cdr(ks), cdr(vs), env));
+	else
+		return cons(cons(ks, vs), env); // Bind remaining values to dangling key
 }
 
 void *apply(void *f, void *args, void *env)
@@ -306,33 +338,40 @@ void *evcon(void *xs, void *env)
 	// Evaluate cond expressions xs in environment env
 	if (!xs)
 		return NULL;
-	if (eval(caar(xs), env))
+	else if (eval(caar(xs), env))
 		return eval(cadar(xs), env);
-	return evcon(cdr(xs), env);
+	else
+		return evcon(cdr(xs), env);
 }
 
 void *eval(void *x, void *env)
 {
+	void *pre_eval = next_cell;
+	void *ret = NULL;
 	// Evaluate expression x in environment env
 	if (IN(x, syms)) {
+		// Symbol -> return variable binding
 		return assoc(x, env);
 	} else if (IN(x, cells)) {
-		// Check for special forms
+		// List -> check for special forms
 		if (car(x) == l_quote_sym) // quote -> (do not eval)
 			return cadr(x);
 		else if (car(x) == l_cond_sym) // cond -> call evcon
-			return evcon(cdr(x), env);
-		else if (car(x) == l_lambda_sym) // lambda -> return (list args body env)
+			ret = evcon(cdr(x), env);
+		else if (car(x) == l_lambda_sym) // lambda -> return (args body env)
 			return list3(cadr(x), caddr(x), env);
-		else // Lisp function application
-			return apply(eval(car(x), env), evlis(cdr(x), env), env);
+		else // No special form -> apply function
+			ret = apply(eval(car(x), env), evlis(cdr(x), env), env);
 	} else {
+		// Nil or unknown -> return as-is
 		return x;
 	}
+	// Trigger GC on cases that don't return early
+	return gc(ret, pre_eval);
 }
 
 
-// **************** Primitives ****************
+// **************** Primitive functions ****************
 
 void *l_cons(void *args, void *env)
 {
@@ -364,7 +403,18 @@ void *l_eq(void *args, void *env)
 }
 
 
-// **************** REPL/Testing ****************
+// **************** REPL ****************
+
+void *evald(void *x, void **env)
+{
+	// eval() with `define` permitted
+	if (IN(x, cells) && car(x) == l_define_sym) {
+		*env = cons(cons(cadr(x), eval(caddr(x), *env)), *env);
+		return cadr(x);
+	} else {
+		return eval(x, *env);
+	}
+}
 
 int main()
 {
@@ -382,7 +432,9 @@ int main()
 
 	// Read-eval-print loop
 	for (;;) {
-		print(eval(read(), env));
+		void *pre_eval = next_cell;
+		print(evald(read(), &env));
 		printf("\n");
+		env = gc(env, pre_eval);
 	}
 }
