@@ -272,35 +272,44 @@ void *read(void)
 
 // **************** Garbage collection ****************
 
-// The concept for this comes directly from the second SectorLISP writeup - full credit to them for that
-// It has been implemented from scratch here and commented based on my own understanding of the idea
+// The inspiration to use copying garbage collection comes from the second SectorLISP writeup - credit to them for that
+// It has been implemented from scratch here and commented based on my own understanding of copying GC
+
+// According to the tinylisp paper, using SectorLISP-style GC shouldn't work
+// TODO: Figure out why it seems to work here, or find a counterexample to prove it doesn't
 
 void *copy(void *x, void *pre_eval, intptr_t cell_offset)
 {
 	// Copy an object, offsetting all cell pointers above pre_eval
-	if (!IN(x, cells) || x < pre_eval)
+	if (!IN(x, cells) || x < pre_eval) // No need to copy values below the pre-eval point
 		return x;
 	void *a = copy(car(x), pre_eval, cell_offset);
 	void *d = copy(cdr(x), pre_eval, cell_offset);
 	return cons(a, d) + cell_offset;
 }
 
-void *gc(void *ret, void *pre_eval)
+void gc(void **ret, void **env, void *pre_eval)
 {
-	// Collect garbage by copying a return value to the pre-eval next_cell position
+#ifndef DISABLE_GC
+	// Copying garbage collection for a return value and the environment
 	if (next_cell == pre_eval) // Ellide useless calls
-		return ret;
+		return;
 	// Create a fresh copy of the return value elsewhere, offsetting cells to match their post-GC position
 	void *pre_copy = next_cell;
 	intptr_t diff = (intptr_t)pre_copy - (intptr_t)pre_eval;
-	void *post_gc_ret = copy(ret, pre_eval, -diff);
+	void *post_gc_env = copy(*env, pre_eval, -diff);
+	void *post_gc_ret = copy(*ret, pre_eval, -diff);
 	// Move the copy directly to the pre-eval position
-	size_t ret_size = (intptr_t)next_cell - (intptr_t)pre_copy;
-	memcpy(pre_eval, pre_copy, ret_size);
+	size_t copy_size = (intptr_t)next_cell - (intptr_t)pre_copy;
+	memcpy(pre_eval, pre_copy, copy_size);
 	// Correct next_cell to account for GC
-	next_cell = pre_eval + ret_size;
+	next_cell = pre_eval + copy_size;
 	DEBUG(printf("GC: %d -> %d\n", (void **)pre_copy - cells, (void **)next_cell - cells);)
-	return post_gc_ret;
+	*env = post_gc_env;
+	*ret = post_gc_ret;
+#else
+	DEBUG(printf("No GC: %d\n", (void **)next_cell - cells);)
+#endif
 }
 
 
@@ -384,21 +393,20 @@ void *evcon(void *xs, void *env)
 	return ERROR;
 }
 
-void *evlet(void *ls, void *x, void *env)
+void *evlet(void *ls, void *x, void **envp)
 {
-	// Evaluate expression x with let bindings ls on top of environment env (TODO: no TCO yet)
+	// Evaluate expression x with let bindings ls on top of environment env (modified for TCO)
 	while (IN(ls, cells)) {
-		env = cons(cons(caar(ls), eval(cadar(ls), env)), env);
+		*envp = cons(cons(caar(ls), eval(cadar(ls), *envp)), *envp);
 		ls = cdr(ls);
 	}
-	return eval(x, env);
+	return x;
 }
 
 void *eval_step(void **cont, void **envp)
 {
 	void *x = *cont, *env = *envp;
 	// Evaluate expression x in environment env (modified for TCO)
-	void *pre_eval = next_cell;
 	if (IN(x, syms)) {
 		// Symbol -> return variable binding
 		return assoc(x, env);
@@ -408,8 +416,8 @@ void *eval_step(void **cont, void **envp)
 			return cadr(x);
 		} else if (car(x) == l_cond_sym) { // cond -> call evcon
 			*cont = evcon(cdr(x), env);
-		} else if (car(x) == l_let_sym) { // let -> call evlet (TODO: no TCO yet)
-			return evlet(cadr(x), caddr(x), env);
+		} else if (car(x) == l_let_sym) { // let -> call evlet
+			*cont = evlet(cadr(x), caddr(x), envp);
 		} else if (car(x) == l_lambda_sym || car(x) == l_macro_sym) {
 			// lambda/macro -> return with args, body, env; see apply() for env caveat
 			return list4(car(x), cadr(x), caddr(x), env == defines ? NULL : env);
@@ -424,14 +432,6 @@ void *eval_step(void **cont, void **envp)
 		// Nil or unknown -> return as-is
 		return x;
 	}
-	// Trigger GC on cases that don't return immediately
-#ifndef DISABLE_GC
-	// According to the tinylisp paper, using SectorLISP-style GC here shouldn't work
-	// TODO: Figure out why this seems to work here, or find a counterexample to prove it doesn't
-	// It definitely doesn't work when trying to move this to the new eval() function
-	// It also causes problems when trying to tail-call optimize let bindings
-	gc(*cont, pre_eval);
-#endif
 	return INCOMPLETE;
 }
 
@@ -440,11 +440,14 @@ void *eval(void *x, void *env)
 	DEBUG(static int level = 0; level++;)
 	DEBUG(printf("%*sL%d eval: ", 4*level, "", level); print(x); printf("\n");)
 	// Tail-call optimized eval
-	void *ret = NULL;
+	void *pre_eval, *ret;
 	for (;;) {
+		pre_eval = next_cell;
 		ret = eval_step(&x, &env);
 		if (ret != INCOMPLETE)
 			break;
+		gc(&x, &env, pre_eval); // Collect garbage, keeping the continuation expression
+
 #ifdef DISABLE_TCO
 		// If TCO is disabled for testing purposes, eval recursively
 		ret = eval(x, env);
@@ -454,6 +457,8 @@ void *eval(void *x, void *env)
 	}
 	DEBUG(printf("%*sL%d result: ", 4*level, "", level); print(ret); printf("\n");)
 	DEBUG(level--;)
+
+	gc(&ret, &env, pre_eval); // Collect garbage, keeping the return value
 	return ret;
 }
 
@@ -529,10 +534,11 @@ int main()
 	FOREACH_PRIM(DEFINE_PRIM)
 
 	// Read-eval-print loop
+	void *nil = NULL;
 	for (;;) {
 		void *pre_eval = next_cell;
 		print(evald(read()));
 		printf("\n");
-		defines = gc(defines, pre_eval);
+		gc(&nil, &defines, pre_eval); // Destroy return value and keep definitions
 	}
 }
