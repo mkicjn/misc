@@ -6,7 +6,7 @@
  * - To have a prototypical Lisp interpreter simple enough to eventually translate into Forth (as a fun challenge later)
  *
  * In terms of features, this implementation only aims to eventually provide the bare minimum to meaningfully support microKanren.
- * (It falls far short of that currently - porting that over will be another learning project down the line.)
+ * (It still falls a bit short of that currently - porting that over will be another learning project down the line.)
  *
  * Certain design decisions are inspired by Justine Tunney's SectorLISP and Dr. Robert van Engelen's tinylisp.
  */
@@ -25,11 +25,19 @@
 #define MAX_SYM_SPACE 100000
 #endif
 
+#ifdef DEBUG
+#undef DEBUG
+#define DEBUG(X) X
+#else
+#define DEBUG(X)
+#endif
+
 
 // TODO list
-// * TCO in some form or another
-// * More error codes and typechecks (low priority)
-// * Numeric types (low priority)
+// * Let-bindings
+// * Numeric types
+// * Macros
+// * More error codes and typechecks
 
 
 // **************** Top-level definitions ****************
@@ -40,8 +48,9 @@
 	X("\003car", l_car) \
 	X("\003cdr", l_cdr) \
 	X("\004atom", l_atom) \
-	X("\002eq", l_eq) \
-	X("\004null", l_null)
+	X("\003eq?", l_eq) \
+	X("\005null?", l_null) \
+	X("\004eval", l_eval)
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
 #define FOREACH_SYMVAR(X) \
@@ -49,6 +58,7 @@
 	X("\005quote", l_quote) \
 	X("\004cond", l_cond) \
 	X("\006lambda", l_lambda) \
+	X("\005macro", l_macro) \
 	X("\006define", l_define) \
 	FOREACH_PRIM(X)
 
@@ -70,8 +80,9 @@ enum l_prim_e {
 // Global Lisp environment (populated at runtime)
 void *defines = NULL;
 
-// Designated sentinel value for errors
+// Designated sentinel values
 #define ERROR ((void *)-1LL)
+#define INCOMPLETE ((void *)-2LL)
 
 
 // **************** Memory regions and region-based type inference ****************
@@ -114,9 +125,10 @@ void *cons(void *x, void *y)
 }
 
 // Convenience macros for cons
-#define list1(x) cons(x, NULL)
-#define list2(x, y) cons(x, list1(y))
-#define list3(x, y, z) cons(x, list2(y, z))
+#define list1(a) cons(a, NULL)
+#define list2(a, b) cons(a, list1(b))
+#define list3(a, b, c) cons(a, list2(b, c))
+#define list4(a, b, c, d) cons(a, list3(b, c, d))
 
 void *car(void *l)
 {
@@ -135,9 +147,10 @@ void *cdr(void *l)
 // Convenience macros for car/cdr
 #define caar(x) car(car(x))
 #define cdar(x) cdr(car(x))
+#define cadar(x) car(cdr(car(x)))
 #define cadr(x) car(cdr(x))
 #define caddr(x) car(cdr(cdr(x)))
-#define cadar(x) car(cdr(car(x)))
+#define cadddr(x) car(cdr(cdr(cdr(x))))
 
 void print(void *x)
 {
@@ -276,6 +289,8 @@ void *copy(void *x, void *pre_eval, intptr_t cell_offset)
 void *gc(void *ret, void *pre_eval)
 {
 	// Collect garbage by copying a return value to the pre-eval next_cell position
+	if (next_cell == pre_eval) // Ellide useless calls
+		return ret;
 	// Create a fresh copy of the return value elsewhere, offsetting cells to match their post-GC position
 	void *pre_copy = next_cell;
 	intptr_t diff = (intptr_t)pre_copy - (intptr_t)pre_eval;
@@ -285,19 +300,30 @@ void *gc(void *ret, void *pre_eval)
 	memcpy(pre_eval, pre_copy, ret_size);
 	// Correct next_cell to account for GC
 	next_cell = pre_eval + ret_size;
+	DEBUG(printf("GC: %d -> %d\n", (void **)pre_copy - cells, (void **)next_cell - cells);)
 	return post_gc_ret;
 }
 
 
-/* **************** Interpreter **************** */
+/* **************** Interpreter (modified for TCO) **************** */
+
+// The implementation of TCO here aims to modify the original interpreter structure as little as possible.
+// The basic idea here is to:
+// - Add a new eval function that relies on an infinite loop to step through the evaluation
+// - Modify the old eval, evcon, and apply to return an expression to continue from instead of calling eval, where possible
+// The identifiers cont, envp, and INCOMPLETE signal where these modifications happened.
 
 void *eval(void *x, void *env);
 
 void *assoc(void *k, void *l)
 {
 	// Search for value of key k in association list l
-	if (!l)
+	if (!l) {
+		printf("\033[31mUnbound variable: ");
+		print(k);
+		printf("\033[m\n");
 		return ERROR;
+	}
 	else if (k == caar(l)) // string interning allows ==
 		return cdar(l);
 	else
@@ -326,19 +352,21 @@ void *pairlis(void *ks, void *vs, void *env)
 		return cons(cons(ks, vs), env); // Bind remaining values to dangling key
 }
 
-void *apply(void *f, void *args, void *env)
+void *apply(void *f, void *args, void **cont, void **envp)
 {
-	// Apply function f to args in environment env
+	// Apply function f to args in environment env (modified for TCO)
 	if (IN(f, prims)) {
 		l_prim_t *fp = f;
-		return (*fp)(args, env);
+		return (*fp)(args, *envp);
 	} else if (IN(f, cells)) {
 		// Closures are structured as (args body env)
 		// `env` is set to nil if there is no meaningful environment to close over
 		// This signals for us to reference the global environment instead, permitting recursive function definitions
 		// (Credit goes entirely to tinylisp for this idea)
-		env = caddr(f);
-		return eval(cadr(f), pairlis(car(f), args, env ? env : defines));
+		void *env = cadddr(f);
+		*envp = pairlis(cadr(f), args, env ? env : defines);
+		*cont = caddr(f);
+		return INCOMPLETE;
 	} else {
 		return ERROR;
 	}
@@ -346,39 +374,74 @@ void *apply(void *f, void *args, void *env)
 
 void *evcon(void *xs, void *env)
 {
-	// Evaluate cond expressions xs in environment env
+	// Partially evaluate cond expressions xs in environment env (modified for TCO)
+	while (IN(xs, cells)) {
+		if (eval(caar(xs), env))
+			return cadar(xs);
+		xs = cdr(xs);
+	}
 	if (!xs)
 		return NULL;
-	else if (eval(caar(xs), env))
-		return eval(cadar(xs), env);
-	else
-		return evcon(cdr(xs), env);
+	return ERROR;
 }
 
-void *eval(void *x, void *env)
+void *eval_step(void **cont, void **envp)
 {
+	void *x = *cont, *env = *envp;
+	// Evaluate expression x in environment env (modified for TCO)
 	void *pre_eval = next_cell;
-	void *ret = NULL;
-	// Evaluate expression x in environment env
 	if (IN(x, syms)) {
 		// Symbol -> return variable binding
 		return assoc(x, env);
 	} else if (IN(x, cells)) {
 		// List -> check for special forms
-		if (car(x) == l_quote_sym) // quote -> (do not eval)
+		if (car(x) == l_quote_sym) { // quote -> do not eval
 			return cadr(x);
-		else if (car(x) == l_cond_sym) // cond -> call evcon
-			ret = evcon(cdr(x), env);
-		else if (car(x) == l_lambda_sym) // lambda -> return (args body env); see apply() for env caveat
-			return list3(cadr(x), caddr(x), env == defines ? NULL : env);
-		else // No special form -> apply function
-			ret = apply(eval(car(x), env), evlis(cdr(x), env), env);
+		} else if (car(x) == l_cond_sym) { // cond -> call evcon
+			*cont = evcon(cdr(x), env);
+		} else if (car(x) == l_lambda_sym || car(x) == l_macro_sym) { // lambda/macro -> return with args, body, env; see apply() for env caveat
+			return list4(car(x), cadr(x), caddr(x), env == defines ? NULL : env);
+		} else { // No special form -> apply function or macro
+			void *f = eval(car(x), env);
+			if (car(f) == l_macro_sym) // macro -> don't eval arguments
+				return apply(f, cdr(x), cont, envp);
+			else
+				return apply(f, evlis(cdr(x), env), cont, envp);
+		}
 	} else {
 		// Nil or unknown -> return as-is
 		return x;
 	}
-	// Trigger GC on cases that don't return early
-	return gc(ret, pre_eval);
+	// Trigger GC on cases that don't return immediately
+#ifndef DISABLE_GC
+	// According to the tinylisp paper, using SectorLISP-style GC here shouldn't work
+	// TODO: Figure out why this seems to work here, or find a counterexample to prove it doesn't
+	// It definitely doesn't work when trying to move this to the new eval() function
+	gc(x, pre_eval);
+#endif
+	return INCOMPLETE;
+}
+
+void *eval(void *x, void *env)
+{
+	DEBUG(static int level = 0; level++;)
+	DEBUG(printf("%*sL%d eval: ", 4*level, "", level); print(x); printf("\n");)
+	// Tail-call optimized eval
+	void *ret = NULL;
+	for (;;) {
+		ret = eval_step(&x, &env);
+		if (ret != INCOMPLETE)
+			break;
+#ifdef DISABLE_TCO
+		// If TCO is disabled for testing purposes, eval recursively
+		ret = eval(x, env);
+		break;
+#endif
+		DEBUG(printf("%*sL%d step: ", 4*level, "", level); print(x); printf("\n");)
+	}
+	DEBUG(printf("%*sL%d result: ", 4*level, "", level); print(ret); printf("\n");)
+	DEBUG(level--;)
+	return ret;
 }
 
 
@@ -418,6 +481,11 @@ void *l_null(void *args, void *env)
 	if (car(args))
 		return NULL;
 	return l_t_sym;
+}
+
+void *l_eval(void *args, void *env)
+{
+	return eval(car(args), env);
 }
 
 
