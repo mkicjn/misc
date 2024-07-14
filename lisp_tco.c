@@ -296,7 +296,13 @@ void *gc(void *ret, void *pre_eval)
 }
 
 
-/* **************** Interpreter **************** */
+/* **************** Interpreter (modified for TCO) **************** */
+
+// The implementation of TCO here aims to modify the original interpreter structure as little as possible.
+// The basic idea here is to:
+// - Add a new eval function that relies on an infinite loop to step through the evaluation
+// - Modify the old eval, evcon, and apply to return an expression to continue from instead of calling eval, where possible
+// The identifiers cont, envp, and INCOMPLETE signal where these modifications happened.
 
 void *eval(void *x, void *env);
 
@@ -390,8 +396,9 @@ void *eval_step(void **cont, void **envp)
 	}
 	// Trigger GC on cases that don't return immediately
 #ifndef DISABLE_GC
-	// Using SectorLISP-style GC here shouldn't work according to tinylisp
-	// TODO: Figure out why this works or find a counterexample to prove it doesn't
+	// According to the tinylisp paper, using SectorLISP-style GC here shouldn't work
+	// TODO: Figure out why this seems to work here, or find a counterexample to prove it doesn't
+	// It definitely doesn't work when trying to move this to the new eval() function
 	gc(x, pre_eval);
 #endif
 	return INCOMPLETE;
