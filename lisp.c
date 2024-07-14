@@ -34,10 +34,8 @@
 
 
 // TODO list
-// * Let-bindings
 // * Numeric types
-// * Macros
-// * More error codes and typechecks
+// * More checks and error messages
 
 
 // **************** Top-level definitions ****************
@@ -60,6 +58,7 @@
 	X("\006lambda", l_lambda) \
 	X("\005macro", l_macro) \
 	X("\006define", l_define) \
+	X("\003let", l_let) \
 	FOREACH_PRIM(X)
 
 // Declare a function for each primitive
@@ -374,7 +373,7 @@ void *apply(void *f, void *args, void **cont, void **envp)
 
 void *evcon(void *xs, void *env)
 {
-	// Partially evaluate cond expressions xs in environment env (modified for TCO)
+	// Evaluate cond expressions xs in environment env (modified for TCO)
 	while (IN(xs, cells)) {
 		if (eval(caar(xs), env))
 			return cadar(xs);
@@ -383,6 +382,16 @@ void *evcon(void *xs, void *env)
 	if (!xs)
 		return NULL;
 	return ERROR;
+}
+
+void *evlet(void *ls, void *x, void *env)
+{
+	// Evaluate expression x with let bindings ls on top of environment env (TODO: no TCO yet)
+	while (IN(ls, cells)) {
+		env = cons(cons(caar(ls), eval(cadar(ls), env)), env);
+		ls = cdr(ls);
+	}
+	return eval(x, env);
 }
 
 void *eval_step(void **cont, void **envp)
@@ -399,7 +408,10 @@ void *eval_step(void **cont, void **envp)
 			return cadr(x);
 		} else if (car(x) == l_cond_sym) { // cond -> call evcon
 			*cont = evcon(cdr(x), env);
-		} else if (car(x) == l_lambda_sym || car(x) == l_macro_sym) { // lambda/macro -> return with args, body, env; see apply() for env caveat
+		} else if (car(x) == l_let_sym) { // let -> call evlet (TODO: no TCO yet)
+			return evlet(cadr(x), caddr(x), env);
+		} else if (car(x) == l_lambda_sym || car(x) == l_macro_sym) {
+			// lambda/macro -> return with args, body, env; see apply() for env caveat
 			return list4(car(x), cadr(x), caddr(x), env == defines ? NULL : env);
 		} else { // No special form -> apply function or macro
 			void *f = eval(car(x), env);
@@ -417,7 +429,8 @@ void *eval_step(void **cont, void **envp)
 	// According to the tinylisp paper, using SectorLISP-style GC here shouldn't work
 	// TODO: Figure out why this seems to work here, or find a counterexample to prove it doesn't
 	// It definitely doesn't work when trying to move this to the new eval() function
-	gc(x, pre_eval);
+	// It also causes problems when trying to tail-call optimize let bindings
+	gc(*cont, pre_eval);
 #endif
 	return INCOMPLETE;
 }
