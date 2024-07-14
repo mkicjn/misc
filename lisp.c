@@ -250,7 +250,10 @@ void *read(void)
 		next();
 		return list;
 	} else { // Everything else
-		return symbol();
+		void *sym = symbol();
+		if (sym == ERROR)
+			next(); // Skip problem characters
+		return sym;
 	}
 }
 
