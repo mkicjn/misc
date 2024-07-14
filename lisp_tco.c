@@ -34,9 +34,8 @@
 
 
 // TODO list
-// * TCO in some form or another
+// * Numeric types
 // * More error codes and typechecks (low priority)
-// * Numeric types (low priority)
 
 
 // **************** Top-level definitions ****************
@@ -79,6 +78,7 @@ void *defines = NULL;
 
 // Designated sentinel value for errors
 #define ERROR ((void *)-1LL)
+#define INCOMPLETE ((void *)-2LL)
 
 
 // **************** Memory regions and region-based type inference ****************
@@ -280,6 +280,8 @@ void *copy(void *x, void *pre_eval, intptr_t cell_offset)
 void *gc(void *ret, void *pre_eval)
 {
 	// Collect garbage by copying a return value to the pre-eval next_cell position
+	if (next_cell == pre_eval) // Ellide useless calls
+		return ret;
 	// Create a fresh copy of the return value elsewhere, offsetting cells to match their post-GC position
 	void *pre_copy = next_cell;
 	intptr_t diff = (intptr_t)pre_copy - (intptr_t)pre_eval;
@@ -331,65 +333,90 @@ void *pairlis(void *ks, void *vs, void *env)
 		return cons(cons(ks, vs), env); // Bind remaining values to dangling key
 }
 
-void *apply(void *f, void *args, void **env)
+void *apply(void *f, void *args, void **cont, void **envp)
 {
-	// Return body of function f and modify env to bind args
-	if (IN(f, cells)) {
+	// Apply function f to args in environment env (modified for TCO)
+	if (IN(f, prims)) {
+		l_prim_t *fp = f;
+		return (*fp)(args, *envp);
+	} else if (IN(f, cells)) {
 		// Closures are structured as (args body env)
 		// `env` is set to nil if there is no meaningful environment to close over
 		// This signals for us to reference the global environment instead, permitting recursive function definitions
 		// (Credit goes entirely to tinylisp for this idea)
-		void *e = caddr(f);
-		*env = pairlis(car(f), args, e ? e : defines);
-		return cadr(f);
+		void *env = caddr(f);
+		*envp = pairlis(car(f), args, env ? env : defines);
+		*cont = cadr(f);
+		return INCOMPLETE;
+	} else {
+		return ERROR;
 	}
-	return ERROR;
 }
 
 void *evcon(void *xs, void *env)
 {
-	// Partially evaluate cond expressions xs in environment env
-	// (return correct expression unevaluated)
+	// Partially evaluate cond expressions xs in environment env (modified for TCO)
 	while (IN(xs, cells)) {
 		if (eval(caar(xs), env))
 			return cadar(xs);
 		xs = cdr(xs);
 	}
-	return xs ? ERROR : NULL;
+	if (!xs)
+		return NULL;
+	return ERROR;
+}
+
+void *eval_step(void **cont, void **envp)
+{
+	void *x = *cont, *env = *envp;
+	// Evaluate expression x in environment env (modified for TCO)
+	void *pre_eval = next_cell;
+	if (IN(x, syms)) {
+		// Symbol -> return variable binding
+		return assoc(x, env);
+	} else if (IN(x, cells)) {
+		// List -> check for special forms
+		if (car(x) == l_quote_sym) // quote -> (do not eval)
+			return cadr(x);
+		else if (car(x) == l_cond_sym) // cond -> call evcon
+			*cont = evcon(cdr(x), env);
+		else if (car(x) == l_lambda_sym) // lambda -> return (args body env); see apply() for env caveat
+			return list3(cadr(x), caddr(x), env == defines ? NULL : env);
+		else // No special form -> apply function
+			return apply(eval(car(x), env), evlis(cdr(x), env), cont, envp);
+	} else {
+		// Nil or unknown -> return as-is
+		return x;
+	}
+	// Trigger GC on cases that don't return immediately
+#ifndef DISABLE_GC
+	// Using SectorLISP-style GC here shouldn't work according to tinylisp
+	// TODO: Figure out why this works or find a counterexample to prove it doesn't
+	gc(x, pre_eval);
+#endif
+	return INCOMPLETE;
 }
 
 void *eval(void *x, void *env)
 {
-	DEBUG(static int j = 0; int i = j++;)
-	// Evaluate expression x in environment env (with TCO)
+	DEBUG(static int level = 0; level++;)
+	DEBUG(printf("%*sL%d eval: ", 2*level, "", level); print(x); printf("\n");)
+	// Tail-call optimized eval
+	void *ret = NULL;
 	for (;;) {
-		DEBUG(printf("Eval %d: ", i); print(x); printf("\n");)
-		void *pre_eval = next_cell;
-		if (IN(x, syms)) {
-			// Symbol -> return variable binding
-			return assoc(x, env);
-		} else if (IN(x, cells)) {
-			// List -> check for special forms
-			if (car(x) == l_quote_sym) // quote -> (do not eval)
-				return cadr(x);
-			else if (car(x) == l_lambda_sym) // lambda -> return (args body env); see apply() for env caveat
-				return list3(cadr(x), caddr(x), env == defines ? NULL : env);
-			else if (car(x) == l_cond_sym) // cond -> continue evaluating where evcon says to
-				x = evcon(cdr(x), env);
-			else { // No special form -> continue evaluating at function application
-				void *f = eval(car(x), env);
-				void *args = evlis(cdr(x), env);
-				if (IN(f, prims))
-					return (*(l_prim_t *)f)(args, env);
-				x = apply(f, args, &env);
-			}
-		} else {
-			// Nil or unknown -> return as-is
-			return x;
-		}
-		// Trigger GC on cases that don't return
-		gc(x, pre_eval);////////////////////////////////////////////////////////////////////////////////
+		ret = eval_step(&x, &env);
+		if (ret != INCOMPLETE)
+			break;
+#ifdef DISABLE_TCO
+		// If TCO is disabled for testing purposes, eval recursively
+		ret = eval(x, env);
+		break;
+#endif
+		DEBUG(printf("%*sL%d step: ", 2*level, "", level); print(x); printf("\n");)
 	}
+	DEBUG(printf("%*sL%d result: ", 2*level, "", level); print(ret); printf("\n");)
+	DEBUG(level--;)
+	return ret;
 }
 
 
