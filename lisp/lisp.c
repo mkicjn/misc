@@ -5,8 +5,8 @@
  * - To use this mini project as hands-on experience to better understand McCarthy's metacircular evaluator
  * - To have a prototypical Lisp interpreter simple enough to eventually translate into Forth (as a fun challenge later)
  *
- * In terms of features, this implementation only aims to eventually provide the bare minimum to meaningfully support microKanren.
- * (It still falls a bit short of that currently - porting that over will be another learning project down the line.)
+ * In terms of features, this implementation only aims to provide the bare minimum to meaningfully support microKanren.
+ * (It might be there now, but it's hard to say - porting that over will be another learning project down the line.)
  *
  * Certain design decisions are inspired by Justine Tunney's SectorLISP and Dr. Robert van Engelen's tinylisp.
  */
@@ -32,11 +32,6 @@
 #else
 #define DEBUG(X)
 #endif
-
-
-// TODO list
-// * Numeric types
-// * More checks and error messages
 
 
 // **************** Top-level definitions ****************
@@ -338,7 +333,7 @@ void *assoc(void *k, void *l)
 		return ERROR;
 	}
 	else if (k == caar(l)) // string interning allows ==
-		return cdar(l);
+		return car(l);
 	else
 		return assoc(k, cdr(l));
 }
@@ -414,7 +409,7 @@ void *eval_step(void **cont, void **envp)
 	// Evaluate expression x in environment env (modified for TCO)
 	if (IN(x, syms)) {
 		// Symbol -> return variable binding
-		return assoc(x, env);
+		return cdr(assoc(x, env));
 	} else if (IN(x, cells)) {
 		// List -> check for special forms
 		if (car(x) == l_quote_sym) { // quote -> do not eval
