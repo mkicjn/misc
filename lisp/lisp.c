@@ -249,7 +249,11 @@ void *read(void)
 {
 	// Parse a Lisp expression
 	space();
-	if (peek == '\'') { // Quoted expression
+	if (peek == ';') { // Comments
+		while (peek != '\n')
+			next();
+		return read();
+	} else if (peek == '\'') { // Quoted expression
 		next();
 		space();
 		return list2(l_quote_sym, read());
@@ -294,21 +298,21 @@ void gc(void **ret, void **env, void *pre_eval)
 	// Copying garbage collection for a return value and the environment
 	if (next_cell == pre_eval) // Ellide useless calls
 		return;
-	// Create a fresh copy of the return value elsewhere, offsetting cells to match their post-GC position
+	// Copy the return value and environment as needed, offsetting cells to match their post-GC position
 	void *pre_copy = next_cell;
 	intptr_t diff = (intptr_t)pre_copy - (intptr_t)pre_eval;
 	void *post_gc_env = copy(*env, pre_eval, -diff);
 	void *post_gc_ret = copy(*ret, pre_eval, -diff);
-	// Move the copy directly to the pre-eval position
+	// Move the copied cells to the pre-eval position
 	size_t copy_size = (intptr_t)next_cell - (intptr_t)pre_copy;
 	memcpy(pre_eval, pre_copy, copy_size);
 	// Correct next_cell to account for GC
 	next_cell = pre_eval + copy_size;
-	DEBUG(printf("GC: %d -> %d\n", (void **)pre_copy - cells, (void **)next_cell - cells);)
+	DEBUG(printf("Cells used: %d -> %d\n", (void **)pre_copy - cells, (void **)next_cell - cells);)
 	*env = post_gc_env;
 	*ret = post_gc_ret;
 #else
-	DEBUG(printf("No GC: %d\n", (void **)next_cell - cells);)
+	DEBUG(printf("Cells used: %d\n", (void **)next_cell - cells);)
 #endif
 }
 
@@ -318,7 +322,7 @@ void gc(void **ret, void **env, void *pre_eval)
 // The implementation of TCO here aims to modify the original interpreter structure as little as possible.
 // The basic idea here is to:
 // - Add a new eval function that relies on an infinite loop to step through the evaluation
-// - Modify the old eval, evcon, and apply to return an expression to continue from instead of calling eval, where possible
+// - Modify the old eval, evcon, evlet, and apply to return an expression to continue from instead of calling eval, where possible
 // The identifiers cont, envp, and INCOMPLETE signal where these modifications happened.
 
 void *eval(void *x, void *env);
@@ -437,9 +441,9 @@ void *eval_step(void **cont, void **envp)
 
 void *eval(void *x, void *env)
 {
+	// Tail-call optimized eval
 	DEBUG(static int level = 0; level++;)
 	DEBUG(printf("%*sL%d eval: ", 4*level, "", level); print(x); printf("\n");)
-	// Tail-call optimized eval
 	void *pre_eval, *ret;
 	for (;;) {
 		pre_eval = next_cell;
@@ -534,8 +538,8 @@ int main()
 	FOREACH_PRIM(DEFINE_PRIM)
 
 	// Read-eval-print loop
-	void *nil = NULL;
 	for (;;) {
+		void *nil = NULL;
 		void *pre_eval = next_cell;
 		print(evald(read()));
 		printf("\n");
