@@ -446,7 +446,9 @@ void *eval(void *x, void *env)
 		ret = eval_step(&x, &env);
 		if (ret != INCOMPLETE)
 			break;
-		gc(&x, &env, pre_eval); // Collect garbage, keeping the continuation expression
+		//gc(&x, &env, pre_eval); // Collect garbage, keeping the continuation expression
+		// ^ TODO: This call causes inconsistency with eq? due to deep copying env
+		// Need to determine whether this is the only problematic call and find a good compromise
 
 #ifdef DISABLE_TCO
 		// If TCO is disabled for testing purposes, eval recursively
