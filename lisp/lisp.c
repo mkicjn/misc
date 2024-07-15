@@ -16,6 +16,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stddef.h>
 
 #ifndef MAX_CELL_SPACE
 #define MAX_CELL_SPACE 100000
@@ -108,8 +109,8 @@ char *prim_syms[NUM_PRIMS] = {
 };
 
 // Macro for determining whether a pointer lies within a given array
-#define IN(X,T) ((intptr_t)(X) >= (intptr_t)(T) \
-		&& (intptr_t)(X) < (intptr_t)(T) + sizeof(T))
+#define IN(X,T) ((uintptr_t)(X) >= (uintptr_t)(T) \
+		&& (uintptr_t)(X) < (uintptr_t)(T) + sizeof(T))
 
 
 // **************** Basic value operations ****************
@@ -282,37 +283,37 @@ void *read(void)
 // According to the tinylisp paper, using SectorLISP-style GC shouldn't work
 // TODO: Figure out why it seems to work here, or find a counterexample to prove it doesn't
 
-void *copy(void *x, void *pre_eval, intptr_t cell_offset)
+void *copy(void *x, void **pre_eval, ptrdiff_t cell_offset)
 {
 	// Copy an object, offsetting all cell pointers above pre_eval
-	if (!IN(x, cells) || x < pre_eval) // No need to copy values below the pre-eval point
+	if (!IN(x, cells) || (void **)x < pre_eval) // No need to copy values below the pre-eval point
 		return x;
 	void *a = copy(car(x), pre_eval, cell_offset);
 	void *d = copy(cdr(x), pre_eval, cell_offset);
-	return cons(a, d) + cell_offset;
+	return (void **)cons(a, d) + cell_offset;
 }
 
-void gc(void **ret, void **env, void *pre_eval)
+void gc(void **ret, void **env, void **pre_eval)
 {
-#ifndef DISABLE_GC
 	// Copying garbage collection for a return value and the environment
 	if (next_cell == pre_eval) // Ellide useless calls
 		return;
+#ifndef DISABLE_GC
 	// Copy the return value and environment as needed, offsetting cells to match their post-GC position
-	void *pre_copy = next_cell;
-	intptr_t diff = (intptr_t)pre_copy - (intptr_t)pre_eval;
+	void **pre_copy = next_cell;
+	ptrdiff_t diff = pre_copy - pre_eval;
 	void *post_gc_env = copy(*env, pre_eval, -diff);
 	void *post_gc_ret = copy(*ret, pre_eval, -diff);
 	// Move the copied cells to the pre-eval position
-	size_t copy_size = (intptr_t)next_cell - (intptr_t)pre_copy;
-	memcpy(pre_eval, pre_copy, copy_size);
+	ptrdiff_t copy_size = next_cell - pre_copy;
+	memcpy(pre_eval, pre_copy, copy_size * sizeof(*pre_copy));
 	// Correct next_cell to account for GC
 	next_cell = pre_eval + copy_size;
-	DEBUG(printf("Cells used: %d -> %d\n", (void **)pre_copy - cells, (void **)next_cell - cells);)
 	*env = post_gc_env;
 	*ret = post_gc_ret;
+	DEBUG(printf("Cells used: %ld -> %ld\n", pre_copy - cells, next_cell - cells);)
 #else
-	DEBUG(printf("Cells used: %d\n", (void **)next_cell - cells);)
+	DEBUG(printf("Cells used: %ld\n", next_cell - cells);)
 #endif
 }
 
@@ -444,7 +445,7 @@ void *eval(void *x, void *env)
 	// Tail-call optimized eval
 	DEBUG(static int level = 0; level++;)
 	DEBUG(printf("%*sL%d eval: ", 4*level, "", level); print(x); printf("\n");)
-	void *pre_eval, *ret;
+	void **pre_eval, *ret;
 	for (;;) {
 		pre_eval = next_cell;
 		ret = eval_step(&x, &env);
@@ -471,21 +472,25 @@ void *eval(void *x, void *env)
 
 void *l_cons(void *args, void *env)
 {
+	(void)env;
 	return cons(car(args), cadr(args));
 }
 
 void *l_car(void *args, void *env)
 {
+	(void)env;
 	return caar(args);
 }
 
 void *l_cdr(void *args, void *env)
 {
+	(void)env;
 	return cdar(args);
 }
 
 void *l_atom(void *args, void *env)
 {
+	(void)env;
 	if (IN(car(args), cells))
 		return NULL;
 	return l_t_sym;
@@ -493,6 +498,7 @@ void *l_atom(void *args, void *env)
 
 void *l_eq(void *args, void *env)
 {
+	(void)env;
 	if (car(args) == cadr(args))
 		return l_t_sym;
 	return NULL;
@@ -500,6 +506,7 @@ void *l_eq(void *args, void *env)
 
 void *l_null(void *args, void *env)
 {
+	(void)env;
 	if (car(args))
 		return NULL;
 	return l_t_sym;
@@ -540,7 +547,7 @@ int main()
 	// Read-eval-print loop
 	for (;;) {
 		void *nil = NULL;
-		void *pre_eval = next_cell;
+		void **pre_eval = next_cell;
 		print(evald(read()));
 		printf("\n");
 		gc(&nil, &defines, pre_eval); // Destroy return value and keep definitions
