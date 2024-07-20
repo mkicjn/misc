@@ -276,7 +276,7 @@ void *read(void)
 // According to the tinylisp paper, using SectorLISP-style GC shouldn't work
 // TODO: Figure out why it seems to work here, or find a counterexample to prove it doesn't
 
-void **pre_eval = NULL;
+void **pre_eval = cells;
 
 void *copy(void *x, ptrdiff_t cell_offset)
 {
@@ -474,20 +474,6 @@ void *eval(void *x, void *env)
 
 // **************** REPL ****************
 
-void *evald(void *x)
-{
-	// Top-level eval() with `define`
-	if (IN(x, cells) && car(x) == l_define_sym) {
-		// `define` is the only "true" special form in this interpreter, which cannot be treated as a function
-		if (!IN(cadr(x), syms))
-			return ERROR;
-		defines = cons(cons(cadr(x), eval(caddr(x), defines)), defines);
-		return cadr(x);
-	} else {
-		return eval(x, defines);
-	}
-}
-
 int main()
 {
 	// Set up symbols and bindings for built-ins
@@ -504,9 +490,16 @@ int main()
 	// Read-eval-print loop
 	for (;;) {
 		void *nil = NULL;
-		pre_eval = next_cell;
-		print(evald(read()));
-		printf("\n");
+		void *exp = read();
+		if (car(exp) == l_define_sym) {
+			// Handle defines
+			if (IN(cadr(exp), syms))
+				defines = define(cadr(exp), eval(caddr(exp), defines), defines);
+		} else {
+			// Evaluate expressions
+			print(eval(exp, defines));
+			printf("\n");
+		}
 		gc(&nil, &defines); // Destroy return value and keep definitions
 	}
 }
