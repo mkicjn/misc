@@ -46,7 +46,7 @@
 	X("\005quote", l_quote) \
 	X("\004cond", l_cond) \
 	X("\006lambda", l_lambda) \
-	X("\004let*", l_let) \
+	X("\003let", l_let) \
 	X("\005macro", l_macro)
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
@@ -70,9 +70,6 @@ enum l_prim_e {
 	FOREACH_PRIM(DEFINE_ENUM_VAL)
 	NUM_PRIMS
 };
-
-// Global Lisp environment (populated at runtime)
-void *defines = NULL;
 
 // Designated sentinel values
 #define ERROR ((void *)-1LL)
@@ -335,6 +332,9 @@ void *define(void *k, void *v, void *env)
 // The identifiers cont, envp, and INCOMPLETE signal where these modifications happened.
 
 void *eval(void *x, void *env);
+
+// Global Lisp environment (populated at runtime)
+void *defines = NULL;
 
 void *assoc(void *k, void *l)
 {
