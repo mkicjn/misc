@@ -43,23 +43,24 @@
 	X("\003cdr", l_cdr) \
 	X("\005atom?", l_atom) \
 	X("\003eq?", l_eq) \
-	X("\005null?", l_null)
+	X("\005null?", l_null) \
+	X("\004eval", l_eval) \
+	X("\005quote", l_quote) \
+	X("\004cond", l_cond) \
+	X("\006lambda", l_lambda) \
+	X("\003let", l_let) \
+	X("\005macro", l_macro)
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
 #define FOREACH_SYMVAR(X) \
 	X("\001t", l_t) \
-	X("\005quote", l_quote) \
-	X("\004cond", l_cond) \
-	X("\006lambda", l_lambda) \
-	X("\005macro", l_macro) \
 	X("\006define", l_define) \
-	X("\003let", l_let) \
 	FOREACH_PRIM(X)
 
 // Declare a function for each primitive
-#define DECLARE_FUNC(SYM,ID) void *ID(void *args);
+#define DECLARE_FUNC(SYM,ID) void *ID(void *args, void **cont, void **envp);
 FOREACH_PRIM(DECLARE_FUNC)
-typedef void *(*l_prim_t)(void *args); // Function pointer type for Lisp primitives
+typedef void *(*l_prim_t)(void *args, void **cont, void **envp); // Function pointer type for Lisp primitives
 
 // Declare character pointer variables for each built-in symbol
 #define DECLARE_SYMVAR(SYM,ID) char *ID##_sym;
@@ -314,10 +315,10 @@ void gc(void **ret, void **env, void **pre_eval)
 
 /* **************** Interpreter (modified for TCO) **************** */
 
-// The implementation of TCO here aims to modify the original interpreter structure as little as possible.
+// The implementation of TCO here aims to avoid deviating too heavily from the original interpreter structure
 // The basic idea here is to:
 // - Add a new eval function that relies on an infinite loop to step through the evaluation
-// - Modify the old eval, evcon, evlet, and apply to return an expression to continue from instead of calling eval, where possible
+// - Modify the old interpreter functions to return an expression to continue from instead of calling eval, where possible
 // The identifiers cont, envp, and INCOMPLETE signal where these modifications happened.
 
 void *eval(void *x, void *env);
@@ -361,22 +362,28 @@ void *pairlis(void *ks, void *vs, void *env)
 
 void *apply(void *f, void *args, void **cont, void **envp)
 {
-	// Apply function f to args in environment env (modified for TCO)
-	if (IN(f, prims)) {
-		l_prim_t *fp = f;
-		return (*fp)(args);
-	} else if (IN(f, cells)) {
-		// Closures are structured as (args body env)
-		// `env` is set to nil if there is no meaningful environment to close over
-		// This signals for us to reference the global environment instead, permitting recursive function definitions
-		// (Credit goes entirely to tinylisp for this idea)
-		void *env = cadddr(f);
-		*envp = pairlis(cadr(f), args, env ? env : defines);
+	// Apply non-primitive function f to unevaluated args in environment env (modified for TCO)
+	if (!IN(f, cells))
+		return ERROR;
+
+	// Closures are structured as (lambda/macro args body env)
+	// `env` is nil if there is no meaningful environment to close over
+	// This signals for us to reference the global environment instead, permitting recursive function definitions
+	// (Credit goes entirely to tinylisp for this idea)
+
+	void *env = cadddr(f);
+	if (!env)
+		env = defines;
+
+	if (car(f) == l_macro_sym) { // macro -> don't eval args, but do eval result before continuing
+		*cont = eval(caddr(f), pairlis(cadr(f), args, env));
+		return INCOMPLETE;
+	} else if (car(f) == l_lambda_sym) { // lambda -> eval args, continue with body
+		*envp = pairlis(cadr(f), evlis(args, *envp), env);
 		*cont = caddr(f);
 		return INCOMPLETE;
-	} else {
-		return ERROR;
 	}
+	return ERROR;
 }
 
 void *evcon(void *xs, void *env)
@@ -394,44 +401,29 @@ void *evcon(void *xs, void *env)
 
 void *evlet(void *ls, void *x, void **envp)
 {
-	// Evaluate expression x with let bindings ls on top of environment env (modified for TCO)
-	while (IN(ls, cells)) {
-		*envp = cons(cons(caar(ls), eval(cadar(ls), *envp)), *envp);
-		ls = cdr(ls);
-	}
-	return x;
+       // Evaluate expression x with let bindings ls on top of environment env (modified for TCO)
+       while (IN(ls, cells)) {
+               *envp = cons(cons(caar(ls), eval(cadar(ls), *envp)), *envp);
+               ls = cdr(ls);
+       }
+       return x;
 }
 
 void *eval_step(void **cont, void **envp)
 {
 	void *x = *cont, *env = *envp;
 	// Evaluate expression x in environment env (modified for TCO)
-	if (IN(x, syms)) {
-		// Symbol -> return variable binding
+	if (IN(x, syms)) { // Symbol -> return variable binding
 		return cdr(assoc(x, env));
-	} else if (IN(x, cells)) {
-		// List -> check for special forms
-		if (car(x) == l_quote_sym) { // quote -> do not eval
-			return cadr(x);
-		} else if (car(x) == l_cond_sym) { // cond -> call evcon
-			*cont = evcon(cdr(x), env);
-		} else if (car(x) == l_let_sym) { // let -> call evlet
-			*cont = evlet(cadr(x), caddr(x), envp);
-		} else if (car(x) == l_lambda_sym || car(x) == l_macro_sym) {
-			// lambda/macro -> return with args, body, env; see apply() for env caveat
-			return list4(car(x), cadr(x), caddr(x), env == defines ? NULL : env);
-		} else { // No special form -> apply function or macro
-			void *f = eval(car(x), env);
-			if (car(f) == l_macro_sym) // macro -> sidestep apply
-				*cont = eval(caddr(f), pairlis(cadr(f), cdr(x), env));
-			else
-				return apply(f, evlis(cdr(x), env), cont, envp);
-		}
-	} else {
-		// Nil or unknown -> return as-is
-		return x;
+	} else if (IN(x, cells)) { // List -> interpret S-expression
+		void *f = eval(car(x), env);
+		if (IN(f, prims)) // Primitive -> call C function
+			return (*(l_prim_t *)f)(cdr(x), cont, envp);
+		else // Non-primitive -> apply function or macro
+			return apply(f, cdr(x), cont, envp);
 	}
-	return INCOMPLETE;
+	// Nil or unknown -> return as-is
+	return x;
 }
 
 void *eval(void *x, void *env)
@@ -464,51 +456,13 @@ void *eval(void *x, void *env)
 }
 
 
-// **************** Primitive functions ****************
-
-void *l_cons(void *args)
-{
-	return cons(car(args), cadr(args));
-}
-
-void *l_car(void *args)
-{
-	return caar(args);
-}
-
-void *l_cdr(void *args)
-{
-	return cdar(args);
-}
-
-void *l_atom(void *args)
-{
-	if (IN(car(args), cells))
-		return NULL;
-	return l_t_sym;
-}
-
-void *l_eq(void *args)
-{
-	if (car(args) == cadr(args))
-		return l_t_sym;
-	return NULL;
-}
-
-void *l_null(void *args)
-{
-	if (car(args))
-		return NULL;
-	return l_t_sym;
-}
-
-
 // **************** REPL ****************
 
 void *evald(void *x)
 {
-	// eval() with global definitions and permitting `define`
+	// Top-level eval() with `define`
 	if (IN(x, cells) && car(x) == l_define_sym) {
+		// `define` is the only "true" special form in this interpreter, which cannot be treated as a function
 		if (!IN(cadr(x), syms))
 			return ERROR;
 		defines = cons(cons(cadr(x), eval(caddr(x), defines)), defines);
@@ -539,4 +493,97 @@ int main()
 		printf("\n");
 		gc(&nil, &defines, pre_eval); // Destroy return value and keep definitions
 	}
+}
+
+
+// **************** Primitives ****************
+
+// "Special forms" - i.e., primitives which DO NOT evaluate their arguments
+
+void *l_quote(void *args, void **cont, void **envp)
+{
+	(void)envp;
+	(void)cont; // no TCO
+	return car(args);
+}
+
+void *l_cond(void *args, void **cont, void **envp)
+{
+	*cont = evcon(args, *envp);
+	return INCOMPLETE;
+}
+
+void *l_lambda(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	return list4(l_lambda_sym, car(args), cadr(args), *envp == defines ? NULL : *envp);
+}
+
+void *l_let(void *args, void **cont, void **envp)
+{
+	*cont = evlet(car(args), cadr(args), envp);
+	return INCOMPLETE;
+}
+
+void *l_macro(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	return list4(l_macro_sym, car(args), cadr(args), *envp == defines ? NULL : *envp);
+}
+
+// "Functions" - i.e., primitives which DO evaluate their arguments
+
+void *l_cons(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp);
+	return cons(car(args), cadr(args));
+}
+
+void *l_car(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp);
+	return caar(args);
+}
+
+void *l_cdr(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp);
+	return cdar(args);
+}
+
+void *l_atom(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp);
+	if (IN(car(args), cells))
+		return NULL;
+	return l_t_sym;
+}
+
+void *l_eq(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp);
+	if (car(args) == cadr(args))
+		return l_t_sym;
+	return NULL;
+}
+
+void *l_null(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp);
+	if (car(args))
+		return NULL;
+	return l_t_sym;
+}
+
+void *l_eval(void *args, void **cont, void **envp)
+{
+	args = evlis(args, *envp);
+	*cont = car(args);
+	return INCOMPLETE;
 }
