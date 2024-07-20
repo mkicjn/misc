@@ -1,11 +1,9 @@
 /*
  * Unnamed Lisp interpreter (WIP)
  *
- * The goal of this Lisp interpreter is to be simple and readable, motivated by the following desires:
- * - To use this mini project as hands-on experience to better understand McCarthy's metacircular evaluator
- * - To have a prototypical Lisp interpreter simple enough to eventually translate into Forth (as a fun challenge later)
+ * The goal of this Lisp interpreter is not to be small or fast, but to be simple and readable without sacrificing important optimizations.
  *
- * In terms of features, this implementation only aims to provide the bare minimum to meaningfully support microKanren.
+ * In terms of features, this implementation only aims to provide the bare minimum to meaningfully support uKanren.
  * (It might be there now, but it's hard to say - porting that over will be another learning project down the line.)
  *
  * Certain design decisions are inspired by Justine Tunney's SectorLISP and Dr. Robert van Engelen's tinylisp.
@@ -48,12 +46,12 @@
 	X("\005quote", l_quote) \
 	X("\004cond", l_cond) \
 	X("\006lambda", l_lambda) \
-	X("\003let", l_let) \
+	X("\004let*", l_let) \
 	X("\005macro", l_macro)
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
 #define FOREACH_SYMVAR(X) \
-	X("\001t", l_t) \
+	X("\002#t", l_t) \
 	X("\006define", l_define) \
 	FOREACH_PRIM(X)
 
@@ -278,17 +276,19 @@ void *read(void)
 // According to the tinylisp paper, using SectorLISP-style GC shouldn't work
 // TODO: Figure out why it seems to work here, or find a counterexample to prove it doesn't
 
-void *copy(void *x, void **pre_eval, ptrdiff_t cell_offset)
+void **pre_eval = NULL;
+
+void *copy(void *x, ptrdiff_t cell_offset)
 {
 	// Copy an object, offsetting all cell pointers above pre_eval
 	if (!IN(x, cells) || (void **)x < pre_eval) // No need to copy values below the pre-eval point
 		return x;
-	void *a = copy(car(x), pre_eval, cell_offset);
-	void *d = copy(cdr(x), pre_eval, cell_offset);
+	void *a = copy(car(x), cell_offset);
+	void *d = copy(cdr(x), cell_offset);
 	return (void **)cons(a, d) + cell_offset;
 }
 
-void gc(void **ret, void **env, void **pre_eval)
+void gc(void **ret, void **env)
 {
 	// Copying garbage collection for a return value and the environment
 	if (next_cell == pre_eval) // Ellide useless calls
@@ -297,8 +297,8 @@ void gc(void **ret, void **env, void **pre_eval)
 	// Copy the return value and environment as needed, offsetting cells to match their post-GC position
 	void **pre_copy = next_cell;
 	ptrdiff_t diff = pre_copy - pre_eval;
-	void *post_gc_env = copy(*env, pre_eval, -diff);
-	void *post_gc_ret = copy(*ret, pre_eval, -diff);
+	void *post_gc_env = copy(*env, -diff);
+	void *post_gc_ret = copy(*ret, -diff);
 	// Move the copied cells to the pre-eval position
 	ptrdiff_t copy_size = next_cell - pre_copy;
 	memcpy(pre_eval, pre_copy, copy_size * sizeof(*pre_copy));
@@ -310,6 +310,19 @@ void gc(void **ret, void **env, void **pre_eval)
 #else
 	DEBUG(printf("Cells used: %ld\n", next_cell - cells);)
 #endif
+}
+
+void *define(void *k, void *v, void *env)
+{
+	// Update an existing binding for k from this eval call to point to v
+	for (void *e = env; e > (void *)pre_eval; e = cdr(e)) {
+		if (caar(e) == k) {
+			*CDR(car(e)) = v;
+			return env;
+		}
+	}
+	// If not possible, make a new binding
+	return cons(cons(k, v), env);
 }
 
 
@@ -355,9 +368,9 @@ void *pairlis(void *ks, void *vs, void *env)
 	if (!ks)
 		return env;
 	else if (IN(ks, cells))
-		return cons(cons(car(ks), car(vs)), pairlis(cdr(ks), cdr(vs), env));
+		return pairlis(cdr(ks), cdr(vs), define(car(ks), car(vs), env));
 	else
-		return cons(cons(ks, vs), env); // Bind remaining values to dangling key
+		return define(ks, vs, env); // Bind remaining values to dangling key
 }
 
 void *apply(void *f, void *args, void **cont, void **envp)
@@ -431,13 +444,15 @@ void *eval(void *x, void *env)
 	// Tail-call optimized eval
 	DEBUG(static int level = 0; level++;)
 	DEBUG(printf("%*sL%d eval: ", 4*level, "", level); print(x); printf("\n");)
-	void **pre_eval, *ret;
+	void **old_pre_eval = pre_eval;
+	pre_eval = next_cell;
+
+	void *ret;
 	for (;;) {
-		pre_eval = next_cell;
 		ret = eval_step(&x, &env);
 		if (ret != INCOMPLETE)
 			break;
-		//gc(&x, &env, pre_eval); // Collect garbage, keeping the continuation expression
+		gc(&x, &env); // Collect garbage, keeping the continuation expression
 		// ^ TODO: This call causes inconsistency with eq? due to deep copying env
 		// Need to determine whether this is the only problematic call and find a good compromise
 
@@ -451,7 +466,8 @@ void *eval(void *x, void *env)
 	DEBUG(printf("%*sL%d result: ", 4*level, "", level); print(ret); printf("\n");)
 	DEBUG(level--;)
 
-	gc(&ret, &env, pre_eval); // Collect garbage, keeping the return value
+	gc(&ret, &env); // Collect garbage, keeping the return value
+	pre_eval = old_pre_eval;
 	return ret;
 }
 
@@ -488,10 +504,10 @@ int main()
 	// Read-eval-print loop
 	for (;;) {
 		void *nil = NULL;
-		void **pre_eval = next_cell;
+		pre_eval = next_cell;
 		print(evald(read()));
 		printf("\n");
-		gc(&nil, &defines, pre_eval); // Destroy return value and keep definitions
+		gc(&nil, &defines); // Destroy return value and keep definitions
 	}
 }
 
@@ -536,28 +552,28 @@ void *l_macro(void *args, void **cont, void **envp)
 void *l_cons(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
-	args = evlis(args, *envp);
+	args = evlis(args, *envp); // evaluate args
 	return cons(car(args), cadr(args));
 }
 
 void *l_car(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
-	args = evlis(args, *envp);
+	args = evlis(args, *envp); // evaluate args
 	return caar(args);
 }
 
 void *l_cdr(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
-	args = evlis(args, *envp);
+	args = evlis(args, *envp); // evaluate args
 	return cdar(args);
 }
 
 void *l_atom(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
-	args = evlis(args, *envp);
+	args = evlis(args, *envp); // evaluate args
 	if (IN(car(args), cells))
 		return NULL;
 	return l_t_sym;
@@ -566,7 +582,7 @@ void *l_atom(void *args, void **cont, void **envp)
 void *l_eq(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
-	args = evlis(args, *envp);
+	args = evlis(args, *envp); // evaluate args
 	if (car(args) == cadr(args))
 		return l_t_sym;
 	return NULL;
@@ -575,7 +591,7 @@ void *l_eq(void *args, void **cont, void **envp)
 void *l_null(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
-	args = evlis(args, *envp);
+	args = evlis(args, *envp); // evaluate args
 	if (car(args))
 		return NULL;
 	return l_t_sym;
@@ -583,7 +599,7 @@ void *l_null(void *args, void **cont, void **envp)
 
 void *l_eval(void *args, void **cont, void **envp)
 {
-	args = evlis(args, *envp);
+	args = evlis(args, *envp); // evaluate args
 	*cont = car(args);
 	return INCOMPLETE;
 }
