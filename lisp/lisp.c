@@ -1,12 +1,11 @@
 /*
  * Unnamed Lisp interpreter (WIP)
  *
- * The goal of this Lisp interpreter is not to be small or fast, but to be simple and readable without sacrificing important optimizations.
+ * This Lisp interpreter is not meant to be especially small or fast, but to be as simple as possible while retaining critical optimizations.
+ * Namely, aggressive tail-call optimization and garbage collection are needed to allow deeply recursive functions to the extent possible.
+ * The end goal is to eventually port uKanren to this implementation.
  *
- * In terms of features, this implementation only aims to provide the bare minimum to meaningfully support uKanren.
- * (It might be there now, but it's hard to say - porting that over will be another learning project down the line.)
- *
- * Certain design decisions are inspired by Justine Tunney's SectorLISP and Dr. Robert van Engelen's tinylisp.
+ * Certain high-level design choices were inspired by Justine Tunney's SectorLISP and Dr. Robert van Engelen's tinylisp.
  */
 
 #include <stdio.h>
@@ -55,45 +54,46 @@
 	X("\006define", l_define) \
 	FOREACH_PRIM(X)
 
-// Declare a function for each primitive
-#define DECLARE_FUNC(SYM,ID) void *ID(void *args, void **cont, void **envp);
-FOREACH_PRIM(DECLARE_FUNC)
-typedef void *(*l_prim_t)(void *args, void **cont, void **envp); // Function pointer type for Lisp primitives
-
-// Declare character pointer variables for each built-in symbol
-#define DECLARE_SYMVAR(SYM,ID) char *ID##_sym;
-FOREACH_SYMVAR(DECLARE_SYMVAR)
-
-// Declare a compile-time numeric index for each primitive
+// Declare a compile-time numeric index for each primitive (later used to index prims[] and prim_syms[])
 enum l_prim_e {
 #define DEFINE_ENUM_VAL(SYM,ID) ID##_e,
 	FOREACH_PRIM(DEFINE_ENUM_VAL)
 	NUM_PRIMS
 };
 
-// Designated sentinel values
-#define ERROR ((void *)-1LL)
-#define INCOMPLETE ((void *)-2LL)
-#define FORWARD ((void *)-3LL)
+// Declare a function for each primitive (later pointed to by elements of prims[])
+#define DECLARE_FUNC(SYM,ID) void *ID(void *args, void **cont, void **envp);
+FOREACH_PRIM(DECLARE_FUNC)
+
+typedef void *(*l_prim_t)(void *args, void **cont, void **envp); // Function pointer type for Lisp primitives
+
+// Declare character pointer variables for each built-in symbol (later pointed to by elements of prim_syms[])
+#define DECLARE_SYMVAR(SYM,ID) char *ID##_sym;
+FOREACH_SYMVAR(DECLARE_SYMVAR)
+
+// Designated sentinel values for interpreter internals
+#define ERROR ((void *)-1LL)       // used for value errors or failed lookups
+#define INCOMPLETE ((void *)-2LL)  // used as part of TCO to signal eval to continue
+#define FORWARD ((void *)-3LL)     // used as part of GC to signal copy to avoid duplication
 
 
 // **************** Memory regions and region-based type inference ****************
 
 // Space for cons cells in the form of [cell 0 car, cell 0 cdr, cell 1 car, cell 1 cdr, ...]
-void *cells[MAX_CELL_SPACE];
-void **next_cell = cells;
+void *pairs[MAX_CELL_SPACE];
+void **next_cell = pairs;
 
 // Space for interned symbols in the form of counted strings (first char is length), stored consecutively
 char syms[MAX_SYM_SPACE];
 char *next_sym = syms;
 
-// Space for pointers to primitive functions
+// Space for pointers to function pointers of primitives (later initialized by main)
 l_prim_t prims[NUM_PRIMS] = {
 #define DEFINE_PRIM_VAL(SYM,ID) ID,
 	FOREACH_PRIM(DEFINE_PRIM_VAL)
 };
 
-// Space for pointers to primitive function names
+// Space for pointers to symbolic names of primitives (later initialized by main)
 char *prim_syms[NUM_PRIMS] = {
 #define DEFINE_PRIM_NAME(SYM,ID) SYM,
 	FOREACH_PRIM(DEFINE_PRIM_NAME)
@@ -106,6 +106,7 @@ char *prim_syms[NUM_PRIMS] = {
 
 // **************** Basic value operations ****************
 
+// List operations
 void *cons(void *x, void *y)
 {
 	void **car = next_cell++;
@@ -115,26 +116,28 @@ void *cons(void *x, void *y)
 	return car;
 }
 
-#define list1(a) cons(a, NULL)
-#define list2(a, b) cons(a, list1(b))
-#define list3(a, b, c) cons(a, list2(b, c))
-#define list4(a, b, c, d) cons(a, list3(b, c, d))
-
 #define CAR(l) ((void **)l)
+#define CDR(l) ((void **)l + 1)
+
 void *car(void *l)
 {
-	if (!IN(l, cells))
+	if (!IN(l, pairs))
 		return ERROR;
 	return *CAR(l);
 }
 
-#define CDR(l) ((void **)l + 1)
 void *cdr(void *l)
 {
-	if (!IN(l, cells))
+	if (!IN(l, pairs))
 		return ERROR;
 	return *CDR(l);
 }
+
+// Convenience macros
+#define list1(a) cons(a, NULL)
+#define list2(a, b) cons(a, list1(b))
+#define list3(a, b, c) cons(a, list2(b, c))
+#define list4(a, b, c, d) cons(a, list3(b, c, d))
 
 #define caar(x) car(car(x))
 #define cdar(x) cdr(car(x))
@@ -143,16 +146,17 @@ void *cdr(void *l)
 #define caddr(x) car(cdr(cdr(x)))
 #define cadddr(x) car(cdr(cdr(cdr(x))))
 
+// Value printing
 void print(void *x)
 {
 	if (!x) {
 		printf("()");
-	} else if (IN(x, cells)) {
+	} else if (IN(x, pairs)) {
 		// For lists, first print the head
 		printf("(");
 		print(car(x));
 		// Then print successive elements until encountering NIL or atom
-		for (x = cdr(x); x && IN(x, cells); x = cdr(x)) {
+		for (x = cdr(x); x && IN(x, pairs); x = cdr(x)) {
 			printf(" ");
 			print(car(x));
 		}
@@ -268,22 +272,33 @@ void *read(void)
 
 // **************** Garbage collection ****************
 
-// The inspiration to use copying garbage collection comes from the second SectorLISP writeup - credit to them for that
-// It has been implemented from scratch here with some enhancements
+// The inspiration to use copying garbage collection with pointer offsetting comes from SectorLISP - credit to them for that.
+// It has been implemented from scratch here with some enhancements, namely, copying the environment and forwarding pointers.
+//
+// Without these enhancements, SectorLISP's GC strategy will introduce problems when adding TCO.
+// This is noted but not explained clearly in the tinylisp article, which advocates for a much simpler strategy that is more akin to having no GC at all.
+//
+// In short, when you start eliminating nested calls to eval, it becomes possible for lists to contain more than one pointer to the same object in the same eval frame.
+// Since the object is not from before the pre-eval point like it normally would be, it won't be skipped during copy() and can get deep copied multiple times.
+// When this happens, GC will actually increase memory usage and break pointer equality checks that should be expected to succeed.
+//
+// The solution is to impurely modify each cell after it's copied, such that copy() can know that it was copied and where to if it is encountered again.
 
-void **pre_eval = cells;
+void **pre_eval = pairs;
 
 void *copy(void *x, ptrdiff_t diff)
 {
 	// Copy an object, offsetting all cell pointers
-	if (!IN(x, cells) || (void **)x < pre_eval) // No need to copy values below the pre-eval point
+	if (!IN(x, pairs) || (void **)x < pre_eval) // No need to copy values below the pre-eval point
 		return x;
-	if (IN(x, cells) && car(x) == FORWARD) // No need to copy values that have already been copied
+	if (car(x) == FORWARD) // No need to copy values that have already been copied
 		return cdr(x);
+	// Deep copy the value normally
 	void *a = copy(car(x), diff);
 	void *d = copy(cdr(x), diff);
 	void *res = (void **)cons(a, d) - diff;
-	*CAR(x) = FORWARD; // Leave a forward pointer to indicate the cell has been copied
+	// Leave a forward pointer to indicate that the cell has already been copied
+	*CAR(x) = FORWARD;
 	*CDR(x) = res;
 	return res;
 }
@@ -294,26 +309,27 @@ void gc(void **ret, void **env)
 	if (next_cell == pre_eval) // Ellide useless calls
 		return;
 #ifndef DISABLE_GC
-	// Copy the return value and environment as needed, offsetting cells to match their post-GC position
+	// Copy the return value and environment as needed, offsetting pairs to match their post-GC position
 	void **pre_copy = next_cell;
 	ptrdiff_t diff = pre_copy - pre_eval;
 	void *post_gc_env = copy(*env, diff);
 	void *post_gc_ret = copy(*ret, diff);
-	// Move the copied cells to the pre-eval position
+	// Move the copied pairs into the post-GC position
 	ptrdiff_t copy_size = next_cell - pre_copy;
 	memcpy(pre_eval, pre_copy, copy_size * sizeof(*pre_copy));
 	// Correct next_cell to account for GC
 	next_cell = pre_eval + copy_size;
 	*env = post_gc_env;
 	*ret = post_gc_ret;
-	DEBUG(printf("Cells used: %ld -> %ld\n", pre_copy - cells, next_cell - cells);)
+	DEBUG(printf("Cells used: %ld -> %ld\n", pre_copy - pairs, next_cell - pairs);)
 #else
-	DEBUG(printf("Cells used: %ld\n", next_cell - cells);)
+	DEBUG(printf("Cells used: %ld\n", next_cell - pairs);)
 #endif
 }
 
 void *define(void *k, void *v, void *env)
 {
+#ifndef DISABLE_GC
 	// Update an existing binding for k from this eval call to point to v
 	for (void *e = env; e > (void *)pre_eval; e = cdr(e)) {
 		if (caar(e) == k) {
@@ -321,6 +337,7 @@ void *define(void *k, void *v, void *env)
 			return env;
 		}
 	}
+#endif
 	// If not possible, make a new binding
 	return cons(cons(k, v), env);
 }
@@ -359,7 +376,7 @@ void *evlis(void *l, void *env)
 	// Map eval over list l (i.e., to form an argument list)
 	if (!l)
 		return NULL;
-	else if (IN(l, cells))
+	else if (IN(l, pairs))
 		return cons(eval(car(l), env), evlis(cdr(l), env));
 	else
 		return eval(l, env); // Append value of dangling atom to list
@@ -370,7 +387,7 @@ void *pairlis(void *ks, void *vs, void *env)
 	// Pair keys (ks) with values (vs) in environment env
 	if (!ks)
 		return env;
-	else if (IN(ks, cells))
+	else if (IN(ks, pairs))
 		return pairlis(cdr(ks), cdr(vs), define(car(ks), car(vs), env));
 	else
 		return define(ks, vs, env); // Bind remaining values to dangling key
@@ -379,7 +396,7 @@ void *pairlis(void *ks, void *vs, void *env)
 void *apply(void *f, void *args, void **cont, void **envp)
 {
 	// Apply non-primitive function f to unevaluated args in environment env (modified for TCO)
-	if (!IN(f, cells))
+	if (!IN(f, pairs))
 		return ERROR;
 
 	// Closures are structured as (lambda/macro args body env)
@@ -405,7 +422,7 @@ void *apply(void *f, void *args, void **cont, void **envp)
 void *evcon(void *xs, void *env)
 {
 	// Evaluate cond expressions xs in environment env (modified for TCO)
-	while (IN(xs, cells)) {
+	while (IN(xs, pairs)) {
 		if (eval(caar(xs), env))
 			return cadar(xs);
 		xs = cdr(xs);
@@ -418,7 +435,7 @@ void *evcon(void *xs, void *env)
 void *evlet(void *ls, void *x, void **envp)
 {
        // Evaluate expression x with let bindings ls on top of environment env (modified for TCO)
-       while (IN(ls, cells)) {
+       while (IN(ls, pairs)) {
                *envp = cons(cons(caar(ls), eval(cadar(ls), *envp)), *envp);
                ls = cdr(ls);
        }
@@ -431,11 +448,11 @@ void *eval_step(void **cont, void **envp)
 	// Evaluate expression x in environment env (modified for TCO)
 	if (IN(x, syms)) { // Symbol -> return variable binding
 		return cdr(assoc(x, env));
-	} else if (IN(x, cells)) { // List -> interpret S-expression
+	} else if (IN(x, pairs)) { // List -> interpret S-expression
 		void *f = eval(car(x), env);
 		if (IN(f, prims)) // Primitive -> call C function
 			return (*(l_prim_t *)f)(cdr(x), cont, envp);
-		else // Non-primitive -> apply function or macro
+		else // Non-primitive -> apply lambda or macro
 			return apply(f, cdr(x), cont, envp);
 	}
 	// Nil or unknown -> return as-is
@@ -456,8 +473,6 @@ void *eval(void *x, void *env)
 		if (ret != INCOMPLETE)
 			break;
 		gc(&x, &env); // Collect garbage, keeping the continuation expression
-		// ^ TODO: This call causes inconsistency with eq? due to deep copying env
-		// Need to determine whether this is the only problematic call and find a good compromise
 
 #ifdef DISABLE_TCO
 		// If TCO is disabled for testing purposes, eval recursively
@@ -570,7 +585,7 @@ void *l_atom(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
-	if (IN(car(args), cells))
+	if (IN(car(args), pairs))
 		return NULL;
 	return l_t_sym;
 }
