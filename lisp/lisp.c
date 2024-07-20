@@ -14,6 +14,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <time.h>
 
 #ifndef MAX_CELL_SPACE
 #define MAX_CELL_SPACE 100000
@@ -276,7 +277,7 @@ void *read(void)
 // It has been implemented from scratch here with some enhancements, namely, copying the environment and forwarding pointers.
 //
 // Without these enhancements, SectorLISP's GC strategy will introduce problems when adding TCO.
-// This is noted but not explained clearly in the tinylisp article, which advocates for a much simpler strategy that is more akin to having no GC at all.
+// This is noted but not explained clearly in the tinylisp article, which tries to cope with a much simpler strategy that is more akin to having no GC at all.
 //
 // In short, when you start eliminating nested calls to eval, it becomes possible for lists to contain more than one pointer to the same object in the same eval frame.
 // Since the object is not from before the pre-eval point like it normally would be, it won't be skipped during copy() and can get deep copied multiple times.
@@ -309,6 +310,7 @@ void gc(void **ret, void **env)
 	if (next_cell == pre_eval) // Ellide useless calls
 		return;
 #ifndef DISABLE_GC
+	DEBUG(clock_t start = clock();)
 	// Copy the return value and environment as needed, offsetting pairs to match their post-GC position
 	void **pre_copy = next_cell;
 	ptrdiff_t diff = pre_copy - pre_eval;
@@ -321,7 +323,8 @@ void gc(void **ret, void **env)
 	next_cell = pre_eval + copy_size;
 	*env = post_gc_env;
 	*ret = post_gc_ret;
-	DEBUG(printf("Cells used: %ld -> %ld\n", pre_copy - pairs, next_cell - pairs);)
+	DEBUG(double ms = (double)(clock() - start) * 1000.0 / CLOCKS_PER_SEC;)
+	DEBUG(printf("Cells used: %ld -> %ld (%.3fms)\n", pre_copy - pairs, next_cell - pairs, ms);)
 #else
 	DEBUG(printf("Cells used: %ld\n", next_cell - pairs);)
 #endif
@@ -462,6 +465,7 @@ void *eval_step(void **cont, void **envp)
 void *eval(void *x, void *env)
 {
 	// Tail-call optimized eval
+	DEBUG(clock_t start = clock();)
 	DEBUG(static int level = 0; level++;)
 	DEBUG(printf("%*sL%d eval: ", 4*level, "", level); print(x); printf("\n");)
 	void **old_pre_eval = pre_eval;
@@ -481,7 +485,8 @@ void *eval(void *x, void *env)
 #endif
 		DEBUG(printf("%*sL%d step: ", 4*level, "", level); print(x); printf("\n");)
 	}
-	DEBUG(printf("%*sL%d result: ", 4*level, "", level); print(ret); printf("\n");)
+	DEBUG(double ms = (double)(clock() - start) * 1000.0 / CLOCKS_PER_SEC;)
+	DEBUG(printf("%*sL%d result: ", 4*level, "", level); print(ret); printf(" (%.3fms)\n", ms);)
 	DEBUG(level--;)
 
 	gc(&ret, &env); // Collect garbage, keeping the return value
