@@ -41,10 +41,9 @@
 	X("\004cons", l_cons) \
 	X("\003car", l_car) \
 	X("\003cdr", l_cdr) \
-	X("\004atom", l_atom) \
+	X("\005atom?", l_atom) \
 	X("\003eq?", l_eq) \
-	X("\005null?", l_null) \
-	X("\004eval", l_eval)
+	X("\005null?", l_null)
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
 #define FOREACH_SYMVAR(X) \
@@ -424,7 +423,7 @@ void *eval_step(void **cont, void **envp)
 		} else { // No special form -> apply function or macro
 			void *f = eval(car(x), env);
 			if (car(f) == l_macro_sym) // macro -> don't eval arguments
-				return apply(f, cdr(x), cont, envp);
+				*cont = eval(caddr(f), pairlis(cadr(f), evlis(cdr(x), env), env));
 			else
 				return apply(f, evlis(cdr(x), env), cont, envp);
 		}
@@ -509,11 +508,6 @@ void *l_null(void *args, void *env)
 	return l_t_sym;
 }
 
-void *l_eval(void *args, void *env)
-{
-	return eval(car(args), env);
-}
-
 
 // **************** REPL ****************
 
@@ -521,6 +515,8 @@ void *evald(void *x)
 {
 	// eval() with global definitions and permitting `define`
 	if (IN(x, cells) && car(x) == l_define_sym) {
+		if (!IN(cadr(x), syms))
+			return ERROR;
 		defines = cons(cons(cadr(x), eval(caddr(x), defines)), defines);
 		return cadr(x);
 	} else {
