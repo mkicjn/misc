@@ -284,6 +284,9 @@ void *read(void)
 // When this happens, GC will actually increase memory usage and break pointer equality checks that should be expected to succeed.
 //
 // The solution is to impurely modify each cell after it's copied, such that copy() can know that it was copied and where to if it is encountered again.
+//
+// Side note: The addition of a define() function that impurely modifies bindings in the same eval frame when possible is also critical to avoid running out of memory.
+// Otherwise, recursive functions will blow up memory with unusable bindings, growing the environment list and keeping values alive unnecessarily.
 
 void **pre_eval = pairs;
 
