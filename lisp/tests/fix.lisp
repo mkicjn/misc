@@ -4,7 +4,7 @@
 ; Y combinator test
 (define Y
   (lambda (y)
-    (let ((f (lambda (f) (y (lambda args ((f f) . args))))))
+    (let* ((f (lambda (f) (y (lambda args ((f f) . args))))))
       (f f))))
 
 (define last

@@ -46,7 +46,7 @@
 	X("\005quote", l_quote) \
 	X("\004cond", l_cond) \
 	X("\006lambda", l_lambda) \
-	X("\003let", l_let) \
+	X("\004let*", l_let) \
 	X("\005macro", l_macro)
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
@@ -74,6 +74,7 @@ enum l_prim_e {
 // Designated sentinel values
 #define ERROR ((void *)-1LL)
 #define INCOMPLETE ((void *)-2LL)
+#define FORWARD ((void *)-3LL)
 
 
 // **************** Memory regions and region-based type inference ****************
@@ -268,21 +269,23 @@ void *read(void)
 // **************** Garbage collection ****************
 
 // The inspiration to use copying garbage collection comes from the second SectorLISP writeup - credit to them for that
-// It has been implemented from scratch here and commented based on my own understanding of copying GC
-
-// According to the tinylisp paper, using SectorLISP-style GC shouldn't work
-// TODO: Figure out why it seems to work here, or find a counterexample to prove it doesn't
+// It has been implemented from scratch here with some enhancements
 
 void **pre_eval = cells;
 
-void *copy(void *x, ptrdiff_t cell_offset)
+void *copy(void *x, ptrdiff_t diff)
 {
-	// Copy an object, offsetting all cell pointers above pre_eval
+	// Copy an object, offsetting all cell pointers
 	if (!IN(x, cells) || (void **)x < pre_eval) // No need to copy values below the pre-eval point
 		return x;
-	void *a = copy(car(x), cell_offset);
-	void *d = copy(cdr(x), cell_offset);
-	return (void **)cons(a, d) + cell_offset;
+	if (IN(x, cells) && car(x) == FORWARD) // No need to copy values that have already been copied
+		return cdr(x);
+	void *a = copy(car(x), diff);
+	void *d = copy(cdr(x), diff);
+	void *res = (void **)cons(a, d) - diff;
+	*CAR(x) = FORWARD; // Leave a forward pointer to indicate the cell has been copied
+	*CDR(x) = res;
+	return res;
 }
 
 void gc(void **ret, void **env)
@@ -294,8 +297,8 @@ void gc(void **ret, void **env)
 	// Copy the return value and environment as needed, offsetting cells to match their post-GC position
 	void **pre_copy = next_cell;
 	ptrdiff_t diff = pre_copy - pre_eval;
-	void *post_gc_env = copy(*env, -diff);
-	void *post_gc_ret = copy(*ret, -diff);
+	void *post_gc_env = copy(*env, diff);
+	void *post_gc_ret = copy(*ret, diff);
 	// Move the copied cells to the pre-eval position
 	ptrdiff_t copy_size = next_cell - pre_copy;
 	memcpy(pre_eval, pre_copy, copy_size * sizeof(*pre_copy));
