@@ -57,8 +57,9 @@
 	FOREACH_PRIM(X)
 
 // Declare a function for each primitive
-#define DECLARE_FUNC(SYM,ID) void *ID(void *args, void *env);
+#define DECLARE_FUNC(SYM,ID) void *ID(void *args);
 FOREACH_PRIM(DECLARE_FUNC)
+typedef void *(*l_prim_t)(void *args); // Function pointer type for Lisp primitives
 
 // Declare character pointer variables for each built-in symbol
 #define DECLARE_SYMVAR(SYM,ID) char *ID##_sym;
@@ -90,7 +91,6 @@ char syms[MAX_SYM_SPACE];
 char *next_sym = syms;
 
 // Space for pointers to primitive functions
-typedef void *(*l_prim_t)(void *args, void *env); // Function pointer type for Lisp primitives
 l_prim_t prims[NUM_PRIMS] = {
 #define DEFINE_PRIM_VAL(SYM,ID) ID,
 	FOREACH_PRIM(DEFINE_PRIM_VAL)
@@ -118,27 +118,27 @@ void *cons(void *x, void *y)
 	return car;
 }
 
-// Convenience macros for cons
 #define list1(a) cons(a, NULL)
 #define list2(a, b) cons(a, list1(b))
 #define list3(a, b, c) cons(a, list2(b, c))
 #define list4(a, b, c, d) cons(a, list3(b, c, d))
 
+#define CAR(l) ((void **)l)
 void *car(void *l)
 {
 	if (!IN(l, cells))
 		return ERROR;
-	return *(void **)l;
+	return *CAR(l);
 }
 
+#define CDR(l) ((void **)l + 1)
 void *cdr(void *l)
 {
 	if (!IN(l, cells))
 		return ERROR;
-	return *((void **)l+1);
+	return *CDR(l);
 }
 
-// Convenience macros for car/cdr
 #define caar(x) car(car(x))
 #define cdar(x) cdr(car(x))
 #define cadar(x) car(cdr(car(x)))
@@ -364,7 +364,7 @@ void *apply(void *f, void *args, void **cont, void **envp)
 	// Apply function f to args in environment env (modified for TCO)
 	if (IN(f, prims)) {
 		l_prim_t *fp = f;
-		return (*fp)(args, *envp);
+		return (*fp)(args);
 	} else if (IN(f, cells)) {
 		// Closures are structured as (args body env)
 		// `env` is set to nil if there is no meaningful environment to close over
@@ -422,8 +422,8 @@ void *eval_step(void **cont, void **envp)
 			return list4(car(x), cadr(x), caddr(x), env == defines ? NULL : env);
 		} else { // No special form -> apply function or macro
 			void *f = eval(car(x), env);
-			if (car(f) == l_macro_sym) // macro -> don't eval arguments
-				*cont = eval(caddr(f), pairlis(cadr(f), evlis(cdr(x), env), env));
+			if (car(f) == l_macro_sym) // macro -> sidestep apply
+				*cont = eval(caddr(f), pairlis(cadr(f), cdr(x), env));
 			else
 				return apply(f, evlis(cdr(x), env), cont, envp);
 		}
@@ -466,43 +466,37 @@ void *eval(void *x, void *env)
 
 // **************** Primitive functions ****************
 
-void *l_cons(void *args, void *env)
+void *l_cons(void *args)
 {
-	(void)env;
 	return cons(car(args), cadr(args));
 }
 
-void *l_car(void *args, void *env)
+void *l_car(void *args)
 {
-	(void)env;
 	return caar(args);
 }
 
-void *l_cdr(void *args, void *env)
+void *l_cdr(void *args)
 {
-	(void)env;
 	return cdar(args);
 }
 
-void *l_atom(void *args, void *env)
+void *l_atom(void *args)
 {
-	(void)env;
 	if (IN(car(args), cells))
 		return NULL;
 	return l_t_sym;
 }
 
-void *l_eq(void *args, void *env)
+void *l_eq(void *args)
 {
-	(void)env;
 	if (car(args) == cadr(args))
 		return l_t_sym;
 	return NULL;
 }
 
-void *l_null(void *args, void *env)
+void *l_null(void *args)
 {
-	(void)env;
 	if (car(args))
 		return NULL;
 	return l_t_sym;
