@@ -85,8 +85,8 @@ void *defines = NULL; // Global Lisp environment (populated at runtime)
 // **************** Memory regions and region-based type inference ****************
 
 // Space for cons cells in the form of [cell 0 car, cell 0 cdr, cell 1 car, cell 1 cdr, ...]
-void *pairs[MAX_CELL_SPACE];
-void **next_cell = pairs;
+void *cells[MAX_CELL_SPACE];
+void **next_cell = cells;
 
 // Space for interned symbols in the form of counted strings (first char is length), stored consecutively
 char syms[MAX_SYM_SPACE];
@@ -126,14 +126,14 @@ void *cons(void *x, void *y)
 
 void *car(void *l)
 {
-	if (!IN(l, pairs))
+	if (!IN(l, cells))
 		return ERROR;
 	return *CAR(l);
 }
 
 void *cdr(void *l)
 {
-	if (!IN(l, pairs))
+	if (!IN(l, cells))
 		return ERROR;
 	return *CDR(l);
 }
@@ -156,7 +156,7 @@ void print(void *x)
 {
 	if (!x) {
 		printf("()");
-	} else if (IN(x, pairs) && (car(x) == LAMBDA || car(x) == MACRO)) {
+	} else if (IN(x, cells) && (car(x) == LAMBDA || car(x) == MACRO)) {
 		// For closures, print the type (lambda/macro), args, and body
 		printf("{closure: ");
 		print(car(x) == LAMBDA ? l_lambda_sym : l_macro_sym);
@@ -165,12 +165,12 @@ void print(void *x)
 		printf(" => ");
 		print(caddr(x));
 		printf("}");
-	} else if (IN(x, pairs)) {
+	} else if (IN(x, cells)) {
 		// For lists, first print the head
 		printf("(");
 		print(car(x));
 		// Then print successive elements until encountering NIL or atom
-		for (x = cdr(x); x && IN(x, pairs); x = cdr(x)) {
+		for (x = cdr(x); x && IN(x, cells); x = cdr(x)) {
 			printf(" ");
 			print(car(x));
 		}
@@ -301,12 +301,12 @@ void *read(void)
 // Side note: The addition of a define() function that impurely modifies bindings in the same eval frame when possible is also critical to avoid running out of memory.
 // Otherwise, recursive functions will blow up memory with unusable bindings, growing the environment list and keeping values alive unnecessarily.
 
-void **pre_eval = pairs;
+void **pre_eval = cells;
 
 void *copy(void *x, ptrdiff_t diff)
 {
 	// Copy an object, offsetting all cell pointers
-	if (!IN(x, pairs) || (void **)x < pre_eval) // No need to copy values below the pre-eval point
+	if (!IN(x, cells) || (void **)x < pre_eval) // No need to copy values below the pre-eval point
 		return x;
 	if (car(x) == FORWARD) // No need to copy values that have already been copied
 		return cdr(x);
@@ -327,12 +327,12 @@ void gc(void **ret, void **env)
 		return;
 #ifndef DISABLE_GC
 	DEBUG(clock_t start = clock();)
-	// Copy the return value and environment as needed, offsetting pairs to match their post-GC position
+	// Copy the return value and environment as needed, offsetting cells to match their post-GC position
 	void **pre_copy = next_cell;
 	ptrdiff_t diff = pre_copy - pre_eval;
 	void *post_gc_env = copy(*env, diff);
 	void *post_gc_ret = copy(*ret, diff);
-	// Move the copied pairs into the post-GC position
+	// Move the copied cells into the post-GC position
 	ptrdiff_t copy_size = next_cell - pre_copy;
 	memcpy(pre_eval, pre_copy, copy_size * sizeof(*pre_copy));
 	// Correct next_cell to account for GC
@@ -340,9 +340,9 @@ void gc(void **ret, void **env)
 	*env = post_gc_env;
 	*ret = post_gc_ret;
 	DEBUG(double ms = (double)(clock() - start) * 1000.0 / CLOCKS_PER_SEC;)
-	DEBUG(printf("Cells used: %ld -> %ld (%.3fms)\n", pre_copy - pairs, next_cell - pairs, ms);)
+	DEBUG(printf("Cells used: %ld -> %ld (%.3fms)\n", pre_copy - cells, next_cell - cells, ms);)
 #else
-	DEBUG(printf("Cells used: %ld\n", next_cell - pairs);)
+	DEBUG(printf("Cells used: %ld\n", next_cell - cells);)
 #endif
 }
 
@@ -392,7 +392,7 @@ void *evlis(void *l, void *env)
 	// Map eval over list l (i.e., to form an argument list)
 	if (!l)
 		return NULL;
-	else if (IN(l, pairs))
+	else if (IN(l, cells))
 		return cons(eval(car(l), env), evlis(cdr(l), env));
 	else
 		return eval(l, env); // Append value of dangling atom to list
@@ -403,7 +403,7 @@ void *pairlis(void *ks, void *vs, void *env)
 	// Pair keys (ks) with values (vs) in environment env
 	if (!ks)
 		return env;
-	else if (IN(ks, pairs))
+	else if (IN(ks, cells))
 		return pairlis(cdr(ks), cdr(vs), define(car(ks), car(vs), env));
 	else
 		return define(ks, vs, env); // Bind remaining values to dangling key
@@ -412,7 +412,7 @@ void *pairlis(void *ks, void *vs, void *env)
 void *apply(void *f, void *args, void **cont, void **envp)
 {
 	// Apply non-primitive function f to unevaluated args in environment env (modified for TCO)
-	if (!IN(f, pairs))
+	if (!IN(f, cells))
 		return ERROR;
 
 	// Closures are structured as (lambda/macro args body env)
@@ -438,7 +438,7 @@ void *apply(void *f, void *args, void **cont, void **envp)
 void *evcon(void *xs, void *env)
 {
 	// Evaluate cond expressions xs in environment env (modified for TCO)
-	while (IN(xs, pairs)) {
+	while (IN(xs, cells)) {
 		if (eval(caar(xs), env))
 			return cadar(xs);
 		xs = cdr(xs);
@@ -451,7 +451,7 @@ void *evcon(void *xs, void *env)
 void *evlet(void *ls, void *x, void **envp)
 {
        // Evaluate expression x with let bindings ls on top of environment env (modified for TCO)
-       while (IN(ls, pairs)) {
+       while (IN(ls, cells)) {
                *envp = cons(cons(caar(ls), eval(cadar(ls), *envp)), *envp);
                ls = cdr(ls);
        }
@@ -464,7 +464,7 @@ void *eval_step(void **cont, void **envp)
 	// Evaluate expression x in environment env (modified for TCO)
 	if (IN(x, syms)) { // Symbol -> return variable binding
 		return cdr(assoc(x, env));
-	} else if (IN(x, pairs)) { // List -> interpret S-expression
+	} else if (IN(x, cells)) { // List -> interpret S-expression
 		void *f = eval(car(x), env);
 		if (IN(f, prims)) // Primitive -> call C function
 			return (*(l_prim_t *)f)(cdr(x), cont, envp);
@@ -603,7 +603,7 @@ void *l_atom(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
-	if (IN(car(args), pairs))
+	if (IN(car(args), cells))
 		return NULL;
 	return l_t_sym;
 }
