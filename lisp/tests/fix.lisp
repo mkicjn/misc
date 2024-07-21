@@ -13,6 +13,6 @@
 			  ((null? (cdr ls)) (car ls))
 			  ('else (f (cdr ls))))))))
 
-(last '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
+(eq? 'z (last '(a b c d e f g h i j k l m n o p q r s t u v w x y z)))
 
 ((Y (lambda (f) (lambda () (f)))))

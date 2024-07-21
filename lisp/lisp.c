@@ -72,14 +72,15 @@ typedef void *(*l_prim_t)(void *args, void **cont, void **envp); // Function poi
 #define DECLARE_SYMVAR(SYM,ID) char *ID##_sym;
 FOREACH_SYMVAR(DECLARE_SYMVAR)
 
-// Designated sentinel values (for when a value is needed that cannot be computed by the user / mistaken for a real result)
-#define ERROR ((void *)-1LL)       // used for value errors or failed lookups
-#define INCOMPLETE ((void *)-2LL)  // used as part of TCO to signal eval to continue
-#define FORWARD ((void *)-3LL)     // used as part of GC to signal copy to avoid duplication
-#define LAMBDA ((void *)-4LL)      // used to distinguish actual closures from S-expressions
-#define MACRO ((void *)-5LL)       // used to distinguish actual closures from S-expressions
+// Designated sentinel values (for when a value is needed that cannot be mistaken for an ordinary input or computation)
+#define ERROR ((void *)1)       // used for value errors or failed lookups
+#define INCOMPLETE ((void *)2)  // used as part of TCO to signal eval to continue
+#define FORWARD ((void *)3)     // used as part of GC to signal copy to avoid duplication
+#define LAMBDA ((void *)4)      // used to distinguish closures from unevaluated lists
+#define MACRO ((void *)5)       // used to distinguish closures from unevaluated lists
+// TODO: Represent numerical values this way?
 
-void *defines = NULL; // Global Lisp environment (populated at runtime)
+void *defines = NULL; // Global Lisp environment (populated by main at runtime)
 
 
 // **************** Memory regions and region-based type inference ****************
@@ -92,13 +93,13 @@ void **next_cell = cells;
 char syms[MAX_SYM_SPACE];
 char *next_sym = syms;
 
-// Space for pointers to function pointers of primitives (later initialized by main)
+// Space for pointers to function pointers of primitives (later used by main to populate defines)
 l_prim_t prims[NUM_PRIMS] = {
 #define DEFINE_PRIM_VAL(SYM,ID) ID,
 	FOREACH_PRIM(DEFINE_PRIM_VAL)
 };
 
-// Space for pointers to symbolic names of primitives (later initialized by main)
+// Space for pointers to symbolic names of primitives (later used by main to populate defines)
 char *prim_syms[NUM_PRIMS] = {
 #define DEFINE_PRIM_NAME(SYM,ID) SYM,
 	FOREACH_PRIM(DEFINE_PRIM_NAME)
@@ -159,11 +160,12 @@ void print(void *x)
 	} else if (IN(x, cells) && (car(x) == LAMBDA || car(x) == MACRO)) {
 		// For closures, print the type (lambda/macro), args, and body
 		printf("{closure: ");
-		print(car(x) == LAMBDA ? l_lambda_sym : l_macro_sym);
+		print(car(x) == LAMBDA ? l_lambda_sym : l_macro_sym); // type
 		printf(" ");
-		print(cadr(x));
+		print(cadr(x)); // args
 		printf(" => ");
-		print(caddr(x));
+		print(caddr(x)); // body
+		// TODO: Find a good way to display the closure environment
 		printf("}");
 	} else if (IN(x, cells)) {
 		// For lists, first print the head
@@ -543,7 +545,9 @@ int main()
 
 // **************** Primitives ****************
 
-// "Special forms" - i.e., primitives which DO NOT evaluate their arguments
+// "Special forms" - i.e., primitives which DO NOT evaluate all their arguments
+
+// TODO: Consider adding `and` and `or` and comparing with macros
 
 void *l_quote(void *args, void **cont, void **envp)
 {
@@ -576,7 +580,7 @@ void *l_macro(void *args, void **cont, void **envp)
 	return list4(MACRO, car(args), cadr(args), *envp == defines ? NULL : *envp);
 }
 
-// "Functions" - i.e., primitives which DO evaluate their arguments
+// "Functions" - i.e., primitives which DO evaluate all their arguments
 
 void *l_cons(void *args, void **cont, void **envp)
 {
