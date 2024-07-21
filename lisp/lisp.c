@@ -72,10 +72,14 @@ typedef void *(*l_prim_t)(void *args, void **cont, void **envp); // Function poi
 #define DECLARE_SYMVAR(SYM,ID) char *ID##_sym;
 FOREACH_SYMVAR(DECLARE_SYMVAR)
 
-// Designated sentinel values for interpreter internals
+// Designated sentinel values (for when a value is needed that cannot be computed by the user / mistaken for a real result)
 #define ERROR ((void *)-1LL)       // used for value errors or failed lookups
 #define INCOMPLETE ((void *)-2LL)  // used as part of TCO to signal eval to continue
 #define FORWARD ((void *)-3LL)     // used as part of GC to signal copy to avoid duplication
+#define LAMBDA ((void *)-4LL)      // used to distinguish actual closures from S-expressions
+#define MACRO ((void *)-5LL)       // used to distinguish actual closures from S-expressions
+
+void *defines = NULL; // Global Lisp environment (populated at runtime)
 
 
 // **************** Memory regions and region-based type inference ****************
@@ -152,6 +156,15 @@ void print(void *x)
 {
 	if (!x) {
 		printf("()");
+	} else if (IN(x, pairs) && (car(x) == LAMBDA || car(x) == MACRO)) {
+		// For closures, print the type (lambda/macro), args, and body
+		printf("{closure: ");
+		print(car(x) == LAMBDA ? l_lambda_sym : l_macro_sym);
+		printf(" ");
+		print(cadr(x));
+		printf(" => ");
+		print(caddr(x));
+		printf("}");
 	} else if (IN(x, pairs)) {
 		// For lists, first print the head
 		printf("(");
@@ -359,9 +372,6 @@ void *define(void *k, void *v, void *env)
 
 void *eval(void *x, void *env);
 
-// Global Lisp environment (populated at runtime)
-void *defines = NULL;
-
 void *assoc(void *k, void *l)
 {
 	// Search for value of key k in association list l
@@ -414,10 +424,10 @@ void *apply(void *f, void *args, void **cont, void **envp)
 	if (!env)
 		env = defines;
 
-	if (car(f) == l_macro_sym) { // macro -> don't eval args, but do eval result before continuing
+	if (car(f) == MACRO) { // macro -> don't eval args, but do eval result before continuing
 		*cont = eval(caddr(f), pairlis(cadr(f), args, env));
 		return INCOMPLETE;
-	} else if (car(f) == l_lambda_sym) { // lambda -> eval args, continue with body
+	} else if (car(f) == LAMBDA) { // lambda -> eval args, continue with body
 		*envp = pairlis(cadr(f), evlis(args, *envp), env);
 		*cont = caddr(f);
 		return INCOMPLETE;
@@ -551,7 +561,7 @@ void *l_cond(void *args, void **cont, void **envp)
 void *l_lambda(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
-	return list4(l_lambda_sym, car(args), cadr(args), *envp == defines ? NULL : *envp);
+	return list4(LAMBDA, car(args), cadr(args), *envp == defines ? NULL : *envp);
 }
 
 void *l_let(void *args, void **cont, void **envp)
@@ -563,7 +573,7 @@ void *l_let(void *args, void **cont, void **envp)
 void *l_macro(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
-	return list4(l_macro_sym, car(args), cadr(args), *envp == defines ? NULL : *envp);
+	return list4(MACRO, car(args), cadr(args), *envp == defines ? NULL : *envp);
 }
 
 // "Functions" - i.e., primitives which DO evaluate their arguments
