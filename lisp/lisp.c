@@ -56,12 +56,15 @@
 	X("\005atom?", l_atom) \
 	X("\003eq?", l_eq) \
 	X("\005null?", l_null) \
+	X("\003not", l_not) \
 	X("\004eval", l_eval) \
 	X("\005quote", l_quote) \
 	X("\004cond", l_cond) \
 	X("\006lambda", l_lambda) \
 	X("\004let*", l_let) \
 	X("\005macro", l_macro) \
+	X("\003and", l_and) \
+	X("\002or", l_or) \
 	FOREACH_ARITH_PRIM(X)
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
@@ -622,8 +625,6 @@ int main()
 
 // "Special forms" - i.e., primitives which DO NOT evaluate all their arguments
 
-// TODO: Consider adding `and` and `or` and comparing with macros
-
 void *l_quote(void *args, void **cont, void **envp)
 {
 	(void)envp;
@@ -653,6 +654,30 @@ void *l_macro(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	return list4(MACRO, car(args), cadr(args), *envp == defines ? NULL : *envp);
+}
+
+// TODO: Compare `and` and `or` implementations with macros
+
+void *l_and(void *args, void **cont, void **envp)
+{
+	// TODO: add GC calls here?
+	for (; IN(cdr(args), cells); args = cdr(args))
+		if (!eval(car(args), *envp))
+			return NULL;
+	*cont = car(args);
+	return INCOMPLETE;
+}
+
+void *l_or(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	// TODO: add GC calls here?
+	for (; IN(cdr(args), cells); args = cdr(args)) {
+		void *x = eval(car(args), *envp);
+		if (x)
+			return x;
+	}
+	return NULL;
 }
 
 // "Functions" - i.e., primitives which DO evaluate all their arguments
@@ -705,6 +730,11 @@ void *l_null(void *args, void **cont, void **envp)
 	return l_t_sym;
 }
 
+void *l_not(void *args, void **cont, void **envp)
+{
+	return l_null(args, cont, envp);
+}
+
 void *l_eval(void *args, void **cont, void **envp)
 {
 	args = evlis(args, *envp); // evaluate args
@@ -717,6 +747,9 @@ void *l_eval(void *args, void **cont, void **envp)
 // These need to be especially careful with the types of their arguments since numbers are cons pairs.
 // Other primitives rely on car() and cdr() to return ERROR if something goes wrong, which is normally fine.
 // However, if that happens here, it could be misinterpreted as a value, so extra checking is needed.
+
+// TODO: Consider simplifying these functions, even if it means breaking Scheme-like behavior.
+// TODO: Consider removing some of these functions, since many aren't needed for the goals of this project.
 
 void *l_add(void *args, void **cont, void **envp)
 {
@@ -864,3 +897,5 @@ void *name(void *args, void **cont, void **envp) \
 COMPARISON_PRIM(l_equal, ==)
 COMPARISON_PRIM(l_gt, >)
 COMPARISON_PRIM(l_lt, <)
+COMPARISON_PRIM(l_gte, >=)
+COMPARISON_PRIM(l_lte, <=)
