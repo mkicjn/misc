@@ -884,10 +884,11 @@ void *name(void *args, void **cont, void **envp) \
 		void *arg = car(args); \
 		if (car(arg) != NUMBER) \
 			return ERROR; \
-		/* If not equal, return false */ \
+		/* If comparison fails, return false */ \
 		union l_num_u n = {.as_ptr = cdr(arg)}; \
 		if (!(n.as_num op cmp.as_num)) \
 			return NULL; \
+		/* Continue comparison from this argument */ \
 		cmp.as_num = n.as_num; \
 	} \
 	/* Ran out of arguments -> return true */ \
