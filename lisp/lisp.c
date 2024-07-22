@@ -720,6 +720,8 @@ void *l_eq(void *args, void **cont, void **envp)
 	args = evlis(args, *envp); // evaluate args
 	if (car(args) == cadr(args))
 		return l_t_sym;
+	if (caar(args) == NUMBER && caadr(args) == NUMBER)
+		return cdar(args) == cdadr(args) ? l_t_sym : NULL;
 	return NULL;
 }
 
