@@ -34,7 +34,21 @@
 
 // **************** Top-level definitions ****************
 
-// X macro: Built-in symbols for which a primitive will be defined
+// X macro: Built-in symbols for which an arithmetic primitive will be defined
+// TODO: Move arithmetic functions to own file?
+#define FOREACH_ARITH_PRIM(X) \
+	X("\001+", l_add) \
+	X("\001-", l_sub) \
+	X("\001*", l_mul) \
+	X("\001/", l_div) \
+	X("\006modulo", l_mod) \
+	X("\001=", l_equal) \
+	X("\001>", l_gt) \
+	X("\001<", l_lt) \
+	X("\002>=", l_gte) \
+	X("\002<=", l_lte)
+
+// X macro: Built-in symbols for which a primitive (arithmetic or otherwise) will be defined
 #define FOREACH_PRIM(X) \
 	X("\004cons", l_cons) \
 	X("\003car", l_car) \
@@ -48,12 +62,7 @@
 	X("\006lambda", l_lambda) \
 	X("\004let*", l_let) \
 	X("\005macro", l_macro) \
-	X("\001+", l_add) \
-	X("\001-", l_sub) \
-	X("\001*", l_mul) \
-	X("\001/", l_div) \
-	X("\006modulo", l_mod) \
-	X("\001=", l_equal)
+	FOREACH_ARITH_PRIM(X)
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
 #define FOREACH_SYMVAR(X) \
@@ -103,7 +112,7 @@ union l_num_u {
 	l_num_t as_num;
 	void *as_ptr;
 };
-// How to calculate modulo (differs for integers vs. floating point types)
+// How to calculate modulo (placed here because it may differ for integers vs. floating point types)
 #define MOD(a,b) ((a)%(b))
 //#include <math.h>
 //#define MOD(a,b) fmod((a),(b))
@@ -823,29 +832,35 @@ void *l_mod(void *args, void **cont, void **envp)
 	return cons(NUMBER, res.as_ptr);
 }
 
-void *l_equal(void *args, void **cont, void **envp)
-{
-	(void)cont; // no TCO
-	args = evlis(args, *envp); // evaluate args
-
-	// No arguments -> return true
-	if (!IN(args, cells))
-		return l_t_sym;
-	// Grab the first argument
-	if (caar(args) != NUMBER)
-		return ERROR;
-	union l_num_u cmp = {.as_ptr = cdar(args)};
-	// For each subsequent argument:
-	for (args = cdr(args); IN(args, cells); args = cdr(args)) {
-		// Ensure the argument is a number
-		void *arg = car(args);
-		if (car(arg) != NUMBER)
-			return ERROR;
-		// If not equal, return false
-		union l_num_u n = {.as_ptr = cdr(arg)};
-		if (n.as_num != cmp.as_num)
-			return NULL;
-	}
-	// Ran out of arguments -> return true
-	return l_t_sym;
+#define COMPARISON_PRIM(name, op) \
+void *name(void *args, void **cont, void **envp) \
+{ \
+	(void)cont; /* no TCO */ \
+	args = evlis(args, *envp); /* evaluate args */ \
+ \
+	/* No arguments -> return true */ \
+	if (!IN(args, cells)) \
+		return l_t_sym; \
+	/* Grab the first argument */ \
+	if (caar(args) != NUMBER) \
+		return ERROR; \
+	union l_num_u cmp = {.as_ptr = cdar(args)}; \
+	/* For each subsequent argument: */ \
+	for (args = cdr(args); IN(args, cells); args = cdr(args)) { \
+		/* Ensure the argument is a number */ \
+		void *arg = car(args); \
+		if (car(arg) != NUMBER) \
+			return ERROR; \
+		/* If not equal, return false */ \
+		union l_num_u n = {.as_ptr = cdr(arg)}; \
+		if (!(n.as_num op cmp.as_num)) \
+			return NULL; \
+		cmp.as_num = n.as_num; \
+	} \
+	/* Ran out of arguments -> return true */ \
+	return l_t_sym; \
 }
+
+COMPARISON_PRIM(l_equal, ==)
+COMPARISON_PRIM(l_gt, >)
+COMPARISON_PRIM(l_lt, <)
