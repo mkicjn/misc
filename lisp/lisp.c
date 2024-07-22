@@ -47,7 +47,13 @@
 	X("\004cond", l_cond) \
 	X("\006lambda", l_lambda) \
 	X("\004let*", l_let) \
-	X("\005macro", l_macro)
+	X("\005macro", l_macro) \
+	X("\001+", l_add) \
+	X("\001-", l_sub) \
+	X("\001*", l_mul) \
+	X("\001/", l_div) \
+	X("\006modulo", l_mod) \
+	X("\001=", l_equal)
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
 #define FOREACH_SYMVAR(X) \
@@ -78,28 +84,52 @@ FOREACH_SYMVAR(DECLARE_SYMVAR)
 #define FORWARD ((void *)3)     // used as part of GC to signal copy to avoid duplication
 #define LAMBDA ((void *)4)      // used to distinguish closures from unevaluated lists
 #define MACRO ((void *)5)       // used to distinguish closures from unevaluated lists
-// TODO: Represent numerical values this way?
+#define NUMBER ((void *)6)      // used for implementing numbers (see below)
 
-void *defines = NULL; // Global Lisp environment (populated by main at runtime)
+// How exactly to represent numeric values is difficult, since they must be distinguishable from pointers.
+// SectorLISP does not implement numbers, and tinylisp relies on NaN-boxing.
+// However, numbers are useful to have, and NaN-boxing is unappealing since it relies on bit fiddling with doubles.
+
+// The approach chosen for this implementation is to represent numbers by consing a sentinel value to them.
+// This doubles the space required to store numbers, but is EXTREMELY convenient because it reuses cell GC.
+// The added space overhead, while unfortunate, seems forgivable as Lisp is primarily meant for symbolic computation.
+
+// Numeric type to use and associated conversion specifier
+typedef long long l_num_t;
+#define NUM_FMT "%lld"
+// Union type for casting purposes, in case l_num_t isn't an integral type
+// Note that sizeof(l_num_t) must NOT be greater than sizeof(void *), or there will be problems
+union l_num_u {
+	l_num_t as_num;
+	void *as_ptr;
+};
+// How to calculate modulo (differs for integers vs. floating point types)
+#define MOD(a,b) ((a)%(b))
+//#include <math.h>
+//#define MOD(a,b) fmod((a),(b))
 
 
 // **************** Memory regions and region-based type inference ****************
 
 // Space for cons cells in the form of [cell 0 car, cell 0 cdr, cell 1 car, cell 1 cdr, ...]
+// (This memory is managed via garbage collection)
 void *cells[MAX_CELL_SPACE];
 void **next_cell = cells;
 
-// Space for interned symbols in the form of counted strings (first char is length), stored consecutively
+// Space for symbols in the form of counted strings (first char is length), stored consecutively
+// (This memory is managed via string interning)
 char syms[MAX_SYM_SPACE];
 char *next_sym = syms;
 
 // Space for pointers to function pointers of primitives (later used by main to populate defines)
+// (This memory is completely static)
 l_prim_t prims[NUM_PRIMS] = {
 #define DEFINE_PRIM_VAL(SYM,ID) ID,
 	FOREACH_PRIM(DEFINE_PRIM_VAL)
 };
 
 // Space for pointers to symbolic names of primitives (later used by main to populate defines)
+// (This memory is completely static)
 char *prim_syms[NUM_PRIMS] = {
 #define DEFINE_PRIM_NAME(SYM,ID) SYM,
 	FOREACH_PRIM(DEFINE_PRIM_NAME)
@@ -139,6 +169,17 @@ void *cdr(void *l)
 	return *CDR(l);
 }
 
+bool atom(void *l)
+{
+	// A value in a cons cell should be treated as atomic if it is a lambda, macro, or number cell
+	// This function is for making that additional distinction, when it matters
+	// car() and cdr() only perform the most basic check so as not to interfere when it does not matter
+	if (!IN(l, cells))
+		return true;
+	void *t = car(l);
+	return (t == LAMBDA || t == MACRO || t == NUMBER);
+}
+
 // Convenience macros
 #define list1(a) cons(a, NULL)
 #define list2(a, b) cons(a, list1(b))
@@ -146,17 +187,22 @@ void *cdr(void *l)
 #define list4(a, b, c, d) cons(a, list3(b, c, d))
 
 #define caar(x) car(car(x))
-#define cdar(x) cdr(car(x))
+#define caadr(x) car(car(cdr(x)))
 #define cadar(x) car(cdr(car(x)))
 #define cadr(x) car(cdr(x))
 #define caddr(x) car(cdr(cdr(x)))
 #define cadddr(x) car(cdr(cdr(cdr(x))))
+#define cdar(x) cdr(car(x))
+#define cdadr(x) cdr(car(cdr(x)))
 
 // Value printing
 void print(void *x)
 {
 	if (!x) {
 		printf("()");
+	} else if (IN(x, cells) && (car(x) == NUMBER)) {
+		union l_num_u num = {.as_ptr = cdr(x)};
+		printf(NUM_FMT, num.as_num);
 	} else if (IN(x, cells) && (car(x) == LAMBDA || car(x) == MACRO)) {
 		// For closures, print the type (lambda/macro), args, and body
 		printf("{closure: ");
@@ -245,6 +291,20 @@ char *intern(char *s)
 	return s;
 }
 
+void *number(char *s)
+{
+	// Parse the newest symbol (pointed at by s) as a number
+	// (i.e., return a pointer to a number and free down to s if applicable)
+	*next_sym = '\0'; // Null terminate for numeric parsing
+	union l_num_u num;
+	if (sscanf(s+1, NUM_FMT, &num.as_num) > 0) { // (+1 to skip length byte)
+		next_sym = s;
+		DEBUG(printf("Parsed number %s -> " NUM_FMT "\n", s+1, num.as_num));
+		return cons(NUMBER, num.as_ptr);
+	}
+	return NULL;
+}
+
 void *symbol(void)
 {
 	// Parse a symbol (and intern it)
@@ -254,7 +314,9 @@ void *symbol(void)
 	if (next_sym == s+1) // Disallow empty symbols
 		return ERROR;
 	*s = next_sym - (s+1); // Store length in first byte
-	return intern(s);
+	// If the symbol is a valid number, return that; otherwise intern string
+	void *n = number(s);
+	return n ? n : intern(s);
 }
 
 void *read(void)
@@ -372,6 +434,8 @@ void *define(void *k, void *v, void *env)
 // - Modify the old interpreter functions to return an expression to continue from instead of calling eval, where possible
 // The identifiers cont, envp, and INCOMPLETE signal where these modifications happened.
 
+void *defines = NULL; // Global Lisp environment (populated by main at runtime)
+
 void *eval(void *x, void *env);
 
 void *assoc(void *k, void *l)
@@ -466,6 +530,8 @@ void *eval_step(void **cont, void **envp)
 	// Evaluate expression x in environment env (modified for TCO)
 	if (IN(x, syms)) { // Symbol -> return variable binding
 		return cdr(assoc(x, env));
+	} else if (atom(x)) { // Atomic -> return as-is
+		return x;
 	} else if (IN(x, cells)) { // List -> interpret S-expression
 		void *f = eval(car(x), env);
 		if (IN(f, prims)) // Primitive -> call C function
@@ -473,7 +539,7 @@ void *eval_step(void **cont, void **envp)
 		else // Non-primitive -> apply lambda or macro
 			return apply(f, cdr(x), cont, envp);
 	}
-	// Nil or unknown -> return as-is
+	// Unknown -> return as-is
 	return x;
 }
 
@@ -593,23 +659,23 @@ void *l_car(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
-	return caar(args);
+	return atom(car(args)) ? ERROR : caar(args);
 }
 
 void *l_cdr(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
-	return cdar(args);
+	return atom(car(args)) ? ERROR : cdar(args);
 }
 
 void *l_atom(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
-	if (IN(car(args), cells))
-		return NULL;
-	return l_t_sym;
+	if (atom(car(args)))
+		return l_t_sym;
+	return NULL;
 }
 
 void *l_eq(void *args, void **cont, void **envp)
@@ -635,4 +701,151 @@ void *l_eval(void *args, void **cont, void **envp)
 	args = evlis(args, *envp); // evaluate args
 	*cont = car(args);
 	return INCOMPLETE;
+}
+
+// Arithmetic functions
+
+// These need to be especially careful with the types of their arguments since numbers are cons pairs.
+// Other primitives rely on car() and cdr() to return ERROR if something goes wrong, which is normally fine.
+// However, if that happens here, it could be misinterpreted as a value, so extra checking is needed.
+
+void *l_add(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp); // evaluate args
+
+	// Start with an initial sum of 0
+	union l_num_u res = {.as_num = 0};
+	// For each argument:
+	for (; IN(args, cells); args = cdr(args)) {
+		// Ensure the argument is a number
+		void *arg = car(args);
+		if (car(arg) != NUMBER)
+			return ERROR;
+		// Add it to the to sum
+		union l_num_u n = {.as_ptr = cdr(arg)};
+		res.as_num += n.as_num;
+	}
+	// Construct a new number with the sum
+	return cons(NUMBER, res.as_ptr);
+}
+
+void *l_sub(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp); // evaluate args
+
+	// Grab the first argument
+	if (caar(args) != NUMBER)
+		return ERROR;
+	union l_num_u res = {.as_ptr = cdar(args)};
+	// Subtract or negate based on number of arguments
+	if (!cdr(args)) { // 1 argument -> negate
+		res.as_num = -res.as_num;
+	} else { // 2+ arguments -> subtract
+		// For each subsequent argument:
+		for (args = cdr(args); IN(args, cells); args = cdr(args)) {
+			// Ensure the argument is a number
+			void *arg = car(args);
+			if (car(arg) != NUMBER)
+				return ERROR;
+			// Subtract it from the result
+			union l_num_u n = {.as_ptr = cdr(arg)};
+			res.as_num -= n.as_num;
+		}
+	}
+	// Construct a new number with the result
+	return cons(NUMBER, res.as_ptr);
+}
+
+void *l_mul(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp); // evaluate args
+
+	// Start with an initial product of 1
+	union l_num_u res = {.as_num = 1};
+	// For each argument:
+	for (; IN(args, cells); args = cdr(args)) {
+		// Ensure the argument is a number
+		void *arg = car(args);
+		if (car(arg) != NUMBER)
+			return ERROR;
+		// Multiply it into the product
+		union l_num_u n = {.as_ptr = cdr(arg)};
+		res.as_num *= n.as_num;
+	}
+	// Construct a new number with the product
+	return cons(NUMBER, res.as_ptr);
+}
+
+void *l_div(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp); // evaluate args
+
+	// Grab the first argument
+	if (caar(args) != NUMBER)
+		return ERROR;
+	union l_num_u res = {.as_ptr = cdar(args)};
+	// Calculate reciprocal or quotient based on number of arguments
+	if (!cdr(args)) { // 1 argument -> reciprocal
+		res.as_num = (l_num_t)1 / res.as_num;
+	} else { // 2+ arguments -> quotient
+		// For each subsequent argument:
+		for (args = cdr(args); IN(args, cells); args = cdr(args)) {
+			// Ensure the argument is a number
+			void *arg = car(args);
+			if (car(arg) != NUMBER)
+				return ERROR;
+			// Divide the result by it
+			union l_num_u n = {.as_ptr = cdr(arg)};
+			res.as_num /= n.as_num;
+		}
+	}
+	// Construct a new number with the result
+	return cons(NUMBER, res.as_ptr);
+}
+
+void *l_mod(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp); // evaluate args
+
+	// Grab the first two arguments
+	if (caar(args) != NUMBER || caadr(args) != NUMBER)
+		return ERROR;
+	union l_num_u a = {.as_ptr = cdar(args)};
+	union l_num_u b = {.as_ptr = cdadr(args)};
+	// Calculate the modulo
+	union l_num_u res = {.as_num = MOD(a.as_num, b.as_num)};
+	// Construct a new number with the result
+	return cons(NUMBER, res.as_ptr);
+}
+
+void *l_equal(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp); // evaluate args
+
+	// No arguments -> return true
+	if (!IN(args, cells))
+		return l_t_sym;
+	// Grab the first argument
+	if (caar(args) != NUMBER)
+		return ERROR;
+	union l_num_u cmp = {.as_ptr = cdar(args)};
+	// For each subsequent argument:
+	for (args = cdr(args); IN(args, cells); args = cdr(args)) {
+		// Ensure the argument is a number
+		void *arg = car(args);
+		if (car(arg) != NUMBER)
+			return ERROR;
+		// If not equal, return false
+		union l_num_u n = {.as_ptr = cdr(arg)};
+		if (n.as_num != cmp.as_num)
+			return NULL;
+	}
+	// Ran out of arguments -> return true
+	return l_t_sym;
 }
