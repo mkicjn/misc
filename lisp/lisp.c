@@ -46,7 +46,9 @@
 	X("\001>", l_gt) \
 	X("\001<", l_lt) \
 	X("\002>=", l_gte) \
-	X("\002<=", l_lte)
+	X("\002<=", l_lte) \
+	X("\003max", l_max) \
+	X("\003min", l_min)
 
 // X macro: Built-in symbols for which a primitive (arithmetic or otherwise) will be defined
 #define FOREACH_PRIM(X) \
@@ -900,3 +902,51 @@ COMPARISON_PRIM(l_gt, >)
 COMPARISON_PRIM(l_lt, <)
 COMPARISON_PRIM(l_gte, >=)
 COMPARISON_PRIM(l_lte, <=)
+
+void *l_max(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp); // evaluate args
+
+	// Grab the first argument
+	if (caar(args) != NUMBER)
+		return ERROR;
+	union l_num_u res = {.as_ptr = cdar(args)};
+	// For each subsequent argument:
+	for (args = cdr(args); IN(args, cells); args = cdr(args)) {
+		// Ensure the argument is a number
+		void *arg = car(args);
+		if (car(arg) != NUMBER)
+			return ERROR;
+		// Collect the maximum
+		union l_num_u n = {.as_ptr = cdr(arg)};
+		if (n.as_num > res.as_num)
+			res.as_num = n.as_num;
+	}
+	// Construct a new number with the result
+	return cons(NUMBER, res.as_ptr);
+}
+
+void *l_min(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp); // evaluate args
+
+	// Grab the first argument
+	if (caar(args) != NUMBER)
+		return ERROR;
+	union l_num_u res = {.as_ptr = cdar(args)};
+	// For each subsequent argument:
+	for (args = cdr(args); IN(args, cells); args = cdr(args)) {
+		// Ensure the argument is a number
+		void *arg = car(args);
+		if (car(arg) != NUMBER)
+			return ERROR;
+		// Collect the maximum
+		union l_num_u n = {.as_ptr = cdr(arg)};
+		if (n.as_num < res.as_num)
+			res.as_num = n.as_num;
+	}
+	// Construct a new number with the result
+	return cons(NUMBER, res.as_ptr);
+}
