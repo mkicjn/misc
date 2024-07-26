@@ -66,12 +66,17 @@
 	X("\005macro", l_macro) \
 	X("\003and", l_and) \
 	X("\002or", l_or) \
+	X("\004type", l_type) \
 	FOREACH_ARITH_PRIM(X)
+// ^ TODO: For some reason, adding the new `type` function makes collatz.lisp take a full second longer to execute...
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
 #define FOREACH_SYMVAR(X) \
 	X("\001t", l_t) \
 	X("\006define", l_define) \
+	X("\006symbol", l_symbol) \
+	X("\006number", l_number) \
+	X("\010function", l_function) \
 	FOREACH_PRIM(X)
 
 // Declare a compile-time numeric index for each primitive (later used to index prims[] and prim_syms[])
@@ -168,28 +173,23 @@ void *cons(void *x, void *y)
 #define CAR(l) ((void **)l)
 #define CDR(l) ((void **)l + 1)
 
-void *car(void *l)
+static inline void *car(void *l)
 {
-	if (!IN(l, cells))
-		return ERROR;
 	return *CAR(l);
 }
 
-void *cdr(void *l)
+static inline void *cdr(void *l)
 {
-	if (!IN(l, cells))
-		return ERROR;
 	return *CDR(l);
 }
 
 bool atom(void *l)
 {
 	// A value in a cons cell should be treated as atomic if it is a lambda, macro, or number cell
-	// This function is for making that additional distinction, when it matters
-	// car() and cdr() only perform the most basic check so as not to interfere when it does not matter
+	// This function is for making that distinction, when it matters
 	if (!IN(l, cells))
 		return true;
-	void *t = car(l);
+	void *t = *CAR(l);
 	return (t == LAMBDA || t == MACRO || t == NUMBER);
 }
 
@@ -741,6 +741,31 @@ void *l_eval(void *args, void **cont, void **envp)
 	args = evlis(args, *envp); // evaluate args
 	*cont = car(args);
 	return INCOMPLETE;
+}
+
+void *l_type(void *args, void **cont, void **envp)
+{
+	(void)cont; // no TCO
+	args = evlis(args, *envp); // evaluate args
+
+	void *x = car(args);
+	if (IN(x, syms)) {
+		return l_symbol_sym;
+	} else if (IN(x, prims)) {
+		return l_function_sym;
+	} else if (IN(x, cells)) {
+		void *t = car(x);
+		if (t == NUMBER)
+			return l_number_sym;
+		else if (t == LAMBDA)
+			return l_function_sym;
+		else if (t == MACRO)
+			return l_macro_sym;
+		else
+			return l_cons_sym;
+	} else {
+		return ERROR;
+	}
 }
 
 // Arithmetic functions
