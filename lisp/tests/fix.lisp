@@ -4,15 +4,15 @@
 ; Y combinator test
 (define Y
   (lambda (y)
-    (let* ((f (lambda (f) (y (lambda args ((f f) . args))))))
+    (let ((f (lambda (f) (y (lambda args ((f f) . args))))))
       (f f))))
 
 (define last
   (Y (lambda (f)
-       (lambda (ls) (cond ((atom? ls) ls)
-			  ((null? (cdr ls)) (car ls))
+       (lambda (ls) (cond ((atom ls) ls)
+			  ((not (cdr ls)) (car ls))
 			  ('else (f (cdr ls))))))))
 
-(eq? 'z (last '(a b c d e f g h i j k l m n o p q r s t u v w x y z)))
+(eq 'z (last '(a b c d e f g h i j k l m n o p q r s t u v w x y z)))
 
 ((Y (lambda (f) (lambda () (f)))))

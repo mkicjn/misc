@@ -41,7 +41,7 @@
 	X("\001-", l_sub) \
 	X("\001*", l_mul) \
 	X("\001/", l_div) \
-	X("\006modulo", l_mod) \
+	X("\003mod", l_mod) \
 	X("\001=", l_equal) \
 	X("\001>", l_gt) \
 	X("\001<", l_lt) \
@@ -55,15 +55,14 @@
 	X("\004cons", l_cons) \
 	X("\003car", l_car) \
 	X("\003cdr", l_cdr) \
-	X("\005atom?", l_atom) \
-	X("\003eq?", l_eq) \
-	X("\005null?", l_null) \
+	X("\004atom", l_atom) \
+	X("\002eq", l_eq) \
 	X("\003not", l_not) \
 	X("\004eval", l_eval) \
 	X("\005quote", l_quote) \
 	X("\004cond", l_cond) \
 	X("\006lambda", l_lambda) \
-	X("\004let*", l_let) \
+	X("\003let", l_let) \
 	X("\005macro", l_macro) \
 	X("\003and", l_and) \
 	X("\002or", l_or) \
@@ -71,7 +70,7 @@
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
 #define FOREACH_SYMVAR(X) \
-	X("\002#t", l_t) \
+	X("\001t", l_t) \
 	X("\006define", l_define) \
 	FOREACH_PRIM(X)
 
@@ -232,7 +231,7 @@ void print(void *x)
 		printf("(");
 		print(car(x));
 		// Then print successive elements until encountering NIL or atom
-		for (x = cdr(x); x && IN(x, cells); x = cdr(x)) {
+		for (x = cdr(x); x && !atom(x); x = cdr(x)) {
 			printf(" ");
 			print(car(x));
 		}
@@ -594,7 +593,7 @@ void *eval(void *x, void *env)
 
 int main()
 {
-	// Set up symbols and bindings for built-ins
+	// Set up symbols and bindings for built-ins using the X macros
 #define COPY_SYM(SYM,ID) \
 		ID##_sym = next_sym; \
 		memcpy(next_sym, SYM, SYM[0] + 1); \
@@ -604,6 +603,9 @@ int main()
 #define DEFINE_PRIM(SYM,ID) \
 		defines = cons(cons(ID##_sym, &prims[ID##_e]), defines);
 	FOREACH_PRIM(DEFINE_PRIM)
+
+	// Special definitions
+	defines = cons(cons(l_t_sym, l_t_sym), defines);
 
 	// Read-eval-print loop
 	for (;;) {
@@ -725,18 +727,13 @@ void *l_eq(void *args, void **cont, void **envp)
 	return NULL;
 }
 
-void *l_null(void *args, void **cont, void **envp)
+void *l_not(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
 	if (car(args))
 		return NULL;
 	return l_t_sym;
-}
-
-void *l_not(void *args, void **cont, void **envp)
-{
-	return l_null(args, cont, envp);
 }
 
 void *l_eval(void *args, void **cont, void **envp)
