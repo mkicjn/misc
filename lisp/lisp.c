@@ -76,6 +76,7 @@
 	X("\006symbol", l_symbol) \
 	X("\006number", l_number) \
 	X("\010function", l_function) \
+	X("\011primitive", l_primitive) \
 	FOREACH_PRIM(X)
 
 // Declare a compile-time numeric index for each primitive (later used to index prims[] and prim_syms[])
@@ -752,7 +753,7 @@ void *l_type(void *args, void **cont, void **envp)
 	if (IN(x, syms)) {
 		return l_symbol_sym;
 	} else if (IN(x, prims)) {
-		return l_function_sym;
+		return l_primitive_sym;
 	} else if (IN(x, cells)) {
 		void *t = car(x);
 		if (t == NUMBER)
