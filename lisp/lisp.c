@@ -5,7 +5,7 @@
  * Namely, aggressive tail-call optimization and garbage collection are needed to allow deeply recursive functions to the extent possible.
  * The end goal is to eventually port uKanren to this implementation.
  *
- * Certain high-level design choices were inspired by Justine Tunney's SectorLISP and Dr. Robert van Engelen's tinylisp.
+ * Certain high-level design choices are/were initially inspired by Justine Tunney's SectorLISP and Dr. Robert van Engelen's tinylisp.
  */
 
 #include <stdio.h>
@@ -218,14 +218,17 @@ void print(void *x)
 		union l_num_u num = {.as_ptr = cdr(x)};
 		printf(NUM_FMT, num.as_num);
 	} else if (IN(x, cells) && (car(x) == LAMBDA || car(x) == MACRO)) {
-		// For closures, print the type (lambda/macro), args, and body
-		printf("{closure: ");
+		// For closures, print the type (lambda/macro), args, body, and env
+		printf("{");
 		print(car(x) == LAMBDA ? l_lambda_sym : l_macro_sym); // type
-		printf(" ");
+		printf(": ");
 		print(cadr(x)); // args
 		printf(" => ");
 		print(caddr(x)); // body
-		// TODO: Find a good way to display the closure environment
+		if (cadddr(x)) {
+			printf(" | captured: ");
+			print(cadddr(x)); // env
+		}
 		printf("}");
 	} else if (IN(x, cells)) {
 		// For lists, first print the head
@@ -452,12 +455,16 @@ void *defines = NULL; // Global Lisp environment (populated by main at runtime)
 
 void *eval(void *x, void *env);
 
-void *assoc(void *k, void *l)
+void *assoc(void *k, void *env)
 {
-	// Search for value of key k in association list l
-	for (; IN(l, cells); l = cdr(l))
-		if (caar(l) == k) // string interning allows ==
-			return cdar(l);
+	// Search for value of key k in the current environment
+	for (void *bs = env; IN(bs, cells); bs = cdr(bs))
+		if (caar(bs) == k) // string interning allows ==
+			return cdar(bs);
+	// If we failed to find k in local bindings, try again with global bindings (as from define)
+	if (env != defines)
+		return assoc(k, defines);
+	// Otherwise, give up
 	printf("\033[31mUnbound variable: ");
 	print(k);
 	printf("\033[m\n");
@@ -491,18 +498,11 @@ void *apply(void *f, void *args, void **cont, void **envp)
 	if (!IN(f, cells))
 		return ERROR;
 
-	// Closures are structured as (lambda/macro args body env)
-	// `env` is nil if there is no meaningful environment to close over
-	// This signals for us to reference the global environment instead, permitting recursive function definitions
-	// (Credit goes entirely to tinylisp for this idea)
-
 	if (car(f) == MACRO) { // macro -> don't eval args, but do eval result before continuing
-		void *env = cadddr(f);
-		*cont = eval(caddr(f), pairlis(cadr(f), args, env ? env : defines));
+		*cont = eval(caddr(f), pairlis(cadr(f), args, cadddr(f)));
 		return INCOMPLETE;
 	} else if (car(f) == LAMBDA) { // lambda -> eval args, continue with body
-		void *env = cadddr(f);
-		*envp = pairlis(cadr(f), evlis(args, *envp), env ? env : defines);
+		*envp = pairlis(cadr(f), evlis(args, *envp), cadddr(f));
 		*cont = caddr(f);
 		return INCOMPLETE;
 	}
@@ -605,13 +605,13 @@ int main()
 		if (IN(exp, cells) && car(exp) == l_define_sym) {
 			// Handle defines
 			if (IN(cadr(exp), syms))
-				defines = define(cadr(exp), eval(caddr(exp), defines), defines);
+				defines = define(cadr(exp), eval(caddr(exp), NULL), defines);
 		} else {
 			// Evaluate expressions
-			print(eval(exp, defines));
+			print(eval(exp, NULL));
 			printf("\n");
 		}
-		gc(&nil, &defines); // Destroy return value and keep definitions
+		gc(&nil, &defines); // Destroy return value and keep global definitions
 	}
 }
 
@@ -643,7 +643,7 @@ void *l_lambda(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	REQUIRED(args, 2);
-	return list4(LAMBDA, car(args), cadr(args), *envp == defines ? NULL : *envp);
+	return list4(LAMBDA, car(args), cadr(args), *envp);
 }
 
 void *l_let(void *args, void **cont, void **envp)
@@ -657,7 +657,7 @@ void *l_macro(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	REQUIRED(args, 2);
-	return list4(MACRO, car(args), cadr(args), *envp == defines ? NULL : *envp);
+	return list4(MACRO, car(args), cadr(args), *envp);
 }
 
 void *l_and(void *args, void **cont, void **envp)
