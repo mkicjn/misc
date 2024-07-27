@@ -1,11 +1,7 @@
 ; Executing this should not exhaust the stack or cell space if everything is working properly
-;((lambda (f) (f f)) (lambda (f) (f f)))
 
 ; Y combinator test
-(define Y
-  (lambda (y)
-    (let ((f (lambda (f) (y (lambda args ((f f) . args))))))
-      (f f))))
+(define Y (lambda (f) (f (lambda args ((Y f) . args)))))
 
 (define last
   (Y (lambda (f)
@@ -15,4 +11,5 @@
 
 (eq 'z (last '(a b c d e f g h i j k l m n o p q r s t u v w x y z)))
 
+; Infinite recursion test
 ((Y (lambda (f) (lambda () (f)))))
