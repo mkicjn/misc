@@ -68,7 +68,6 @@
 	X("\002or", l_or) \
 	X("\004type", l_type) \
 	FOREACH_ARITH_PRIM(X)
-// ^ TODO: For some reason, adding the new `type` function makes collatz.lisp take a full second longer to execute...
 
 // X macro: All built-in symbols (with or without a corresponding primitive)
 #define FOREACH_SYMVAR(X) \
