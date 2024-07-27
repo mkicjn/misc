@@ -455,16 +455,13 @@ void *eval(void *x, void *env);
 void *assoc(void *k, void *l)
 {
 	// Search for value of key k in association list l
-	if (!l) {
-		printf("\033[31mUnbound variable: ");
-		print(k);
-		printf("\033[m\n");
-		return ERROR;
-	}
-	else if (k == caar(l)) // string interning allows ==
-		return car(l);
-	else
-		return assoc(k, cdr(l));
+	for (; IN(l, cells); l = cdr(l))
+		if (caar(l) == k) // string interning allows ==
+			return cdar(l);
+	printf("\033[31mUnbound variable: ");
+	print(k);
+	printf("\033[m\n");
+	return ERROR;
 }
 
 void *evlis(void *l, void *env)
@@ -481,12 +478,11 @@ void *evlis(void *l, void *env)
 void *pairlis(void *ks, void *vs, void *env)
 {
 	// Pair keys (ks) with values (vs) in environment env
+	for (; IN(ks, cells) && IN(vs, cells); ks = cdr(ks), vs = cdr(vs))
+		env = define(car(ks), car(vs), env);
 	if (!ks)
 		return env;
-	else if (IN(ks, cells))
-		return pairlis(cdr(ks), cdr(vs), define(car(ks), car(vs), env));
-	else
-		return define(ks, vs, env); // Bind remaining values to dangling key
+	return define(ks, vs, env); // Bind remaining values to dangling key
 }
 
 void *apply(void *f, void *args, void **cont, void **envp)
@@ -500,15 +496,13 @@ void *apply(void *f, void *args, void **cont, void **envp)
 	// This signals for us to reference the global environment instead, permitting recursive function definitions
 	// (Credit goes entirely to tinylisp for this idea)
 
-	void *env = cadddr(f);
-	if (!env)
-		env = defines;
-
 	if (car(f) == MACRO) { // macro -> don't eval args, but do eval result before continuing
-		*cont = eval(caddr(f), pairlis(cadr(f), args, env));
+		void *env = cadddr(f);
+		*cont = eval(caddr(f), pairlis(cadr(f), args, env ? env : defines));
 		return INCOMPLETE;
 	} else if (car(f) == LAMBDA) { // lambda -> eval args, continue with body
-		*envp = pairlis(cadr(f), evlis(args, *envp), env);
+		void *env = cadddr(f);
+		*envp = pairlis(cadr(f), evlis(args, *envp), env ? env : defines);
 		*cont = caddr(f);
 		return INCOMPLETE;
 	}
@@ -518,11 +512,9 @@ void *apply(void *f, void *args, void **cont, void **envp)
 void *evcon(void *xs, void *env)
 {
 	// Evaluate cond expressions xs in environment env (modified for TCO)
-	while (IN(xs, cells)) {
+	for (; IN(xs, cells); xs = cdr(xs))
 		if (eval(caar(xs), env))
 			return cadar(xs);
-		xs = cdr(xs);
-	}
 	if (!xs)
 		return NULL;
 	return ERROR;
@@ -531,10 +523,8 @@ void *evcon(void *xs, void *env)
 void *evlet(void *ls, void *x, void **envp)
 {
        // Evaluate expression x with let bindings ls on top of environment env (modified for TCO)
-       while (IN(ls, cells)) {
+       for (; IN(ls, cells); ls = cdr(ls))
                *envp = cons(cons(caar(ls), eval(cadar(ls), *envp)), *envp);
-               ls = cdr(ls);
-       }
        return x;
 }
 
@@ -543,7 +533,7 @@ void *eval_step(void **cont, void **envp)
 	void *x = *cont, *env = *envp;
 	// Evaluate expression x in environment env (modified for TCO)
 	if (IN(x, syms)) { // Symbol -> return variable binding
-		return cdr(assoc(x, env));
+		return assoc(x, env);
 	} else if (atom(x)) { // Atomic -> return as-is
 		return x;
 	} else if (IN(x, cells)) { // List -> interpret S-expression
@@ -612,7 +602,7 @@ int main()
 	for (;;) {
 		void *nil = NULL;
 		void *exp = read();
-		if (car(exp) == l_define_sym) {
+		if (IN(exp, cells) && car(exp) == l_define_sym) {
 			// Handle defines
 			if (IN(cadr(exp), syms))
 				defines = define(cadr(exp), eval(caddr(exp), defines), defines);
@@ -630,10 +620,16 @@ int main()
 
 // "Special forms" - i.e., primitives which DO NOT evaluate all their arguments
 
+#define HAS1(args) (IN(args, cells))
+#define HAS2(args) (IN(args, cells) && HAS1(cdr(args)))
+#define HAS3(args) (IN(args, cells) && HAS2(cdr(args)))
+#define REQUIRED(args, n) do { if (!HAS##n(args)) return ERROR; } while (0)
+
 void *l_quote(void *args, void **cont, void **envp)
 {
 	(void)envp;
 	(void)cont; // no TCO
+	REQUIRED(args, 1);
 	return car(args);
 }
 
@@ -646,11 +642,13 @@ void *l_cond(void *args, void **cont, void **envp)
 void *l_lambda(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
+	REQUIRED(args, 2);
 	return list4(LAMBDA, car(args), cadr(args), *envp == defines ? NULL : *envp);
 }
 
 void *l_let(void *args, void **cont, void **envp)
 {
+	REQUIRED(args, 2);
 	*cont = evlet(car(args), cadr(args), envp);
 	return INCOMPLETE;
 }
@@ -658,31 +656,26 @@ void *l_let(void *args, void **cont, void **envp)
 void *l_macro(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
+	REQUIRED(args, 2);
 	return list4(MACRO, car(args), cadr(args), *envp == defines ? NULL : *envp);
 }
 
-// TODO: Compare `and` and `or` implementations with macros
-
 void *l_and(void *args, void **cont, void **envp)
 {
-	// TODO: add GC calls here?
-	for (; IN(cdr(args), cells); args = cdr(args))
-		if (!eval(car(args), *envp))
-			return NULL;
-	*cont = car(args);
-	return INCOMPLETE;
+	(void)cont; // no TCO
+	void *res = l_t_sym;
+	for (; res && IN(args, cells); args = cdr(args))
+		res = eval(car(args), *envp);
+	return res;
 }
 
 void *l_or(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
-	// TODO: add GC calls here?
-	for (; IN(cdr(args), cells); args = cdr(args)) {
-		void *x = eval(car(args), *envp);
-		if (x)
-			return x;
-	}
-	return NULL;
+	void *res = NULL;
+	for (; !res && IN(args, cells); args = cdr(args))
+		res = eval(car(args), *envp);
+	return res;
 }
 
 // "Functions" - i.e., primitives which DO evaluate all their arguments
@@ -691,6 +684,7 @@ void *l_cons(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 2);
 	return cons(car(args), cadr(args));
 }
 
@@ -698,6 +692,7 @@ void *l_car(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 1);
 	return atom(car(args)) ? ERROR : caar(args);
 }
 
@@ -705,6 +700,7 @@ void *l_cdr(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 1);
 	return atom(car(args)) ? ERROR : cdar(args);
 }
 
@@ -712,6 +708,7 @@ void *l_atom(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 1);
 	if (atom(car(args)))
 		return l_t_sym;
 	return NULL;
@@ -721,6 +718,7 @@ void *l_eq(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 2);
 	if (car(args) == cadr(args))
 		return l_t_sym;
 	if (caar(args) == NUMBER && caadr(args) == NUMBER)
@@ -732,6 +730,7 @@ void *l_not(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 1);
 	if (car(args))
 		return NULL;
 	return l_t_sym;
@@ -740,6 +739,7 @@ void *l_not(void *args, void **cont, void **envp)
 void *l_eval(void *args, void **cont, void **envp)
 {
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 1);
 	*cont = car(args);
 	return INCOMPLETE;
 }
@@ -748,6 +748,7 @@ void *l_type(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 1);
 
 	void *x = car(args);
 	if (IN(x, syms)) {
@@ -803,6 +804,7 @@ void *l_sub(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 1);
 
 	// Grab the first argument
 	if (caar(args) != NUMBER)
@@ -880,6 +882,7 @@ void *l_mod(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 2);
 
 	// Grab the first two arguments
 	if (caar(args) != NUMBER || caadr(args) != NUMBER)
@@ -932,6 +935,7 @@ void *l_max(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 1);
 
 	// Grab the first argument
 	if (caar(args) != NUMBER)
@@ -956,6 +960,7 @@ void *l_min(void *args, void **cont, void **envp)
 {
 	(void)cont; // no TCO
 	args = evlis(args, *envp); // evaluate args
+	REQUIRED(args, 1);
 
 	// Grab the first argument
 	if (caar(args) != NUMBER)
