@@ -26,9 +26,9 @@
 
 #ifdef DEBUG
 #undef DEBUG
-#define DEBUG(X) X
+#define DEBUG(stmt) stmt
 #else
-#define DEBUG(X)
+#define DEBUG(stmt)
 #endif
 
 
@@ -80,19 +80,19 @@
 
 // Declare a compile-time numeric index for each primitive (later used to index prims[] and prim_syms[])
 enum l_prim_e {
-#define DEFINE_ENUM_VAL(SYM,ID) ID##_e,
+#define DEFINE_ENUM_VAL(sym, id) id##_e,
 	FOREACH_PRIM(DEFINE_ENUM_VAL)
 	NUM_PRIMS
 };
 
 // Declare a function for each primitive (later pointed to by elements of prims[])
-#define DECLARE_FUNC(SYM,ID) void *ID(void *args, void **cont, void **envp);
+#define DECLARE_FUNC(sym, id) void *id(void *args, void **cont, void **envp);
 FOREACH_PRIM(DECLARE_FUNC)
 
 typedef void *(*l_prim_t)(void *args, void **cont, void **envp); // Function pointer type for Lisp primitives
 
 // Declare character pointer variables for each built-in symbol (later pointed to by elements of prim_syms[])
-#define DECLARE_SYMVAR(SYM,ID) char *ID##_sym;
+#define DECLARE_SYMVAR(sym, id) char *id##_sym;
 FOREACH_SYMVAR(DECLARE_SYMVAR)
 
 // Designated sentinel values (for when a value is needed that cannot be mistaken for an ordinary input or computation)
@@ -114,12 +114,14 @@ FOREACH_SYMVAR(DECLARE_SYMVAR)
 // Numeric type to use and associated conversion specifier
 typedef long long l_num_t;
 #define NUM_FMT "%lld"
-// Union type for casting purposes, in case l_num_t isn't an integral type
+
+// Union for type punning purposes, in case l_num_t isn't an integral type and can't be cast directly to void *
 // Note that sizeof(l_num_t) must NOT be greater than sizeof(void *), or there will be problems
 union l_num_u {
 	l_num_t as_num;
 	void *as_ptr;
 };
+
 // How to calculate modulo (placed here because it may differ for integers vs. floating point types)
 #define MOD(a,b) ((a)%(b))
 //#include <math.h>
@@ -141,14 +143,14 @@ char *next_sym = syms;
 // Space for pointers to function pointers of primitives (later used by main to populate defines)
 // (This memory is completely static)
 l_prim_t prims[NUM_PRIMS] = {
-#define DEFINE_PRIM_VAL(SYM,ID) ID,
+#define DEFINE_PRIM_VAL(sym, id) id,
 	FOREACH_PRIM(DEFINE_PRIM_VAL)
 };
 
 // Space for pointers to symbolic names of primitives (later used by main to populate defines)
 // (This memory is completely static)
 char *prim_syms[NUM_PRIMS] = {
-#define DEFINE_PRIM_NAME(SYM,ID) SYM,
+#define DEFINE_PRIM_NAME(sym, id) sym,
 	FOREACH_PRIM(DEFINE_PRIM_NAME)
 };
 
@@ -169,8 +171,8 @@ void *cons(void *x, void *y)
 	return car;
 }
 
-#define CAR(l) ((void **)l)
-#define CDR(l) ((void **)l + 1)
+#define CAR(l) ((void **)(l))
+#define CDR(l) ((void **)(l) + 1)
 
 static inline void *car(void *l)
 {
@@ -184,8 +186,7 @@ static inline void *cdr(void *l)
 
 bool atom(void *l)
 {
-	// A value in a cons cell should be treated as atomic if it is a lambda, macro, or number cell
-	// This function is for making that distinction, when it matters
+	// A value should be treated as an atom if it is not a cons cell, OR if it represents a lambda, macro, or number
 	if (!IN(l, cells))
 		return true;
 	void *t = *CAR(l);
@@ -593,14 +594,14 @@ void *eval(void *x, void *env)
 int main()
 {
 	// Set up symbols and bindings for built-ins using the X macros
-#define COPY_SYM(SYM,ID) \
-		ID##_sym = next_sym; \
-		memcpy(next_sym, SYM, SYM[0] + 1); \
-		next_sym += SYM[0] + 1;
+#define COPY_SYM(sym, id) \
+		id##_sym = next_sym; \
+		memcpy(next_sym, sym, sym[0] + 1); \
+		next_sym += sym[0] + 1;
 	FOREACH_SYMVAR(COPY_SYM)
 
-#define DEFINE_PRIM(SYM,ID) \
-		defines = cons(cons(ID##_sym, &prims[ID##_e]), defines);
+#define DEFINE_PRIM(sym, id) \
+		defines = cons(cons(id##_sym, &prims[id##_e]), defines);
 	FOREACH_PRIM(DEFINE_PRIM)
 
 	// Special definitions
