@@ -75,7 +75,6 @@
 	X("\006define", l_define) \
 	X("\006symbol", l_symbol) \
 	X("\006number", l_number) \
-	X("\010function", l_function) \
 	X("\011primitive", l_primitive) \
 	FOREACH_PRIM(X)
 
@@ -421,7 +420,7 @@ void gc(void **ret, void **env)
 	*env = post_gc_env;
 	*ret = post_gc_ret;
 	DEBUG(double ms = (double)(clock() - start) * 1000.0 / CLOCKS_PER_SEC;)
-	DEBUG(printf("Cells used: %ld -> %ld (%.3fms)\n", pre_copy - cells, next_cell - cells, ms);)
+	DEBUG(printf("Cells used: %ld -> %ld (%ld copied, %.3fms)\n", pre_copy - cells, next_cell - cells, copy_size, ms);)
 #else
 	DEBUG(printf("Cells used: %ld\n", next_cell - cells);)
 #endif
@@ -608,7 +607,10 @@ int main()
 				defines = define(cadr(exp), eval(caddr(exp), NULL), defines);
 		} else {
 			// Evaluate expressions
-			print(eval(exp, NULL));
+			void *res = eval(exp, NULL);
+			DEBUG(printf("\033[32m"));
+			print(res);
+			DEBUG(printf("\033[m"));
 			printf("\n");
 		}
 		gc(&nil, &defines); // Destroy return value and keep global definitions
@@ -721,6 +723,8 @@ void *l_eq(void *args, void **cont, void **envp)
 	REQUIRED(args, 2);
 	if (car(args) == cadr(args))
 		return l_t_sym;
+	if (!IN(car(args), cells) || !IN(cadr(args), cells))
+		return NULL;
 	if (caar(args) == NUMBER && caadr(args) == NUMBER)
 		return cdar(args) == cdadr(args) ? l_t_sym : NULL;
 	return NULL;
@@ -760,7 +764,7 @@ void *l_type(void *args, void **cont, void **envp)
 		if (t == NUMBER)
 			return l_number_sym;
 		else if (t == LAMBDA)
-			return l_function_sym;
+			return l_lambda_sym;
 		else if (t == MACRO)
 			return l_macro_sym;
 		else
