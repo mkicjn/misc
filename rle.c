@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <limits.h>
 
-#define TABLE_SIZE (1 << 16)
-
 void rle_emit(int count, int last, FILE *out)
 {
 	if (count <= 0)

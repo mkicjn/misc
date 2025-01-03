@@ -1,90 +1,73 @@
 #include <stdio.h>
-#include <limits.h>
+#include <stdint.h>
 
-#ifndef TABLE_SIZE
-#define TABLE_SIZE (1 << 16)
-#endif
+uint8_t in[8];
+size_t in_len;
+uint8_t pred[1 << 16] = {0};
+uint16_t hash = 0;
 
-void lzp_encode(FILE *in, FILE *out)
+void encode(void)
 {
-	char pred_table[TABLE_SIZE] = {0};
-	size_t hash = 0;
-	while (!feof(in)) {
-		char mask = 0;
-		char missed[CHAR_BIT];
-		size_t num_missed = 0;
-		// For each bit in the char mask:
-		for (int i = 0; i < CHAR_BIT; i++) {
-			// Get next character
-			int c = fgetc(in);
-			if (c == EOF)
-				break;
-			// Check if correctly predicted by hash
-			if (pred_table[hash % sizeof(pred_table)] == c) {
-				// If so, indicate on the mask
-				mask |= 1 << i;
-			} else {
-				// Otherwise, fix the table and insert the character into the buffer
-				pred_table[hash % sizeof(pred_table)] = c;
-				missed[num_missed++] = c;
-			}
-			// Update the hash with the input character
-			hash = (hash << 4) ^ c;
+	for (;;) {
+		// Get up to 8 characters
+		in_len = fread(in, 1, 8, stdin);
+
+		// For each character:
+		uint8_t hits = 0;
+		for (int i = 0; i < in_len; i++) {
+			// Put a 1 in the mask if the predictor hit
+			if (pred[hash] == in[i])
+				hits |= (1 << i);
+			// Update the predictor and hash
+			pred[hash] = in[i];
+			hash = (hash << 8) | in[i];
 		}
-		// Output the char mask of correctly-predicted characters
-		fputc(mask, out);
-		// Output incorrectly-predicted characters in the buffer
-		for (int i = 0; i < num_missed; i++)
-			fputc(missed[i], out);
+
+		// Output the mask and any missed bytes
+		putchar(hits);
+		for (int i = 0; i < in_len; i++)
+			if (~hits & (1 << i))
+				putchar(in[i]);
+		
+		// Quit if we ran out of characters part way
+		if (in_len < 8)
+			return;
 	}
 }
 
-void lzp_decode(FILE *in, FILE *out)
+void decode(void)
 {
-	char pred_table[TABLE_SIZE] = {0};
-	size_t hash = 0;
-	while (!feof(in)) {
+	for (;;) {
 		// Expect a mask character
-		int mask = fgetc(in);
-		if (mask == EOF)
-			break;
+		int hits = getchar();
+		if (hits == EOF)
+			return;
+
 		// For each bit in the mask:
-		for (int i = 0; i < CHAR_BIT; i++) {
-			int c;
-			// Check if the character is correctly predicted by the table
-			if (mask & (1 << i)) {
-				// If so, output the prediction
-				c = pred_table[hash % sizeof(pred_table)];
-				fputc(c, out);
-			} else {
-				// Otherwise, expect the correct character, fix the table, and output it
-				c = fgetc(in);
+		for (int i = 0; i < 8; i++) {
+			// If the mask says we're going to miss, expect a correction
+			if (~hits & (1 << i)) {
+				int c = getchar();
 				if (c == EOF)
-					break;
-				pred_table[hash % sizeof(pred_table)] = c;
-				fputc(c, out);
+					return;
+				pred[hash] = c;
 			}
-			// Update the hash with the output character
-			hash = (hash << 4) ^ c;
+			// Output the prediction and update hash
+			putchar(pred[hash]);
+			hash = (hash << 8) | pred[hash];
 		}
-	}
+	};
 }
 
 int main(int argc, char **argv)
 {
-	// Parse command line option
-	char opt = argc == 2 ? argv[1][1] : 0;
-
-	// Show usage if invalid
-	if (opt != 'c' && opt != 'd') {
-		printf("Usage: %s <-c|-d>\n", argc > 0 ? argv[0] : "./lzp");
-		return 1;
-	}
+	(void)argv;
 
 	// Compress/decompress based on option
-	if (opt == 'c')
-		lzp_encode(stdin, stdout);
+	if (argc > 1)
+		decode();
 	else
-		lzp_decode(stdin, stdout);
+		encode();
+
 	return 0;
 }
