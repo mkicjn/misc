@@ -9,27 +9,28 @@ uint16_t hash = 0;
 void encode(void)
 {
 	for (;;) {
-		// Get up to 8 characters
+		// Get up to 8 bytes
 		in_len = fread(in, 1, 8, stdin);
 
-		// For each character:
-		uint8_t hits = 0;
+		// For each byte:
+		uint8_t mask = 0;
 		for (int i = 0; i < in_len; i++) {
+			int c = in[i];
 			// Put a 1 in the mask if the predictor hit
-			if (pred[hash] == in[i])
-				hits |= (1 << i);
+			if (pred[hash] == c)
+				mask |= (1 << i);
 			// Update the predictor and hash
-			pred[hash] = in[i];
-			hash = (hash << 8) | in[i];
+			pred[hash] = c;
+			hash = (hash << 8) | c;
 		}
 
 		// Output the mask and any missed bytes
-		putchar(hits);
+		putchar(mask);
 		for (int i = 0; i < in_len; i++)
-			if (~hits & (1 << i))
+			if (~mask & (1 << i))
 				putchar(in[i]);
 		
-		// Quit if we ran out of characters part way
+		// Quit if we ran out of bytes
 		if (in_len < 8)
 			return;
 	}
@@ -38,23 +39,25 @@ void encode(void)
 void decode(void)
 {
 	for (;;) {
-		// Expect a mask character
-		int hits = getchar();
-		if (hits == EOF)
+		// Expect a mask byte
+		int mask = getchar();
+		if (mask == EOF)
 			return;
 
-		// For each bit in the mask:
+		// For each byte predicted by the mask:
 		for (int i = 0; i < 8; i++) {
+			int c = pred[hash];
 			// If the mask says we're going to miss, expect a correction
-			if (~hits & (1 << i)) {
-				int c = getchar();
+			if (~mask & (1 << i)) {
+				c = getchar();
 				if (c == EOF)
 					return;
-				pred[hash] = c;
 			}
-			// Output the prediction and update hash
-			putchar(pred[hash]);
-			hash = (hash << 8) | pred[hash];
+			// Output the prediction
+			putchar(c);
+			// Update the predictor and hash
+			pred[hash] = c;
+			hash = (hash << 8) | c;
 		}
 	};
 }
