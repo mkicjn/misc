@@ -17,7 +17,7 @@ uint64_t cbrng(uint64_t n)
 	// Tacking on some elements from xorshift+ seems to result in strong qualities, even using the full 64-bits
 	x ^= x << 13;
 	x ^= x >> 7;
-	return x + (x >> 31);
+	return x + (x >> 32);
 }
 
 uint64_t state = 0;
@@ -29,12 +29,42 @@ uint64_t cbrng_next_state()
 {
 	return state+1;
 }
-uint64_t cbrng_next(void)
+uint32_t cbrng_next(void)
 {
 	state = cbrng_next_state();
 	return cbrng(state);
 }
 
+
+uint64_t ctr, key;
+uint32_t squares(uint64_t ctr, uint64_t key)
+{
+	uint64_t x = ctr * key;
+	uint64_t y = x;
+	uint64_t z = x + key;
+
+	x = x*x + y;
+	x = (x >> 32) | (x << 32);
+	x = x*x + z;
+	x = (x >> 32) | (x << 32);
+	x = x*x + y;
+	x = (x >> 32) | (x << 32);
+	x = x*x + z;
+	x = (x >> 32) | (x << 32);
+	return x;
+}
+void squares_seed(uint64_t s)
+{
+	key = s;
+	ctr = s;
+	key = squares(ctr, key);
+	ctr = squares(ctr, key);
+}
+uint32_t squares_next(void)
+{
+	ctr += 1;
+	return squares(ctr, key);
+}
 
 
 void std_seed(uint64_t s)
@@ -128,6 +158,10 @@ uint32_t pcg_next(void)
 #define RNG cbrng
 #endif
 
+#define STR(x) #x
+#define XSTR(x) STR(x)
+#define RNG_STR XSTR(RNG)
+
 #define CONCAT(x,y) x##y
 #define CONCAT2(x,y) CONCAT(x,y)
 #define RNGF(x) CONCAT2(RNG,x)
@@ -197,6 +231,7 @@ int main(int argc, char **argv)
 		fmt = PGM;
 
 	int x, y, n = 0;
+	fprintf(stderr, "RNG=%s\n", RNG_STR);
 	switch (fmt) {
 	case RAW:
 		if (argc < 3) {
