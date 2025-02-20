@@ -11,6 +11,7 @@ ALL = \
 	collatz_csc \
 	collatz_csi \
 	collatz_scheme \
+	collatz_newlisp \
 	collatz_lua \
 	collatz_luajit \
 	collatz_swipl
@@ -68,6 +69,10 @@ collatz_csi: src/collatz.scm
 	chmod +x $@
 collatz_scheme: src/collatz.scm
 	echo "#!/usr/bin/scheme -q" > $@
+	cat $^ >> $@
+	chmod +x $@
+collatz_newlisp: src/collatz.lsp
+	echo "#!/usr/bin/newlisp" > $@
 	cat $^ >> $@
 	chmod +x $@
 
