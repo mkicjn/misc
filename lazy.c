@@ -57,30 +57,48 @@ void *cons(void *x, void *y)
 	return cell;
 }
 
-void *car(void *x)
+void *decons(void *x, void **a, void **d)
 {
-	return atom(x) ? NULL : *CAR(x);
+	if (!atom(x)) {
+		*a = *CAR(x);
+		*d = *CDR(x);
+		*CAR(x) = NULL;
+		*CDR(x) = NULL;
+	} else {
+		*a = NULL;
+		*d = NULL;
+	}
+	give(x);
 }
 
-void *cdr(void *x)
+void print(void *x);
+
+void *pbody(void *x)
 {
-	return atom(x) ? NULL : *CDR(x);
+	if (atom(x)) {
+		return x;
+	} else {
+		void *a, *d;
+		decons(x, &a, &d);
+		print(a);
+		if (d)
+			printf(" ");
+		return pbody(d);
+	}
 }
 
 void print(void *x)
 {
-	if (atom(x)) {
+	if (!x) {
+		printf("()");
+	} else if (atom(x)) {
 		printf("%p", x);
 	} else {
 		printf("(");
-		print(car(x));
-		for (x = cdr(x); !atom(x); x = cdr(x)) {
-			printf(" ");
-			print(car(x));
-		}
-		if (cdr(x)) {
-			printf(" . ");
-			print(cdr(x));
+		void *d = pbody(x);
+		if (d) {
+			printf(". ");
+			print(d);
 		}
 		printf(")");
 	}
@@ -99,47 +117,40 @@ int main()
 {
 	void *list, *list2;
 
-	printf("%p\n", fresh);
+	printf("%llu\n", (fresh - cells) / CELL_PTRS);
 	list = list1(0x1);
 	print(list);
 	printf("\n");
-	give(list);
 
-	printf("%p\n", fresh);
+	printf("%llu\n", (fresh - cells) / CELL_PTRS);
 	list = list2(0x2, 0x3);
 	print(list);
 	printf("\n");
-	give(list);
 
-	printf("%p\n", fresh);
+	printf("%llu\n", (fresh - cells) / CELL_PTRS);
 	list = list3(0x4, 0x5, 0x6);
 	print(list);
 	printf("\n");
-	give(list);
 
-	printf("%p\n", fresh);
+	printf("%llu\n", (fresh - cells) / CELL_PTRS);
 	list = list4(0x7, 0x8, 0x9, 0xa);
 	print(list);
 	printf("\n");
-	give(list);
 
-	printf("%p\n", fresh);
+	printf("%llu\n", (fresh - cells) / CELL_PTRS);
 	list = list3(0xb, 0xc, 0xd);
 	print(list);
 	printf("\n");
-	give(list);
 
-	printf("%p\n", fresh);
+	printf("%llu\n", (fresh - cells) / CELL_PTRS);
 	list = list2(0xe, 0xf);
 	print(list);
 	printf("\n");
-	give(list);
 
-	printf("%p\n", fresh);
+	printf("%llu\n", (fresh - cells) / CELL_PTRS);
 	list = list1(0x10);
 	print(list);
 	printf("\n");
-	give(list);
 
 	return 0;
 }
