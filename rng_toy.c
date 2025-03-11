@@ -14,29 +14,25 @@ uint64_t cbrng(uint64_t n)
 	
 	uint64_t x = n * s;
 	x *= x ^ s;
-	// Tacking on some elements from xorshift+ seems to result in strong qualities, even using the full 64-bits
+	// Tacking on some elements from xorshift+ seems to result in better PractRand results, even using the full 64-bits
 	x ^= x << 13;
 	x ^= x >> 7;
 	return x + (x >> 32);
 }
 
-uint64_t state = 0;
+uint64_t ctr = 0;
 void cbrng_seed(uint64_t s)
 {
-	state = cbrng(cbrng(s));
-}
-uint64_t cbrng_next_state()
-{
-	return state+1;
+	ctr = cbrng(s);
 }
 uint32_t cbrng_next(void)
 {
-	state = cbrng_next_state();
-	return cbrng(state);
+	return cbrng(ctr++);
 }
 
 
-uint64_t ctr, key;
+
+// https://arxiv.org/abs/2004.06278
 uint32_t squares(uint64_t ctr, uint64_t key)
 {
 	uint64_t x = ctr * key;
@@ -53,6 +49,8 @@ uint32_t squares(uint64_t ctr, uint64_t key)
 	x = (x >> 32) | (x << 32);
 	return x;
 }
+//
+uint64_t key;
 void squares_seed(uint64_t s)
 {
 	key = s;
@@ -116,40 +114,52 @@ uint32_t xorshift_next(void)
 	return xorshift(xorshift_state) >> 32;
 }
 
-void xorshift_test(void)
-{
-	xorshift_seed(0xdeadbeef);
-	xorshift_next();
-	uint64_t n = 0;
-	while (xorshift_state != 0xdeadbeef) {
-		xorshift_next();
-		n++;
-	}
-	printf("deadbeef cycle: %lu\n", n);
-}
 
 
+// *Really* minimal PCG32 code / (c) 2014 M.E. O'Neill / pcg-random.org
+// Licensed under Apache License 2.0 (NO WARRANTY, etc. see website)
 
 #define PCG32_INITIALIZER   { 0x853c49e6748fea9bULL, 0xda3e39cb94b95bdbULL }
 typedef struct { uint64_t state;  uint64_t inc; } pcg32_random_t;
 
 uint32_t pcg32_random_r(pcg32_random_t* rng)
 {
-	uint64_t oldstate = rng->state;
-	rng->state = oldstate * 6364136223846793005ULL + (rng->inc|1);
-	uint32_t xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
-	uint32_t rot = oldstate >> 59u;
-	return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
+    uint64_t oldstate = rng->state;
+    // Advance internal state
+    rng->state = oldstate * 6364136223846793005ULL + (rng->inc|1);
+    // Calculate output function (XSH RR), uses old state for max ILP
+    uint32_t xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
+    uint32_t rot = oldstate >> 59u;
+    return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
 }
 
+//
 pcg32_random_t pcg_state = PCG32_INITIALIZER;
 void pcg_seed(uint64_t s)
 {
+	// (This is not the proper initialization)
 	pcg_state.state = s;
 }
 uint32_t pcg_next(void)
 {
 	return pcg32_random_r(&pcg_state);
+}
+
+
+
+// Spotted here: https://verdagon.dev/blog/linear-types-borrowing
+// Thought it was interesting. Works really well when only using the least 32 bits
+int64_t state = 0;
+void vale_seed(int64_t r)
+{
+	state = r;
+}
+int32_t vale_next()
+{
+	state += state / 200096;
+	state -= state * (1 << 25);
+	state += state / (1 << 27);
+	return state;
 }
 
 
@@ -244,9 +254,16 @@ int main(int argc, char **argv)
 			rng_seed(n);
 		}
 		fprintf(stderr, "sizeof(rng_next()): %lu\n", sizeof(rng_next()));
-		for (unsigned i = 0; i != x; i++) {
-			uint64_t u = rng_next();
-			fwrite(&u, sizeof(rng_next()), 1, stdout);
+		if (x > 0) {
+			for (unsigned i = 0; i < x; i++) {
+				uint64_t u = rng_next();
+				fwrite(&u, sizeof(rng_next()), 1, stdout);
+			}
+		} else {
+			for (;;) {
+				uint64_t u = rng_next();
+				fwrite(&u, sizeof(rng_next()), 1, stdout);
+			}
 		}
 		break;
 	case CSV:
