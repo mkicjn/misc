@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
+#define WIDTH 200
+#define HEIGHT 50
+#define AREA (WIDTH*HEIGHT)
 #ifndef VISUALIZE
 #define VISUALIZE 0
 #endif
@@ -185,11 +188,58 @@ int path(int *map,int w,int h,int start,int goal)
 	map[start]=1+max;
 	return 1+max;
 }
+
+#define NO_MAIN
+#include "heap.c"
+long heuristic(int w, int h, int start, int goal)
+{
+	int start_x = start % w;
+	int start_y = start / w;
+	int goal_x = goal % w;
+	int goal_y = goal / w;
+	int dx = goal_x - start_x;
+	int dy = goal_y - start_y;
+#define ABS(x) (x < 0 ? -(x) : x)
+	return ABS(dx) + ABS(dy);
+}
+long heap[AREA];
+int newpath(int *map, int w, int h, int start, int goal)
+{
+	long size = 0;
+	heap_push(heap, size++, (heuristic(w, h, start, goal) << 32) | start);
+	map[start] = -3;
+	while (size > 0) {
+		int next = heap_pop(heap, size--) & 0xffffffff;
+		int x = next % w;
+		int y = next / w;
+		for (int dx = -1; dx <= 1; dx++)
+		for (int dy = -1; dy <= 1; dy++) {
+			int neighbor = next + dx + (dy * w);
+			if (dx == 0 && dy == 0)
+				continue;
+			if (dx < 0 && x <= 0)
+				continue;
+			if (dy < 0 && y <= 0)
+				continue;
+			if (dx > 0 && x >= w-1)
+				continue;
+			if (dy > 0 && y >= h-1)
+				continue;
+			if (neighbor == goal)
+				return 0;
+			if (map[neighbor] != -1)
+				continue;
+			heap_push(heap, size++, (heuristic(w, h, neighbor, goal) << 32) | neighbor);
+			map[neighbor] = -3;
+		}
+		map[next] = 0;
+		if (VISUALIZE) {print_distmap(map,w,h); clkslp(50);}
+	}
+	return -1;
+}
+
 int main(int argc,char **argv)
 {
-#define WIDTH 200
-#define HEIGHT 50
-#define AREA (WIDTH*HEIGHT)
 	static char map[AREA];
 	//static char disp[AREA];
 	unsigned int seed=time(NULL);
@@ -231,6 +281,20 @@ int main(int argc,char **argv)
 	printf("Path length: %d\n",path(imap,WIDTH,HEIGHT,start,goal));
 	t=clock()-t;
 	printf("Pathfinding (DFS?) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
+	map[start]='O';
+	map[goal]='X';
+	print_distmap(imap,WIDTH,HEIGHT);
+	}
+
+	// Test new pathfinding algorithm
+	{
+	int *imap=malloc(AREA*sizeof(int));
+	for (int i=0;i<AREA;i++)
+		imap[i]=map[i]==' '?-1:-2;
+	clock_t t=clock();
+	printf("Path length: %d\n",newpath(imap,WIDTH,HEIGHT,start,goal));
+	t=clock()-t;
+	printf("Pathfinding (A*?) took %fms\n",1000.0*t/CLOCKS_PER_SEC);
 	map[start]='O';
 	map[goal]='X';
 	print_distmap(imap,WIDTH,HEIGHT);

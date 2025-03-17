@@ -21,33 +21,25 @@
 
 void sift_up(long *h, long i)
 {
-	while (i > 0) {
-		long x = PARENT(i);
-		if (h[i] < h[x]) {
-			SWAP(h[i], h[x]);
-			i = x;
-		} else {
-			break;
-		}
+	long x = PARENT(i);
+	if (h[i] < h[x]) {
+		SWAP(h[i], h[x]);
+		sift_up(h, x);
 	}
 }
 
 void sift_down(long *h, long n, long i)
 {
-	while (i <= n) {
-		long x = BEST(h, n, i);
-		if (h[x] < h[i]) {
-			SWAP(h[x], h[i]);
-			i = x;
-		} else {
-			break;
-		}
+	long x = BEST(h, n, i);
+	if (h[x] < h[i]) {
+		SWAP(h[x], h[i]);
+		sift_down(h, n, x);
 	}
 }
 
 void heapify(long *h, long n)
 {
-	for (long i = PARENT(n); i >= 0; i--)
+	for (long i = n - 1; i >= 0; i--)
 		sift_down(h, n, i);
 }
 
