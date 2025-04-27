@@ -94,7 +94,7 @@ WORD(exit)
 WORD(dolit)
 {
 	PUSH(sp) = tos;
-	tos = (intptr_t)(*(++ip));
+	tos = (intptr_t)(*(ip++));
 	NEXT();
 }
 
