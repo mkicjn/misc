@@ -1,5 +1,3 @@
-CFLAGS=-Os
-
 ALL = collatz-stc collatz-dtc collatz-ttc
 
 all: $(ALL)
