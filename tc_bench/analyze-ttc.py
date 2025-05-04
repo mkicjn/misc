@@ -4,14 +4,37 @@ import sys
 DEBUG=True
 
 segments = [[]]
-i = 0
+
+def format_inst(inst):
+    COL_WIDTHS = [8, 20, 40]
+    line = ""
+    for field, width in zip(inst, COL_WIDTHS):
+        line += f'{{:<{width}}}'.format(field)
+    return line
+
+def show_segments():
+    global segments
+    for segment in segments:
+        for inst in segment:
+            print(format_inst(inst))
+        print('')
+
 
 # Read lines into segments based on ending in an instruction targeting tt_interp
 for line in sys.stdin.readlines():
-    segments[i].append(line.lstrip().rstrip().split('\t'))
+    fields = line.lstrip().rstrip().split('\t')
+    # Postprocessing and insertion
+    try:
+        fields[0] = fields[0].rstrip(':')
+        fields[1] = ''.join(fields[1].split(' '))
+        fields = fields[:2] + [''.join(fields[2:])]
+    except IndexError:
+        continue
+    segments[-1].append(fields)
+    # Internal branch detection
     if "<tt_interp+" in line:
-        i += 1
         segments.append([])
+
 
 # Assume the last instruction in the last segment is a return instruction
 ret_inst = segments[-1][-1][-1]
@@ -22,10 +45,8 @@ segments = segments[2:-1]
 print(f'{len(segments)} segments detected')
 
 if DEBUG:
-    for line in segments[1:-1]:
-        for segment in line:
-            print(segment)
-        print('')
+    show_segments()
+
 
 # Find how many times each branch target in tt_interp is targeted
 target_hits = {}
@@ -43,14 +64,17 @@ if DEBUG:
     for (key, value) in target_hits.items():
         print(f'{key}\t{value}')
 
+
 # Find the most common branching instruction targeting somewhere inside tt_interp
 common_target = max(target_hits, key=target_hits.get)
 print('Most common interior branching instruction:')
 print(common_target)
 
+
 # Assume this is an unconditional branch instruction
 jmp_inst = common_target.split(' ')[0]
 print(f'Assuming unconditional branch is `{jmp_inst}`')
+
 
 # Find all unconditional branch instructions in each segments
 segment_jmps = []
@@ -63,6 +87,7 @@ if DEBUG:
     for jmps in segment_jmps:
         print(jmps)
 
+
 # If a segment has more than 1 unconditional branch, delete from the beginning up through the penultimate jump
 for (i, segment) in enumerate(segments):
     if len(segment_jmps[i]) > 1:
@@ -71,19 +96,17 @@ for (i, segment) in enumerate(segments):
 
 if DEBUG:
     print('Post penultimate branch removal:')
-    for line in segments:
-        for segment in line:
-            print(segment)
-        print('')
+    show_segments()
+
 
 # Flatten the list to get all instructions
 insts = [inst for segment in segments for inst in segment]
 
+
 # Expand segments not branching to the most common branch target
 def find_destination(address):
-    key = f"{address}:"
     for segment in segments:
-        hits = [i for (i, line) in enumerate(segment) if line[0] == key]
+        hits = [i for (i, line) in enumerate(segment) if line[0] == address]
         if hits:
             return segment[hits[0]:]
     return None
@@ -91,16 +114,19 @@ def find_destination(address):
 for segment in segments:
     if segment[-1][-1] != common_target:
         last_jmp = segment[-1]
-        target = last_jmp[-1].split()[1]
+        (op, target, *rest) = last_jmp[-1].split()
         destination = find_destination(target)
         if destination is None:
             print(f'Target {target} not found in other primitives; trying that as the common target')
             common_target = last_jmp[-1]
 
+unrecognized = []
 for (i, segment) in enumerate(segments):
     if segment[-1][-1] != common_target:
         last_jmp = segment[-1]
-        target = last_jmp[-1].split()[1]
+        (op, target, *rest) = last_jmp[-1].split()
+        if op != jmp_inst: # 
+            unrecognized.append(op) #
         destination = find_destination(target)
         if destination:
             segments[i] = segment[:-1] + destination
@@ -109,10 +135,12 @@ for (i, segment) in enumerate(segments):
 
 if DEBUG:
     print('Post branch target expansion:')
-    for line in segments:
-        for segment in line:
-            print(segment)
-        print('')
+    show_segments()
+
+if unrecognized:
+    unrecognized = ', '.join(unrecognized)
+    raise NotImplementedError(f"Not sure how to handle {unrecognized} yet")
+
 
 # TODO
 # Infer the encoding of branching instructions (relative / absolute)
