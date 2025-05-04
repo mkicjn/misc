@@ -18,7 +18,7 @@ ret_inst = segments[-1][-1][-1]
 print(f'Assuming return instruction is `{ret_inst}`')
 
 # Cut first and last segments out to isolate instructions
-segments = segments[1:-1]
+segments = segments[2:-1]
 print(f'{len(segments)} segments detected')
 
 if DEBUG:
@@ -79,7 +79,41 @@ if DEBUG:
 # Flatten the list to get all instructions
 insts = [inst for segment in segments for inst in segment]
 
-# TODO
 # Expand segments not branching to the most common branch target
+def find_destination(address):
+    key = f"{address}:"
+    for segment in segments:
+        hits = [i for (i, line) in enumerate(segment) if line[0] == key]
+        if hits:
+            return segment[hits[0]:]
+    return None
+
+for segment in segments:
+    if segment[-1][-1] != common_target:
+        last_jmp = segment[-1]
+        target = last_jmp[-1].split()[1]
+        destination = find_destination(target)
+        if destination is None:
+            print(f'Target {target} not found in other primitives; trying that as the common target')
+            common_target = last_jmp[-1]
+
+for (i, segment) in enumerate(segments):
+    if segment[-1][-1] != common_target:
+        last_jmp = segment[-1]
+        target = last_jmp[-1].split()[1]
+        destination = find_destination(target)
+        if destination:
+            segments[i] = segment[:-1] + destination
+        else:
+            raise RuntimeError(f'Target {target} not found in other primitives')
+
+if DEBUG:
+    print('Post branch target expansion:')
+    for line in segments:
+        for segment in line:
+            print(segment)
+        print('')
+
+# TODO
 # Infer the encoding of branching instructions (relative / absolute)
 # (Meta: Test on aarch64-linux-gnu toolchain)
