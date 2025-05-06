@@ -30,7 +30,7 @@ enum token {
 #define POP(x)  (x--)
 
 static intptr_t stack[1024], rstack[1024];
-const intptr_t tt_interp(const intptr_t *prog)
+intptr_t tt_interp(const intptr_t *prog)
 {
 
 	register const intptr_t *ip = prog;

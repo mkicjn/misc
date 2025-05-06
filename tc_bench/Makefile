@@ -1,3 +1,5 @@
+CFLAGS=-Os -Wall -Wextra -Wpedantic
+
 ALL = collatz-stc collatz-dtc collatz-ttc
 
 all: $(ALL)

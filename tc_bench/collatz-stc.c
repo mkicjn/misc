@@ -3,7 +3,7 @@
 
 #define DOLIT(x) *(++sp) = x;
 
-register intptr_t *sp asm ("rbx");
+register intptr_t *sp asm("rbx");
 
 void inc()
 {
@@ -115,7 +115,7 @@ void iter()
 		add();
 		inc();
 	} // THEN
-};
+}
 
 void collatz()
 {
@@ -132,7 +132,7 @@ void collatz()
 		iter();
 	} // REPEAT
 	drop();
-};
+}
 
 void maxlen()
 {
@@ -149,14 +149,14 @@ void maxlen()
 		zeq();
 	} while (!*(sp--)); // AGAIN
 	drop();
-};
+}
 
 void program()
 {
 	DOLIT(1000000);
 	maxlen();
 	dot();
-};
+}
 
 int main()
 {

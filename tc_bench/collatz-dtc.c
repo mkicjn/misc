@@ -69,57 +69,58 @@ int main()
 	void ***rp = return_stack;
 	intptr_t wr1 = 0, wr2 = 0;
 
+next:
 	goto **(ip++);
 
 docol:
 	*(++rp) = ip+1; // DOCOL
-	ip = *(ip++);
-	goto **(ip++);
+	ip = *ip;
+	goto next;
 
 exit:
 	ip = *(rp--); // EXIT
-	goto **(ip++);
+	goto next;
 
 
 dolit:
 	*(++sp) = *(intptr_t *)(ip++); // DOLIT
-	goto **(ip++);
+	goto next;
 
 inc:
 	(*sp)++; // 1+
-	goto **(ip++);
+	goto next;
 
 dec:
 	(*sp)--; // 1-
-	goto **(ip++);
+	goto next;
 
 div2:
 	(*sp) >>= 1; // 2/
-	goto **(ip++);
+	goto next;
 
 mul2:
 	(*sp) <<= 1; // 2*
-	goto **(ip++);
+	goto next;
 
 add:
 	sp--; // +
 	sp[0] += sp[1];
-	goto **(ip++);
+	goto next;
 
 drop:
 	sp--; // DROP
-	goto **(ip++);
+	goto next;
 
 dup:
 	sp[1] = sp[0]; // DUP
 	sp++;
-	goto **(ip++);
+	goto next;
 
 swap:
 	wr1 = sp[0]; // SWAP
 	sp[0] = sp[-1];
 	sp[-1] = wr1;
-	goto **(ip++);
+	goto next;
 
 rot:
 	wr1 = sp[-1]; // ROT
@@ -127,18 +128,18 @@ rot:
 	sp[0] = sp[-2];
 	sp[-2] = wr1;
 	sp[-1] = wr2;
-	goto **(ip++);
+	goto next;
 
 max:
 	wr1 = sp[0]; // MAX
 	wr2 = sp[-1];
 	sp[-1] = wr1 > wr2 ? wr1 : wr2;
 	sp--;
-	goto **(ip++);
+	goto next;
 
 jmp:
-	ip = *(ip++); // BRANCH
-	goto **(ip++);
+	ip = *ip; // BRANCH
+	goto next;
 
 jz:
 	wr1 = *(sp--); // ?BRANCH
@@ -146,29 +147,29 @@ jz:
 		ip = *ip;
 	else
 		ip++;
-	goto **(ip++);
+	goto next;
 
 zeq:
 	sp[0] = (sp[0] == 0); // 0=
-	goto **(ip++);
+	goto next;
 
 and:
 	sp--; // AND
 	sp[0] &= sp[1];
-	goto **(ip++);
+	goto next;
 
 gt:
 	sp--; // >
 	sp[0] = (sp[0] > sp[1]);
-	goto **(ip++);
+	goto next;
 
 dot:
 	printf("%ld ", *(sp--)); // .
-	goto **(ip++);
+	goto next;
 
 cr:
 	putchar('\n');
-	goto **(ip++);
+	goto next;
 
 bye:
 	return *sp; // BYE
