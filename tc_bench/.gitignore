@@ -1,3 +1,4 @@
 collatz-stc
-collatz-dtc
+collatz-dtc-cps
+collatz-dtc-lav
 collatz-ttc

@@ -13,13 +13,16 @@ struct link {
 	struct link *next;
 };
 
-#define FORTH_REGS(X) intptr_t *dp, void (**ip)(X), intptr_t *sp, intptr_t *rp, intptr_t tos
-// ^ Don't want to leave X blank for declarations because compiler will unnecessarily clear eax
 #define PUSH(sp) (++sp)
 #define POP(sp) (sp--)
 
-#define WORD(cid) void cid##_code(FORTH_REGS(FORTH_REGS()))
+#define FORTH_ARGS(X) intptr_t *dp, void (**ip)(X), intptr_t *sp, intptr_t *rp, intptr_t tos
+// ^ Don't want to leave X empty for declarations because compiler will assume variadicity
+#define FORTH_REGS dp, ip, sp, rp, tos
 
+#define FORTH_DECL(X) void X(FORTH_ARGS(FORTH_ARGS()))
+#define WORD(cid) FORTH_DECL(cid##_code)
+typedef FORTH_DECL((*dtc_t));
 
 // Compile-time dictionary generation
 
@@ -56,7 +59,6 @@ struct link {
 	X("2/", div2) \
 	X("LSHIFT", lsh) \
 	X("RSHIFT", rsh) \
-	X("$", hex) \
 	X##_END
 
 FOR_EACH_WORD(DECLARE_LINKS)
@@ -69,59 +71,68 @@ WORD(next)
 {
 	((*ip)(dp, ip + 1, sp, rp, tos));
 }
-#define NEXT() next_code(dp, ip, sp, rp, tos)
+#define NEXT() next_code(FORTH_REGS)
 
 WORD(key)
-{
-	*PUSH(rp) = tos;
+{ //printf("key %p\n", rp);
+	*PUSH(sp) = tos;
 	tos = getchar();
 	NEXT();
 }
 
 WORD(emit)
-{
+{ //printf("emit %p\n", rp);
 	putchar(tos);
 	tos = *POP(sp);
 	NEXT();
 }
 
+WORD(dot)
+{ //printf("dot %p\n", rp);
+	printf("%ld\n", tos);
+	tos = *POP(sp);
+	NEXT();
+}
+
 WORD(docol)
-{
-	*PUSH(rp) = (intptr_t)ip;
-	ip = *(void **)ip;
+{ //printf("docol %p\n", rp);
+	*PUSH(rp) = (intptr_t)(&ip[1]);
+	ip = (dtc_t *)ip[0];
 	NEXT();
 }
 
 WORD(exit)
-{
-	ip = (void *)(*POP(rp));
+{ //printf("exit %p\n", rp);
+	ip = (dtc_t *)(*POP(rp));
 	NEXT();
 }
 
 WORD(dolit)
-{
+{ //printf("dolit %ld\n", (intptr_t)ip[0]);
 	*PUSH(sp) = tos;
-	tos = (intptr_t)(*(ip++));
+	tos = (intptr_t)ip[0];
+	ip++;
 	NEXT();
 }
 
 WORD(dup)
-{
+{ //printf("dup %p\n", rp);
 	*PUSH(sp) = tos;
 	NEXT();
 }
 
 WORD(drop)
-{
+{ //printf("drop %p\n", rp);
 	tos = *POP(sp);
 	NEXT();
 }
 
 WORD(swap)
-{
-	intptr_t x = tos;
-	tos = sp[0];
-	sp[0] = x;
+{ //printf("swap %p\n", rp);
+	intptr_t a = tos;
+	intptr_t b = sp[0];
+	tos = b;
+	sp[0] = a;
 	NEXT();
 }
 
@@ -135,15 +146,76 @@ WORD_2OP(add, +)
 WORD_2OP(sub, -)
 WORD_2OP(lsh, <<)
 WORD_2OP(rsh, >>)
+WORD_2OP(gt, >)
+WORD_2OP(and, &)
 
 WORD(mul2)
-{
+{ //printf("mul2 %p\n", rp);
 	tos <<= 1;
 	NEXT();
 }
 
 WORD(div2)
-{
+{ //printf("div2 %p\n", rp);
 	tos >>= 1;
 	NEXT();
+}
+
+WORD(inc)
+{ //printf("inc %p\n", rp);
+	tos++;
+	NEXT();
+}
+
+WORD(dec)
+{ //printf("dec %p\n", rp);
+	tos--;
+	NEXT();
+}
+
+WORD(max)
+{ //printf("max %p\n", rp);
+	intptr_t x = *POP(sp);
+	if (x > tos)
+		tos = x;
+	NEXT();
+}
+
+WORD(rot)
+{ //printf("rot %p\n", rp);
+	intptr_t a = tos;
+	intptr_t b = sp[0];
+	intptr_t c = sp[-1];
+	tos = c;
+	sp[0] = a;
+	sp[-1] = b;
+	NEXT();
+}
+
+WORD(jmp)
+{ //printf("jmp %p\n", rp);
+	ip = (dtc_t *)ip[0];
+	NEXT();
+}
+
+WORD(jz)
+{ //printf("jz %p\n", rp);
+	if (tos == 0) {
+		ip = (dtc_t *)ip[0];
+	} else {
+		ip++;
+	}
+	tos = *POP(sp);
+	NEXT();
+}
+
+WORD(zeq)
+{ //printf("zeq %p\n", rp);
+	tos = (tos == 0);
+	NEXT();
+}
+
+WORD(bye)
+{ //printf("bye %p\n", rp);
+	return;
 }

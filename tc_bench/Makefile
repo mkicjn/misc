@@ -1,6 +1,6 @@
-CFLAGS=-Os -Wall -Wextra -Wpedantic
+CFLAGS=-Os -Wall -Wextra -Wpedantic -Wno-unused-parameter
 
-ALL = collatz-stc collatz-dtc collatz-ttc
+ALL = collatz-stc collatz-dtc-cps collatz-dtc-lav collatz-ttc
 
 all: $(ALL)
 
