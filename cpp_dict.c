@@ -15,9 +15,8 @@ struct link {
 
 #define FORTH_REGS(X) intptr_t *dp, void (**ip)(X), intptr_t *sp, intptr_t *rp, intptr_t tos
 // ^ Don't want to leave X blank for declarations because compiler will unnecessarily clear eax
-#define NEXT() ((*ip)(dp, ip + 1, sp, rp, tos))
-#define PUSH(sp) *(++sp)
-#define POP(sp) *(sp--)
+#define PUSH(sp) (++sp)
+#define POP(sp) (sp--)
 
 #define WORD(cid) void cid##_code(FORTH_REGS(FORTH_REGS()))
 
@@ -53,6 +52,8 @@ struct link {
 	X("SWAP", swap) \
 	X("+", add) \
 	X("-", sub) \
+	X("2*", mul2) \
+	X("2/", div2) \
 	X("LSHIFT", lsh) \
 	X("RSHIFT", rsh) \
 	X("$", hex) \
@@ -64,9 +65,15 @@ FOR_EACH_WORD(DEFINE_LINKS)
 
 // Word definitions
 
+WORD(next)
+{
+	((*ip)(dp, ip + 1, sp, rp, tos));
+}
+#define NEXT() next_code(dp, ip, sp, rp, tos)
+
 WORD(key)
 {
-	PUSH(rp) = tos;
+	*PUSH(rp) = tos;
 	tos = getchar();
 	NEXT();
 }
@@ -74,39 +81,39 @@ WORD(key)
 WORD(emit)
 {
 	putchar(tos);
-	tos = POP(sp);
+	tos = *POP(sp);
 	NEXT();
 }
 
 WORD(docol)
 {
-	PUSH(rp) = (intptr_t)ip;
+	*PUSH(rp) = (intptr_t)ip;
 	ip = *(void **)ip;
 	NEXT();
 }
 
 WORD(exit)
 {
-	ip = (void *)(POP(rp));
+	ip = (void *)(*POP(rp));
 	NEXT();
 }
 
 WORD(dolit)
 {
-	PUSH(sp) = tos;
+	*PUSH(sp) = tos;
 	tos = (intptr_t)(*(ip++));
 	NEXT();
 }
 
 WORD(dup)
 {
-	PUSH(sp) = tos;
+	*PUSH(sp) = tos;
 	NEXT();
 }
 
 WORD(drop)
 {
-	tos = POP(sp);
+	tos = *POP(sp);
 	NEXT();
 }
 
@@ -121,10 +128,22 @@ WORD(swap)
 #define WORD_2OP(name, op) \
 WORD(name) \
 { \
-	tos = (POP(sp) op tos); \
+	tos = (*POP(sp) op tos); \
 	NEXT(); \
 }
 WORD_2OP(add, +)
 WORD_2OP(sub, -)
 WORD_2OP(lsh, <<)
 WORD_2OP(rsh, >>)
+
+WORD(mul2)
+{
+	tos <<= 1;
+	NEXT();
+}
+
+WORD(div2)
+{
+	tos >>= 1;
+	NEXT();
+}
