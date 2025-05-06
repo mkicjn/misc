@@ -69,60 +69,60 @@ int main()
 	void ***rp = return_stack;
 	intptr_t wr1 = 0, wr2 = 0;
 
-next:
+next: asm("next:");
 	goto **(ip++);
 
-docol:
+docol: asm("docol:");
 	*(++rp) = ip+1; // DOCOL
 	ip = *ip;
 	goto next;
 
-exit:
+exit: asm("exit:");
 	ip = *(rp--); // EXIT
 	goto next;
 
 
-dolit:
+dolit: asm("dolit:");
 	*(++sp) = *(intptr_t *)(ip++); // DOLIT
 	goto next;
 
-inc:
+inc: asm("inc:");
 	(*sp)++; // 1+
 	goto next;
 
-dec:
+dec: asm("dec:");
 	(*sp)--; // 1-
 	goto next;
 
-div2:
+div2: asm("div2:");
 	(*sp) >>= 1; // 2/
 	goto next;
 
-mul2:
+mul2: asm("mul2:");
 	(*sp) <<= 1; // 2*
 	goto next;
 
-add:
+add: asm("add:");
 	sp--; // +
 	sp[0] += sp[1];
 	goto next;
 
-drop:
+drop: asm("drop:");
 	sp--; // DROP
 	goto next;
 
-dup:
+dup: asm("dup:");
 	sp[1] = sp[0]; // DUP
 	sp++;
 	goto next;
 
-swap:
+swap: asm("swap:");
 	wr1 = sp[0]; // SWAP
 	sp[0] = sp[-1];
 	sp[-1] = wr1;
 	goto next;
 
-rot:
+rot: asm("rot:");
 	wr1 = sp[-1]; // ROT
 	wr2 = sp[0];
 	sp[0] = sp[-2];
@@ -130,18 +130,18 @@ rot:
 	sp[-1] = wr2;
 	goto next;
 
-max:
+max: asm("max:");
 	wr1 = sp[0]; // MAX
 	wr2 = sp[-1];
 	sp[-1] = wr1 > wr2 ? wr1 : wr2;
 	sp--;
 	goto next;
 
-jmp:
+jmp: asm("jmp:");
 	ip = *ip; // BRANCH
 	goto next;
 
-jz:
+jz: asm("jz:");
 	wr1 = *(sp--); // ?BRANCH
 	if (!wr1)
 		ip = *ip;
@@ -149,29 +149,29 @@ jz:
 		ip++;
 	goto next;
 
-zeq:
+zeq: asm("zeq:");
 	sp[0] = (sp[0] == 0); // 0=
 	goto next;
 
-and:
+and: asm("and:");
 	sp--; // AND
 	sp[0] &= sp[1];
 	goto next;
 
-gt:
+gt: asm("gt:");
 	sp--; // >
 	sp[0] = (sp[0] > sp[1]);
 	goto next;
 
-dot:
+dot: asm("dot:");
 	printf("%ld ", *(sp--)); // .
 	goto next;
 
-cr:
+cr: asm("cr:");
 	putchar('\n');
 	goto next;
 
-bye:
+bye: asm("bye:");
 	return *sp; // BYE
 
 }

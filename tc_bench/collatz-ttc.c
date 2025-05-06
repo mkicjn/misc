@@ -32,76 +32,75 @@ enum token {
 static intptr_t stack[1024], rstack[1024];
 intptr_t tt_interp(const intptr_t *prog)
 {
-
 	register const intptr_t *ip = prog;
 	register intptr_t *sp = stack;
 	register intptr_t *rp = rstack;
-	register intptr_t tos = 0;
+	register intptr_t tos = 0; // FIXME: This interpreter may have a slight advantage because the others lack this register
 	register intptr_t wp = 0;
 	register intptr_t rot = 0;
 
 	for (;;) {
 		switch (*(ip++)) {
-		case TOK_BYE:
+		case TOK_BYE: asm("bye:");
 			return tos;
-		case TOK_KEY:
+		case TOK_KEY: asm("key:");
 			*PUSH(sp) = tos;
 			tos = getchar();
 			break;
-		case TOK_EMIT:
+		case TOK_EMIT: asm("emit:");
 			putchar(tos);
 			tos = *POP(sp);
 			break;
-		case TOK_DOCOL:
+		case TOK_DOCOL: asm("docol:");
 			*PUSH(rp) = (intptr_t)(ip+1);
 			ip = *(void **)ip;
 			break;
-		case TOK_EXIT:
+		case TOK_EXIT: asm("exit:");
 			ip = (intptr_t *)(*POP(rp));
 			break;
-		case TOK_DOLIT:
+		case TOK_DOLIT: asm("dolit:");
 			*PUSH(sp) = tos;
 			tos = *(ip++);
 			break;
-		case TOK_DUP:
+		case TOK_DUP: asm("dup:");
 			*PUSH(sp) = tos;
 			break;
-		case TOK_DROP:
+		case TOK_DROP: asm("drop:");
 			tos = *POP(sp);
 			break;
-		case TOK_DEC:
+		case TOK_DEC: asm("dec:");
 			tos--;
 			break;
-		case TOK_INC:
+		case TOK_INC: asm("inc:");
 			tos++;
 			break;
-		case TOK_ADD:
+		case TOK_ADD: asm("add:");
 			tos += *POP(sp);
 			break;
-		case TOK_MUL2:
+		case TOK_MUL2: asm("mul2:");
 			tos <<= 1;
 			break;
-		case TOK_DIV2:
+		case TOK_DIV2: asm("div2:");
 			tos >>= 1;
 			break;
-		case TOK_SWAP:
+		case TOK_SWAP: asm("swap:");
 			wp = tos;
 			tos = sp[0];
 			sp[0] = wp;
 			break;
-		case TOK_JZ:
+		case TOK_JZ: asm("jz:");
 			wp = *(ip++);
 			ip = (tos == 0) ? (intptr_t *)wp : ip;
 			tos = *POP(sp);
 			break;
-		case TOK_JMP:
+		case TOK_JMP: asm("jmp:");
 			wp = *(ip++);
 			ip = (intptr_t *)wp;
 			break;
-		case TOK_ZEQ:
+		case TOK_ZEQ: asm("zeq:");
 			tos = (tos == 0);
 			break;
-		case TOK_ROT:
+		case TOK_ROT: asm("rot:");
 			// tos = tos;
 			wp = *POP(sp);
 			rot = *POP(sp);
@@ -109,21 +108,21 @@ intptr_t tt_interp(const intptr_t *prog)
 			*PUSH(sp) = tos;
 			tos = rot;
 			break;
-		case TOK_AND:
+		case TOK_AND: asm("and:");
 			tos &= *POP(sp);
 			break;
-		case TOK_MAX:
+		case TOK_MAX: asm("max:");
 			wp = *POP(sp);
 			tos = (wp > tos ? wp : tos);
 			break;
-		case TOK_GT:
+		case TOK_GT: asm("gt:");
 			tos = (*POP(sp) > tos);
 			break;
-		case TOK_DOT:
+		case TOK_DOT: asm("dot:");
 			printf("%ld\n", tos);
 			tos = *POP(sp);
 			break;
-		default:
+		default: asm("unknown:");
 			printf("Unknown opcode %ld\n", ip[-1]);
 			return tos;
 		}
