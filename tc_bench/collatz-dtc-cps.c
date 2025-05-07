@@ -6,65 +6,65 @@ int main()
 	// : COLLATZ  0 SWAP  BEGIN  DUP 1 >  WHILE  SWAP 1+ SWAP  ITER  REPEAT  DROP ;
 	// : MAXLEN  0 SWAP  BEGIN   DUP COLLATZ ROT MAX SWAP  1- DUP 0= UNTIL DROP ;
 
-	static void (*iter[])() = {
-		/* 0 */ dup_code,
-		/* 1 */ dolit_code, (void *)1,
-		/* 3 */ and_code,
-		/* 4 */ zeq_code,
-		/* 5 */ jz_code, (void *)&iter[10],
-		/* 7 */ div2_code,
-		/* 8 */ jmp_code, (void *)&iter[14],
-		/* 10 */ dup_code,
-		/* 11 */ mul2_code,
-		/* 12 */ add_code,
-		/* 13 */ inc_code,
-		/* 14 */ exit_code
+	static intptr_t iter[] = {
+		/* 0 */ (intptr_t)dup_code,
+		/* 1 */ (intptr_t)dolit_code, 1,
+		/* 3 */ (intptr_t)and_code,
+		/* 4 */ (intptr_t)zeq_code,
+		/* 5 */ (intptr_t)jz_code, (intptr_t)&iter[10],
+		/* 7 */ (intptr_t)div2_code,
+		/* 8 */ (intptr_t)jmp_code, (intptr_t)&iter[14],
+		/* 10 */ (intptr_t)dup_code,
+		/* 11 */ (intptr_t)mul2_code,
+		/* 12 */ (intptr_t)add_code,
+		/* 13 */ (intptr_t)inc_code,
+		/* 14 */ (intptr_t)exit_code
 	};
 
-	static void (*collatz[])() = {
-		/* 0 */ dolit_code, (void *)0,
-		/* 2 */ swap_code,
-		/* 3 */ dup_code,
-		/* 4 */ dolit_code, (void *)1,
-		/* 6 */ gt_code,
-		/* 7 */ jz_code, (void *)&collatz[16],
-		/* 9 */ swap_code,
-		/* 10 */ inc_code,
-		/* 11 */ swap_code,
-		/* 12 */ docol_code, (void *)iter,
-		/* 14 */ jmp_code, (void *)&collatz[3],
-		/* 16 */ drop_code,
-		/* 17 */ exit_code
+	static intptr_t collatz[] = {
+		/* 0 */ (intptr_t)dolit_code, 0,
+		/* 2 */ (intptr_t)swap_code,
+		/* 3 */ (intptr_t)dup_code,
+		/* 4 */ (intptr_t)dolit_code, 1,
+		/* 6 */ (intptr_t)gt_code,
+		/* 7 */ (intptr_t)jz_code, (intptr_t)&collatz[16],
+		/* 9 */ (intptr_t)swap_code,
+		/* 10 */ (intptr_t)inc_code,
+		/* 11 */ (intptr_t)swap_code,
+		/* 12 */ (intptr_t)docol_code, (intptr_t)iter,
+		/* 14 */ (intptr_t)jmp_code, (intptr_t)&collatz[3],
+		/* 16 */ (intptr_t)drop_code,
+		/* 17 */ (intptr_t)exit_code
 	};
 
-	static void (*maxlen[])() = {
-		/* 0 */ dolit_code, (void *)0,
-		/* 2 */ swap_code,
-		/* 3 */ dup_code,
-		/* 4 */ docol_code, (void *)collatz,
-		/* 6 */ rot_code,
-		/* 7 */ max_code,
-		/* 8 */ swap_code,
-		/* 9 */ dec_code,
-		/* 10 */ dup_code,
-		/* 11 */ zeq_code,
-		/* 12 */ jz_code, (void *)&maxlen[3],
-		/* 14 */ drop_code,
-		/* 15 */ exit_code
+	static intptr_t maxlen[] = {
+		/* 0 */ (intptr_t)dolit_code, 0,
+		/* 2 */ (intptr_t)swap_code,
+		/* 3 */ (intptr_t)dup_code,
+		/* 4 */ (intptr_t)docol_code, (intptr_t)collatz,
+		/* 6 */ (intptr_t)rot_code,
+		/* 7 */ (intptr_t)max_code,
+		/* 8 */ (intptr_t)swap_code,
+		/* 9 */ (intptr_t)dec_code,
+		/* 10 */ (intptr_t)dup_code,
+		/* 11 */ (intptr_t)zeq_code,
+		/* 12 */ (intptr_t)jz_code, (intptr_t)&maxlen[3],
+		/* 14 */ (intptr_t)drop_code,
+		/* 15 */ (intptr_t)exit_code
 	};
 
-	static void (*prog[])() = {
-		dolit_code, (void *)1000000,
-		docol_code, (void *)maxlen,
-		dot_code,
-		bye_code
+	static intptr_t prog[] = {
+		(intptr_t)dolit_code, 1000000,
+		(intptr_t)docol_code, (intptr_t)maxlen,
+		(intptr_t)dot_code,
+		(intptr_t)bye_code
 	};
 
 
 	static intptr_t stack[1000];
 	static intptr_t rstack[1000];
 	intptr_t *dp = NULL;
-	dtc_t *ip = prog;
+	intptr_t *ip = prog;
 	intptr_t *sp = stack;
 	intptr_t *rp = rstack;
 	intptr_t tos = 0;

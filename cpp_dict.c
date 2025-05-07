@@ -16,7 +16,7 @@ struct link {
 #define PUSH(sp) (++sp)
 #define POP(sp) (sp--)
 
-#define FORTH_ARGS(X) intptr_t *dp, void (**ip)(X), intptr_t *sp, intptr_t *rp, intptr_t tos
+#define FORTH_ARGS(X) intptr_t *dp, intptr_t *ip, intptr_t *sp, intptr_t *rp, intptr_t tos
 // ^ Don't want to leave X empty for declarations because compiler will assume variadicity
 #define FORTH_REGS dp, ip, sp, rp, tos
 
@@ -45,31 +45,32 @@ typedef FORTH_DECL((*dtc_t));
 
 #define FOR_EACH_WORD(X) \
 	X##_START \
-	X("KEY", key) \
-	X("EMIT", emit) \
-	X("DOCOL", docol) \
-	X("EXIT", exit) \
-	X("DOLIT", dolit) \
-	X("DUP", dup) \
-	X("DROP", drop) \
-	X("SWAP", swap) \
-	X("+", add) \
-	X("-", sub) \
+	X("key", key) \
+	X("emit", emit) \
+	X(".", dot) \
+	X("exit", exit) \
+	X("dup", dup) \
+	X("drop", drop) \
+	X("swap", swap) \
 	X("2*", mul2) \
 	X("2/", div2) \
-	X("LSHIFT", lsh) \
-	X("RSHIFT", rsh) \
+	X("1+", inc) \
+	X("1-", dec) \
+	X("max", max) \
+	X("rot", rot) \
+	X("0=", zeq) \
+	X("bye", bye) \
 	X##_END
 
 FOR_EACH_WORD(DECLARE_LINKS)
 FOR_EACH_WORD(DEFINE_LINKS)
 
-
 // Word definitions
 
 WORD(next)
 {
-	((*ip)(dp, ip + 1, sp, rp, tos));
+	dtc_t f = (dtc_t)ip[0];
+	f(dp, &ip[1], sp, rp, tos);
 }
 #define NEXT() next_code(FORTH_REGS)
 
@@ -97,20 +98,20 @@ WORD(dot)
 WORD(docol)
 { //printf("docol %p\n", rp);
 	*PUSH(rp) = (intptr_t)(&ip[1]);
-	ip = (dtc_t *)ip[0];
+	ip = (intptr_t *)ip[0];
 	NEXT();
 }
 
 WORD(exit)
 { //printf("exit %p\n", rp);
-	ip = (dtc_t *)(*POP(rp));
+	ip = (intptr_t *)(*POP(rp));
 	NEXT();
 }
 
 WORD(dolit)
 { //printf("dolit %ld\n", (intptr_t)ip[0]);
 	*PUSH(sp) = tos;
-	tos = (intptr_t)ip[0];
+	tos = ip[0];
 	ip++;
 	NEXT();
 }
@@ -194,14 +195,14 @@ WORD(rot)
 
 WORD(jmp)
 { //printf("jmp %p\n", rp);
-	ip = (dtc_t *)ip[0];
+	ip = (intptr_t *)ip[0];
 	NEXT();
 }
 
 WORD(jz)
 { //printf("jz %p\n", rp);
 	if (tos == 0) {
-		ip = (dtc_t *)ip[0];
+		ip = (intptr_t *)ip[0];
 	} else {
 		ip++;
 	}
@@ -217,5 +218,10 @@ WORD(zeq)
 
 WORD(bye)
 { //printf("bye %p\n", rp);
+	(void)dp;
+	(void)ip;
+	(void)sp;
+	(void)rp;
+	(void)tos;
 	return;
 }
