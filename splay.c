@@ -35,8 +35,10 @@ void splay1(struct node **p_ptr, int x_dir)
 
 // Local search
 // Returns direction of X
+int comparisons = 0;
 enum dir get_dir(struct node *n, int key)
 {
+	comparisons++;
 	if (n == NULL)
 		return NOWHERE;
 
@@ -103,9 +105,6 @@ bool splay(struct node **g_ptr, int key)
 	return true;
 }
 
-// TODO: Rigorous testing
-
-
 bool insert(struct node **root_ptr, struct node *x)
 {
 	if (*root_ptr == NULL) {
@@ -126,11 +125,15 @@ bool insert(struct node **root_ptr, struct node *x)
 	return true;
 }
 
+// TODO: Customizable node data (maybe take inspiration from BSD headers?)
+// TODO: Get/Set/Delete interface
+// TODO: More rigorous testing / benchmarking
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void show_tree(struct node *n, int depth)
 {
-	printf("%*s", 8*depth, ""); // Indent
+	printf("%*s", 2*depth, ""); // Indent
 	if (n == NULL) {
 		printf("NULL\n");
 	} else {
@@ -138,12 +141,16 @@ void show_tree(struct node *n, int depth)
 		show_tree(n->child[LEFT], depth+1);
 		show_tree(n->child[RIGHT], depth+1);
 	}
-	if (depth == 0)
+	if (depth == 0) {
+		printf("comparisons: %d\n", comparisons);
+		comparisons = 0;
 		printf("--------------------------------------------------------------------------------\n");
+	}
 }
 
 int main()
 {
+	// Base case testing
 #define NODE(X, L, R) &(struct node){.key=(X), .child={(L), (R)}}
 #define LEAF(X) NODE(X, NULL, NULL)
 	struct node *root;
@@ -176,9 +183,8 @@ int main()
 	splay(&root, 2);
 	show_tree(root, 0);
 
-	// https://www.cs.usfca.edu/%7Egalles/visualization/SplayTree.html
-
-	struct node pool[1000];
+	// Dynamic testing
+	static struct node pool[1000];
 	struct node *next_node;
 
 #define INSERT(k) \
@@ -204,6 +210,17 @@ int main()
 		} while (0)
 
 
+	// Try out the sequential access theorem experimentally (try `grep comparisons`)
+	FREE_NODES();
+	for (int i = 0; i < 100; i++) {
+		INSERT(i);
+	}
+	for (int i = 0; i < 100; i++) {
+		FIND(i);
+	}
+
+	// Manual testing, compare results online:
+	// https://www.cs.usfca.edu/%7Egalles/visualization/SplayTree.html
 	FREE_NODES();
 	INSERT(1);
 	INSERT(2);
