@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <time.h>
 
 struct node {
 	int key;
@@ -131,21 +133,29 @@ bool insert(struct node **root_ptr, struct node *x)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void show_tree(struct node *n, int depth)
+void print_node(struct node *n, int depth, const char *s)
 {
-	printf("%*s", 2*depth, ""); // Indent
+	for (int i = 1; i < depth; i++) {
+		printf("| ");
+	}
+	printf("%s", s);
 	if (n == NULL) {
 		printf("NULL\n");
 	} else {
 		printf("%d\n", n->key);
-		show_tree(n->child[LEFT], depth+1);
-		show_tree(n->child[RIGHT], depth+1);
+		print_node(n->child[LEFT], depth+1, "L: ");
+		print_node(n->child[RIGHT], depth+1, "R: ");
 	}
 	if (depth == 0) {
 		printf("comparisons: %d\n", comparisons);
 		comparisons = 0;
 		printf("--------------------------------------------------------------------------------\n");
 	}
+}
+
+void show_tree(struct node *root)
+{
+	print_node(root, 0, "Root: ");
 }
 
 int main()
@@ -164,9 +174,9 @@ int main()
 				NULL),
 			NULL);
 
-	show_tree(root, 0);
+	show_tree(root);
 	splay(&root, 1);
-	show_tree(root, 0);
+	show_tree(root);
 
 	root = 
 		NODE(3,
@@ -179,9 +189,9 @@ int main()
 			NULL
 		);
 
-	show_tree(root, 0);
+	show_tree(root);
 	splay(&root, 2);
-	show_tree(root, 0);
+	show_tree(root);
 
 	// Dynamic testing
 	static struct node pool[1000];
@@ -194,13 +204,13 @@ int main()
 			n->child[0] = NULL; \
 			n->child[1] = NULL; \
 			insert(&root, n); \
-			show_tree(root, 0); \
+			show_tree(root); \
 		} while (0)
 
 #define FIND(k) \
 		do { \
 			splay(&root, k); \
-			show_tree(root, 0); \
+			show_tree(root); \
 		} while (0)
 
 #define FREE_NODES() \
@@ -212,11 +222,17 @@ int main()
 
 	// Try out the sequential access theorem experimentally (try `grep comparisons`)
 	FREE_NODES();
+	srand(time(NULL));
 	for (int i = 0; i < 100; i++) {
 		INSERT(i);
 	}
 	for (int i = 0; i < 100; i++) {
 		FIND(i);
+	}
+
+	// Try out randomized accesses
+	for (int i = 0; i < 100; i++) {
+		FIND(rand() % 100);
 	}
 
 	// Manual testing, compare results online:
