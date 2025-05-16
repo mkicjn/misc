@@ -9,10 +9,12 @@ struct node {
 };
 
 enum dir {
-	NOWHERE  = -1,
-	LEFT     =  0,
-	RIGHT    =  1,
-	HERE     =  2,
+	// (used for child indexing)
+	LEFT  = 0,
+	RIGHT = 1,
+	// (not used for child indexing)
+	HERE,
+	NOWHERE,
 };
 
 // Move x where p was and swap links around
@@ -26,6 +28,7 @@ enum dir {
 //      / \       / \
 //     b   c     a   b
 //
+// All types of splays have this in common
 void splay1(struct node **p_ptr, int x_dir)
 {
 	struct node *p = *p_ptr;
@@ -73,37 +76,39 @@ enum dir child_splay(struct node **g_ptr, int key)
 	if (p_dir == NOWHERE)
 		return NOWHERE;
 	if (x_dir == HERE) {
-		// Odd parity - P is X; nothing to do
+		// Odd parity - P is now (or was already) X; nothing to do
 		return p_dir;
 	}
 	struct node *x = p->child[x_dir];
 
 	if (p_dir == x_dir) {
 		// Even parity - Zig-zig case
-		splay1(g_ptr, p_dir);  // Splay p
-		splay1(g_ptr, x_dir);  // Splay x
+		splay1(g_ptr, p_dir);  // Splay P
+		splay1(g_ptr, x_dir);  // Splay X
 	} else {
 		// Even parity - Zig-zag case
-		splay1(&g->child[p_dir], x_dir);  // Splay x
-		splay1(g_ptr, p_dir);             // Splay x again
+		splay1(&g->child[p_dir], x_dir);  // Splay X
+		splay1(g_ptr, p_dir);             // Splay X again
 	}
 	return HERE;
 }
 
 // Handles odd parity case of splay operation only (at the root)
-bool splay(struct node **g_ptr, int key)
+bool splay(struct node **p_ptr, int key)
 {
-	struct node *g = *g_ptr;
+	struct node *p = *p_ptr;
 
-	int x_dir = child_splay(g_ptr, key);
+	int x_dir = child_splay(p_ptr, key);
 	printf("(root) x_dir: %d\n", x_dir);
 	if (x_dir == NOWHERE)
 		return false;
-	if (x_dir == HERE)
+	if (x_dir == HERE) {
+		// Even parity case - root is now X; nothing to do
 		return true;
+	}
 
-	// Zig case
-	splay1(g_ptr, x_dir); // Splay x
+	// Odd parity - Zig case
+	splay1(p_ptr, x_dir); // Splay X
 	return true;
 }
 
@@ -149,7 +154,7 @@ void print_node(struct node *n, int depth, const char *s)
 	if (depth == 0) {
 		printf("comparisons: %d\n", comparisons);
 		comparisons = 0;
-		printf("--------------------------------------------------------------------------------\n");
+		printf("----------------------------------------\n");
 	}
 }
 
@@ -195,7 +200,7 @@ int main()
 
 	// Dynamic testing
 	static struct node pool[1000];
-	struct node *next_node;
+	struct node *next_node = pool;
 
 #define INSERT(k) \
 		do { \
