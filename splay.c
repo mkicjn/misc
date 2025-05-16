@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 
 struct node {
 	int key;
@@ -47,7 +48,7 @@ enum dir get_dir(struct node *n, int key)
 		return HERE;
 }
 
-// Even-parity recursive case of splay operation
+// Handles even-parity cases of splay operation only
 // Returns direction of X relative to G, post-splay
 enum dir child_splay(struct node **g_ptr, int key)
 {
@@ -58,35 +59,74 @@ enum dir child_splay(struct node **g_ptr, int key)
 		return NOWHERE;
 	printf("p_dir: %d\n", p_dir);
 	if (p_dir == HERE) {
-		// G is X
+		// Even parity - G is already X; nothing to do
 		return HERE;
 	}
 	struct node *p = g->child[p_dir];
 
-	int x_dir = get_dir(p, key); //child_splay(&g->child[p_dir], key) // ???
+	int x_dir = child_splay(&g->child[p_dir], key);
 	printf("x_dir: %d\n", x_dir);
 	if (p_dir == NOWHERE)
 		return NOWHERE;
 	if (x_dir == HERE) {
-		// P is X
+		// Odd parity - P is X; nothing to do
 		return p_dir;
 	}
 	struct node *x = p->child[x_dir];
 
 	if (p_dir == x_dir) {
-		// Zig-zig case
+		// Even parity - X is now in the same direction from P as P is from G
+		// (Zig-zig case)
 		splay1(g_ptr, p_dir); // Splay p
 		splay1(g_ptr, x_dir); // Splay x
 	} else {
-		// Zig-zag case
+		// Even parity - X is now in the opposite direction from P as P is from G
+		// (Zig-zag case)
 		splay1(&g->child[p_dir], x_dir); // Splay x
 		splay1(g_ptr, p_dir); // Splay x again
 	}
 	return HERE;
 }
 
-// TODO: Handle odd parity case (root)
+// Handles odd parity case of splay operation only (at the root)
+bool splay(struct node **g_ptr, int key)
+{
+	struct node *g = *g_ptr;
 
+	int x_dir = child_splay(g_ptr, key);
+	printf("(root) x_dir: %d\n", x_dir);
+	if (x_dir == NOWHERE)
+		return false;
+	if (x_dir == HERE)
+		return true;
+
+	// Zig case
+	splay1(g_ptr, x_dir); // Splay x
+	return true;
+}
+
+// TODO: Rigorous testing
+
+
+bool insert(struct node **root_ptr, struct node *x)
+{
+	if (*root_ptr == NULL) {
+		// Trivial case
+		*root_ptr = x;
+		return true;
+	}
+	struct node **p_ptr = root_ptr;
+	while (*p_ptr != NULL) {
+		struct node *p = *p_ptr;
+		int x_dir = get_dir(p, x->key);
+		if (x_dir == HERE)
+			return false; // Already exists
+		p_ptr = &p->child[x_dir];
+	}
+	*p_ptr = x;
+	splay(root_ptr, x->key);
+	return true;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -100,30 +140,83 @@ void show_tree(struct node *n, int depth)
 		show_tree(n->child[LEFT], depth+1);
 		show_tree(n->child[RIGHT], depth+1);
 	}
+	if (depth == 0)
+		printf("--------------------------------------------------------------------------------\n");
 }
 
 int main()
 {
-	struct node n_x, n_p, n_g;
-	struct node *g;
+#define NODE(X, L, R) &(struct node){.key=(X), .child={(L), (R)}}
+#define LEAF(X) NODE(X, NULL, NULL)
+	struct node *root;
 
-	n_x = (struct node){.key = 1, .child = {NULL, NULL}};
-	n_p = (struct node){.key = 2, .child = {&n_x, NULL}};
-	n_g = (struct node){.key = 3, .child = {&n_p, NULL}};
+	root = 
+		NODE(3,
+			NODE(2,
+				NODE(1,
+					NULL,
+					NULL),
+				NULL),
+			NULL);
 
-	g = &n_g;
-	show_tree(g, 0);
-	child_splay(&g, n_x.key);
-	show_tree(g, 0);
+	show_tree(root, 0);
+	splay(&root, 1);
+	show_tree(root, 0);
+
+	root = 
+		NODE(3,
+			NODE(1,
+				NULL,
+				NODE(2,
+					NULL,
+					NULL)
+			),
+			NULL
+		);
+
+	show_tree(root, 0);
+	splay(&root, 2);
+	show_tree(root, 0);
+
+	// https://www.cs.usfca.edu/%7Egalles/visualization/SplayTree.html
+
+	struct node pool[1000];
+	struct node *next_node;
+
+#define INSERT(k) \
+		do { \
+			struct node *n = next_node++; \
+			n->key = k; \
+			n->child[0] = NULL; \
+			n->child[1] = NULL; \
+			insert(&root, n); \
+			show_tree(root, 0); \
+		} while (0)
+
+#define FIND(k) \
+		do { \
+			splay(&root, k); \
+			show_tree(root, 0); \
+		} while (0)
+
+#define FREE_NODES() \
+		do { \
+			root = NULL; \
+			next_node = pool; \
+		} while (0)
 
 
-	n_x = (struct node){.key = 2, .child = {NULL, NULL}};
-	n_p = (struct node){.key = 1, .child = {NULL, &n_x}};
-	n_g = (struct node){.key = 3, .child = {&n_p, NULL}};
+	FREE_NODES();
+	INSERT(1);
+	INSERT(2);
+	INSERT(3);
+	INSERT(4);
+	INSERT(5);
+	INSERT(6);
+	INSERT(7);
+	FIND(4);
+	FIND(3);
+	FIND(2);
 
-	g = &n_g;
-	show_tree(g, 0);
-	child_splay(&g, n_x.key);
-	show_tree(g, 0);
-
+	return 0;
 }
