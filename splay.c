@@ -13,12 +13,12 @@ enum dir {
 	HERE     =  2,
 };
 
-// Move child where p was and swap links around
+// Move x where p was and swap links around
 // e.g., splay1(&g->child[LEFT], RIGHT);
 //
-//       g             g
+//      (g)           (g)
 //      / \           / \
-//     p   d  ->     x   d
+//     p   d   ->    x   d
 //    / \           / \
 //   a   x         p   c
 //      / \       / \
@@ -75,15 +75,13 @@ enum dir child_splay(struct node **g_ptr, int key)
 	struct node *x = p->child[x_dir];
 
 	if (p_dir == x_dir) {
-		// Even parity - X is now in the same direction from P as P is from G
-		// (Zig-zig case)
-		splay1(g_ptr, p_dir); // Splay p
-		splay1(g_ptr, x_dir); // Splay x
+		// Even parity - Zig-zig case
+		splay1(g_ptr, p_dir);  // Splay p
+		splay1(g_ptr, x_dir);  // Splay x
 	} else {
-		// Even parity - X is now in the opposite direction from P as P is from G
-		// (Zig-zag case)
-		splay1(&g->child[p_dir], x_dir); // Splay x
-		splay1(g_ptr, p_dir); // Splay x again
+		// Even parity - Zig-zag case
+		splay1(&g->child[p_dir], x_dir);  // Splay x
+		splay1(g_ptr, p_dir);             // Splay x again
 	}
 	return HERE;
 }
@@ -111,7 +109,7 @@ bool splay(struct node **g_ptr, int key)
 bool insert(struct node **root_ptr, struct node *x)
 {
 	if (*root_ptr == NULL) {
-		// Trivial case
+		// Trivial case with no root
 		*root_ptr = x;
 		return true;
 	}
@@ -217,6 +215,9 @@ int main()
 	FIND(4);
 	FIND(3);
 	FIND(2);
+	FIND(3);
+	FIND(6);
+	FIND(1);
 
 	return 0;
 }
