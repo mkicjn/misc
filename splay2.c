@@ -18,6 +18,29 @@ enum dir {
 	NOWHERE,
 };
 
+////////////////////////////////////////////////////////////////////////////////
+
+void print_node(struct node *n, int depth, const char *s)
+{
+	if (n == NULL)
+		return;
+
+	for (int i = 1; i < depth; i++)
+		printf("| ");
+	printf("%s%lu\n", s, n->key);
+	print_node(n->child[LEFT], depth+1, "L:");
+	print_node(n->child[RIGHT], depth+1, "R:");
+}
+
+void show_tree(struct node *root)
+{
+#ifdef SHOW_TREES
+	print_node(root, 0, "");
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 /*
  * Move x where p was and swap links around
  * e.g., splay1(&g->child[LEFT], RIGHT);
@@ -56,54 +79,41 @@ static inline enum dir get_dir(struct node *n, unsigned long key)
 		return HERE;
 }
 
-// Handles even-parity cases of splay operation only
-// Returns direction of X relative to G, post-splay
+// Top-down strategy?
+// Haven't seen this exact method described anywhere
+// Seems quite a bit slower for some reason but succeeds at being tail-recursive
 enum dir child_splay(struct node **g_ptr, unsigned long key)
 {
 	struct node *g = *g_ptr;
-
 	int p_dir = get_dir(g, key);
 	if (p_dir == NOWHERE)
 		return NOWHERE;
-	if (p_dir == HERE) {
-		// Even parity - G is already X; nothing to do
+	if (p_dir == HERE)
 		return HERE;
-	}
 
-	int x_dir = child_splay(&g->child[p_dir], key);
-	if (p_dir == NOWHERE)
+	struct node *p = g->child[p_dir];
+	int x_dir = get_dir(p, key);
+	if (x_dir == NOWHERE)
 		return NOWHERE;
 	if (x_dir == HERE) {
-		// Odd parity - P is now (or was already) X; nothing to do
-		return p_dir;
-	}
-
-	if (p_dir == x_dir) {
-		// Even parity - Zig-zig case
-		splay1(g_ptr, p_dir);  // Splay P
-		splay1(g_ptr, x_dir);  // Splay X
+		// Zig case
+		splay1(g_ptr, p_dir);
+		return HERE;
+	} else if (x_dir == p_dir) {
+		// Zig-zig case
+		splay1(&g->child[p_dir], x_dir);
+		splay1(g_ptr, p_dir);
 	} else {
-		// Even parity - Zig-zag case
-		splay1(&g->child[p_dir], x_dir);  // Splay X
-		splay1(g_ptr, p_dir);             // Splay X again
+		// Zig-zag case
+		splay1(&g->child[p_dir], x_dir);
+		splay1(g_ptr, p_dir);
 	}
-	return HERE;
+	return child_splay(g_ptr, key);
 }
 
-// Handles odd parity case of splay operation only (at the root)
 bool splay(struct node **p_ptr, unsigned long key)
 {
-	int x_dir = child_splay(p_ptr, key);
-	if (x_dir == NOWHERE)
-		return false;
-	if (x_dir == HERE) {
-		// Even parity case - root is now X; nothing to do
-		return true;
-	}
-
-	// Odd parity - Zig case
-	splay1(p_ptr, x_dir); // Splay X
-	return true;
+	return (child_splay(p_ptr, key) == HERE);
 }
 
 bool insert(struct node **root_ptr, struct node *x)
@@ -152,27 +162,6 @@ bool delete(struct node **root_ptr, unsigned long key)
 // TODO: Customizable node data (maybe take inspiration from BSD headers?)
 // TODO: Get/Set/Delete interface
 // TODO: More rigorous testing / benchmarking
-
-////////////////////////////////////////////////////////////////////////////////
-
-void print_node(struct node *n, int depth, const char *s)
-{
-	if (n == NULL)
-		return;
-
-	for (int i = 1; i < depth; i++)
-		printf("| ");
-	printf("%s%lu\n", s, n->key);
-	print_node(n->child[LEFT], depth+1, "L:");
-	print_node(n->child[RIGHT], depth+1, "R:");
-}
-
-void show_tree(struct node *root)
-{
-#ifdef SHOW_TREES
-	print_node(root, 0, "");
-#endif
-}
 
 int main()
 {
