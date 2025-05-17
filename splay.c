@@ -140,17 +140,15 @@ bool insert(struct node **root_ptr, struct node *x)
 
 void print_node(struct node *n, int depth, const char *s)
 {
-	for (int i = 1; i < depth; i++) {
+	if (n == NULL)
+		return;
+
+	for (int i = 1; i < depth; i++)
 		printf("| ");
-	}
-	printf("%s", s);
-	if (n == NULL) {
-		printf("NULL\n");
-	} else {
-		printf("%d\n", n->key);
-		print_node(n->child[LEFT], depth+1, "L: ");
-		print_node(n->child[RIGHT], depth+1, "R: ");
-	}
+	printf("%s%d\n", s, n->key);
+	print_node(n->child[LEFT], depth+1, "L: ");
+	print_node(n->child[RIGHT], depth+1, "R: ");
+
 	if (depth == 0) {
 		printf("comparisons: %d\n", comparisons);
 		comparisons = 0;
