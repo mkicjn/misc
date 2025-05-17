@@ -132,6 +132,25 @@ bool insert(struct node **root_ptr, struct node *x)
 	return true;
 }
 
+int max_key(struct node *n)
+{
+	while (n->child[RIGHT])
+		n = n->child[RIGHT];
+	return n->key;
+}
+
+bool delete(struct node **root_ptr, int key)
+{
+	if (!splay(root_ptr, key))
+		return false;
+	struct node *old_root = *root_ptr; // (To be removed)
+
+	*root_ptr = old_root->child[LEFT];
+	splay(root_ptr, max_key(*root_ptr));
+	(*root_ptr)->child[RIGHT] = old_root->child[RIGHT];
+	return true;
+}
+
 // TODO: Customizable node data (maybe take inspiration from BSD headers?)
 // TODO: Get/Set/Delete interface
 // TODO: More rigorous testing / benchmarking
@@ -146,8 +165,8 @@ void print_node(struct node *n, int depth, const char *s)
 	for (int i = 1; i < depth; i++)
 		printf("| ");
 	printf("%s%d\n", s, n->key);
-	print_node(n->child[LEFT], depth+1, "L: ");
-	print_node(n->child[RIGHT], depth+1, "R: ");
+	print_node(n->child[LEFT], depth+1, "L:");
+	print_node(n->child[RIGHT], depth+1, "R:");
 
 	if (depth == 0) {
 		printf("comparisons: %d\n", comparisons);
@@ -158,7 +177,7 @@ void print_node(struct node *n, int depth, const char *s)
 
 void show_tree(struct node *root)
 {
-	print_node(root, 0, "Root: ");
+	print_node(root, 0, "");
 }
 
 int main()
@@ -216,6 +235,12 @@ int main()
 			show_tree(root); \
 		} while (0)
 
+#define DELETE(k) \
+		do { \
+			delete(&root, k); \
+			show_tree(root); \
+		} while (0)
+
 #define FREE_NODES() \
 		do { \
 			root = NULL; \
@@ -254,6 +279,7 @@ int main()
 	FIND(3);
 	FIND(6);
 	FIND(1);
+	DELETE(6);
 
 	return 0;
 }
