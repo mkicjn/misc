@@ -4,7 +4,8 @@
 #include <time.h>
 
 struct node {
-	int key;
+	unsigned long key;
+	void *val;
 	struct node *child[2];
 };
 
@@ -17,18 +18,20 @@ enum dir {
 	NOWHERE,
 };
 
-// Move x where p was and swap links around
-// e.g., splay1(&g->child[LEFT], RIGHT);
-//
-//      (g)           (g)
-//      / \           / \
-//     p   d   ->    x   d
-//    / \           / \
-//   a   x         p   c
-//      / \       / \
-//     b   c     a   b
-//
-// All types of splays have this in common
+/*
+ * Move x where p was and swap links around
+ * e.g., splay1(&g->child[LEFT], RIGHT);
+ *
+ *      (g)           (g)
+ *      / \           / \
+ *     p   d   ->    x   d
+ *    / \           / \
+ *   a   x         p   c
+ *      / \       / \
+ *     b   c     a   b
+ *
+ * All types of splays have this in common
+ */
 void splay1(struct node **p_ptr, int x_dir)
 {
 	struct node *p = *p_ptr;
@@ -41,9 +44,9 @@ void splay1(struct node **p_ptr, int x_dir)
 // Local search
 // Returns direction of X
 int comparisons = 0;
-enum dir get_dir(struct node *n, int key)
+static inline enum dir get_dir(struct node *n, unsigned long key)
 {
-	comparisons++;
+	//comparisons++;
 	if (n == NULL)
 		return NOWHERE;
 
@@ -57,29 +60,25 @@ enum dir get_dir(struct node *n, int key)
 
 // Handles even-parity cases of splay operation only
 // Returns direction of X relative to G, post-splay
-enum dir child_splay(struct node **g_ptr, int key)
+enum dir child_splay(struct node **g_ptr, unsigned long key)
 {
 	struct node *g = *g_ptr;
 
 	int p_dir = get_dir(g, key);
 	if (p_dir == NOWHERE)
 		return NOWHERE;
-	printf("p_dir: %d\n", p_dir);
 	if (p_dir == HERE) {
 		// Even parity - G is already X; nothing to do
 		return HERE;
 	}
-	struct node *p = g->child[p_dir];
 
 	int x_dir = child_splay(&g->child[p_dir], key);
-	printf("x_dir: %d\n", x_dir);
 	if (p_dir == NOWHERE)
 		return NOWHERE;
 	if (x_dir == HERE) {
 		// Odd parity - P is now (or was already) X; nothing to do
 		return p_dir;
 	}
-	struct node *x = p->child[x_dir];
 
 	if (p_dir == x_dir) {
 		// Even parity - Zig-zig case
@@ -94,12 +93,9 @@ enum dir child_splay(struct node **g_ptr, int key)
 }
 
 // Handles odd parity case of splay operation only (at the root)
-bool splay(struct node **p_ptr, int key)
+bool splay(struct node **p_ptr, unsigned long key)
 {
-	struct node *p = *p_ptr;
-
 	int x_dir = child_splay(p_ptr, key);
-	printf("(root) x_dir: %d\n", x_dir);
 	if (x_dir == NOWHERE)
 		return false;
 	if (x_dir == HERE) {
@@ -132,19 +128,23 @@ bool insert(struct node **root_ptr, struct node *x)
 	return true;
 }
 
-int max_key(struct node *n)
+static inline unsigned long max_key(struct node *n)
 {
 	while (n->child[RIGHT])
 		n = n->child[RIGHT];
 	return n->key;
 }
 
-bool delete(struct node **root_ptr, int key)
+bool delete(struct node **root_ptr, unsigned long key)
 {
 	if (!splay(root_ptr, key))
 		return false;
 	struct node *old_root = *root_ptr; // (To be removed)
 
+	if (!old_root->child[LEFT]) {
+		*root_ptr = old_root->child[RIGHT];
+		return true;
+	}
 	*root_ptr = old_root->child[LEFT];
 	splay(root_ptr, max_key(*root_ptr));
 	(*root_ptr)->child[RIGHT] = old_root->child[RIGHT];
@@ -164,7 +164,7 @@ void print_node(struct node *n, int depth, const char *s)
 
 	for (int i = 1; i < depth; i++)
 		printf("| ");
-	printf("%s%d\n", s, n->key);
+	printf("%s%lu\n", s, n->key);
 	print_node(n->child[LEFT], depth+1, "L:");
 	print_node(n->child[RIGHT], depth+1, "R:");
 
@@ -177,7 +177,9 @@ void print_node(struct node *n, int depth, const char *s)
 
 void show_tree(struct node *root)
 {
+#ifdef SHOW_TREES
 	print_node(root, 0, "");
+#endif
 }
 
 int main()
@@ -216,7 +218,8 @@ int main()
 	show_tree(root);
 
 	// Dynamic testing
-	static struct node pool[1000];
+#define IOTA 1000
+	static struct node pool[IOTA];
 	struct node *next_node = pool;
 
 #define INSERT(k) \
@@ -247,21 +250,42 @@ int main()
 			next_node = pool; \
 		} while (0)
 
+#undef printf
+
+	srand(time(NULL));
+	clock_t dur = 0;
+
+	FREE_NODES();
 
 	// Try out the sequential access theorem experimentally (try `grep comparisons`)
-	FREE_NODES();
-	srand(time(NULL));
-	for (int i = 0; i < 100; i++) {
+	dur = clock();
+	for (int i = 0; i < IOTA; i++) {
 		INSERT(i);
 	}
-	for (int i = 0; i < 100; i++) {
+	dur = (clock() - dur);
+	printf("Average insert duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / IOTA * 1000.0);
+
+	dur = clock();
+	for (int i = 0; i < IOTA; i++) {
 		FIND(i);
 	}
+	dur = (clock() - dur);
+	printf("Average sequential find duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / IOTA * 1000.0);
 
 	// Try out randomized accesses
-	for (int i = 0; i < 100; i++) {
-		FIND(rand() % 100);
+	dur = clock();
+	for (int i = 0; i < IOTA; i++) {
+		FIND(rand() % IOTA);
 	}
+	dur = (clock() - dur);
+	printf("Average randomized find duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / IOTA * 1000.0);
+
+	dur = clock();
+	for (int i = 0; i < IOTA; i++) {
+		DELETE(i);
+	}
+	dur = (clock() - dur);
+	printf("Average delete duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / IOTA * 1000.0);
 
 	// Manual testing, compare results online:
 	// https://www.cs.usfca.edu/%7Egalles/visualization/SplayTree.html
