@@ -45,21 +45,21 @@ typedef FORTH_DECL((*dtc_t));
 
 #define FOR_EACH_WORD(X) \
 	X##_START \
-	X("key", key) \
-	X("emit", emit) \
-	X(".", dot) \
-	X("exit", exit) \
-	X("dup", dup) \
-	X("drop", drop) \
-	X("swap", swap) \
-	X("2*", mul2) \
-	X("2/", div2) \
-	X("1+", inc) \
-	X("1-", dec) \
-	X("max", max) \
-	X("rot", rot) \
-	X("0=", zeq) \
-	X("bye", bye) \
+	X("\003key", key) \
+	X("\004emit", emit) \
+	X("\001.", dot) \
+	X("\004exit", exit) \
+	X("\003dup", dup) \
+	X("\004drop", drop) \
+	X("\004swap", swap) \
+	X("\0022*", mul2) \
+	X("\0022/", div2) \
+	X("\0021+", inc) \
+	X("\0021-", dec) \
+	X("\003max", max) \
+	X("\003rot", rot) \
+	X("\0020=", zeq) \
+	X("\003bye", bye) \
 	X##_END
 
 FOR_EACH_WORD(DECLARE_LINKS)
@@ -75,41 +75,41 @@ WORD(next)
 #define NEXT() next_code(FORTH_REGS)
 
 WORD(key)
-{ //printf("key %p\n", rp);
+{
 	*PUSH(sp) = tos;
 	tos = getchar();
 	NEXT();
 }
 
 WORD(emit)
-{ //printf("emit %p\n", rp);
+{
 	putchar(tos);
 	tos = *POP(sp);
 	NEXT();
 }
 
 WORD(dot)
-{ //printf("dot %p\n", rp);
+{
 	printf("%ld\n", tos);
 	tos = *POP(sp);
 	NEXT();
 }
 
 WORD(docol)
-{ //printf("docol %p\n", rp);
+{
 	*PUSH(rp) = (intptr_t)(&ip[1]);
 	ip = (intptr_t *)ip[0];
 	NEXT();
 }
 
 WORD(exit)
-{ //printf("exit %p\n", rp);
+{
 	ip = (intptr_t *)(*POP(rp));
 	NEXT();
 }
 
 WORD(dolit)
-{ //printf("dolit %ld\n", (intptr_t)ip[0]);
+{
 	*PUSH(sp) = tos;
 	tos = ip[0];
 	ip++;
@@ -117,19 +117,19 @@ WORD(dolit)
 }
 
 WORD(dup)
-{ //printf("dup %p\n", rp);
+{
 	*PUSH(sp) = tos;
 	NEXT();
 }
 
 WORD(drop)
-{ //printf("drop %p\n", rp);
+{
 	tos = *POP(sp);
 	NEXT();
 }
 
 WORD(swap)
-{ //printf("swap %p\n", rp);
+{
 	intptr_t a = tos;
 	intptr_t b = sp[0];
 	tos = b;
@@ -151,31 +151,31 @@ WORD_2OP(gt, >)
 WORD_2OP(and, &)
 
 WORD(mul2)
-{ //printf("mul2 %p\n", rp);
+{
 	tos <<= 1;
 	NEXT();
 }
 
 WORD(div2)
-{ //printf("div2 %p\n", rp);
+{
 	tos >>= 1;
 	NEXT();
 }
 
 WORD(inc)
-{ //printf("inc %p\n", rp);
+{
 	tos++;
 	NEXT();
 }
 
 WORD(dec)
-{ //printf("dec %p\n", rp);
+{
 	tos--;
 	NEXT();
 }
 
 WORD(max)
-{ //printf("max %p\n", rp);
+{
 	intptr_t x = *POP(sp);
 	if (x > tos)
 		tos = x;
@@ -183,7 +183,7 @@ WORD(max)
 }
 
 WORD(rot)
-{ //printf("rot %p\n", rp);
+{
 	intptr_t a = tos;
 	intptr_t b = sp[0];
 	intptr_t c = sp[-1];
@@ -194,13 +194,13 @@ WORD(rot)
 }
 
 WORD(jmp)
-{ //printf("jmp %p\n", rp);
+{
 	ip = (intptr_t *)ip[0];
 	NEXT();
 }
 
 WORD(jz)
-{ //printf("jz %p\n", rp);
+{
 	if (tos == 0) {
 		ip = (intptr_t *)ip[0];
 	} else {
@@ -211,17 +211,24 @@ WORD(jz)
 }
 
 WORD(zeq)
-{ //printf("zeq %p\n", rp);
+{
 	tos = (tos == 0);
 	NEXT();
 }
 
 WORD(bye)
-{ //printf("bye %p\n", rp);
+{
 	(void)dp;
 	(void)ip;
 	(void)sp;
 	(void)rp;
 	(void)tos;
 	return;
+}
+
+WORD(dummy_literal)
+{
+	*PUSH(sp) = tos;
+	tos = 0x0123456789abcdef;
+	NEXT();
 }
