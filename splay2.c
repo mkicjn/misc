@@ -77,9 +77,6 @@ void rotate(struct node **p_ptr, int x_dir)
 static inline enum dir compare(struct node *n, unsigned long key)
 {
 	comparisons++;
-	if (n == NULL)
-		return NOWHERE;
-
 	if (key > n->key)
 		return RIGHT;
 	else if (key < n->key)
@@ -88,41 +85,49 @@ static inline enum dir compare(struct node *n, unsigned long key)
 		return HERE;
 }
 
-// Top-down strategy?
-// Haven't seen this exact method described anywhere
-// Seems quite a bit slower for some reason but succeeds at being tail-recursive
-enum dir child_splay(struct node **g_ptr, unsigned long key)
+// Top-down strategy
+void child_splay(struct node **g_ptr, unsigned long key)
 {
-	struct node *g = *g_ptr;
-	int p_dir = compare(g, key);
-	if (p_dir == NOWHERE)
-		return NOWHERE;
-	if (p_dir == HERE)
-		return HERE;
+	if (*g_ptr == NULL)
+		return;
 
-	struct node *p = g->child[p_dir];
-	int x_dir = compare(p, key);
-	if (x_dir == NOWHERE)
-		return NOWHERE;
-	if (x_dir == HERE) {
-		// Zig case
-		rotate(g_ptr, p_dir);
-		return HERE;
-	} else if (x_dir == p_dir) {
-		// Zig-zig case
-		rotate(&g->child[p_dir], x_dir);
-		rotate(g_ptr, p_dir);
-	} else {
-		// Zig-zag case
-		rotate(&g->child[p_dir], x_dir);
-		rotate(g_ptr, p_dir);
+	struct node *subtree[2] = {NULL, NULL};
+	struct node **leaf[2] = {&subtree[0], &subtree[1]};
+
+	for (;;) {
+		struct node *g = *g_ptr;
+		int p_dir = compare(g, key);
+		if (p_dir == HERE)
+			break;
+
+		struct node *p = g->child[p_dir];
+		if (!p) {
+			break;
+		} else if (p->key == key) {
+			rotate(g_ptr, p_dir);
+			break;
+		} else if (compare(p, key) == p_dir) {
+			rotate(g_ptr, p_dir);
+		}
+
+		g = *g_ptr;
+		p = g->child[p_dir];
+		*leaf[1-p_dir] = g;
+		 leaf[1-p_dir] = &g->child[p_dir];
+		*g_ptr = p;
 	}
-	return child_splay(g_ptr, key);
+
+	struct node *g = *g_ptr;
+	*(leaf[LEFT]) = g->child[LEFT];
+	*(leaf[RIGHT]) = g->child[RIGHT];
+	g->child[LEFT] = subtree[LEFT];
+	g->child[RIGHT] = subtree[RIGHT];
 }
 
-bool splay(struct node **p_ptr, unsigned long key)
+bool splay(struct node **root_ptr, unsigned long key)
 {
-	if (child_splay(p_ptr, key) == HERE) {
+	child_splay(root_ptr, key);
+	if (*root_ptr != NULL && (*root_ptr)->key == key) {
 		//printf("splay succeeded\n");
 		return true;
 	} else {
@@ -362,5 +367,11 @@ int main()
 	FIND(1);
 	DELETE(6);
 
+	// Not found test
+	FREE_NODES();
+	printf("This lookup is expected to fail (but not segfault): ");
+	FIND(0);
+
+	free(pool);
 	return 0;
 }

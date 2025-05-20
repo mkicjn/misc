@@ -367,5 +367,11 @@ int main()
 	FIND(1);
 	DELETE(6);
 
+	// Not found test
+	FREE_NODES();
+	printf("This lookup is expected to fail (but not segfault): ");
+	FIND(0);
+
+	free(pool);
 	return 0;
 }
