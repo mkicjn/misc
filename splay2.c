@@ -86,53 +86,48 @@ static inline enum dir compare(struct node *n, unsigned long key)
 }
 
 // Top-down strategy
-void child_splay(struct node **g_ptr, unsigned long key)
+bool splay(struct node **root_ptr, unsigned long key)
 {
-	if (*g_ptr == NULL)
-		return;
+	if (*root_ptr == NULL)
+		return false;
 
 	struct node *subtree[2] = {NULL, NULL};
 	struct node **leaf[2] = {&subtree[0], &subtree[1]};
 
 	for (;;) {
-		struct node *g = *g_ptr;
-		int p_dir = compare(g, key);
-		if (p_dir == HERE)
+		struct node *g = *root_ptr;
+		int dir = compare(g, key);
+		if (dir == HERE)
+			break;
+		if (g->child[dir] == NULL)
 			break;
 
-		struct node *p = g->child[p_dir];
-		if (!p) {
-			break;
-		} else if (p->key == key) {
-			rotate(g_ptr, p_dir);
-			break;
-		} else if (compare(p, key) == p_dir) {
-			rotate(g_ptr, p_dir);
+		struct node *p = g->child[dir];
+		if (compare(p, key) == dir) {
+			g = p;
+			rotate(root_ptr, dir);
 		}
 
-		g = *g_ptr;
-		p = g->child[p_dir];
-		*leaf[1-p_dir] = g;
-		 leaf[1-p_dir] = &g->child[p_dir];
-		*g_ptr = p;
+		*leaf[1-dir] = g;
+		leaf[1-dir] = &g->child[dir];
+		*root_ptr = g->child[dir];
 	}
 
-	struct node *g = *g_ptr;
-	*(leaf[LEFT]) = g->child[LEFT];
-	*(leaf[RIGHT]) = g->child[RIGHT];
+	struct node *g = *root_ptr;
+	*leaf[LEFT] = g->child[LEFT];
+	*leaf[RIGHT] = g->child[RIGHT];
 	g->child[LEFT] = subtree[LEFT];
 	g->child[RIGHT] = subtree[RIGHT];
+	return g->key == key;
 }
 
-bool splay(struct node **root_ptr, unsigned long key)
+bool find(struct node **root_ptr, unsigned long key)
 {
-	child_splay(root_ptr, key);
-	if (*root_ptr != NULL && (*root_ptr)->key == key) {
-		//printf("splay succeeded\n");
-		return true;
-	} else {
+	if (!splay(root_ptr, key)) {
 		printf("splay failed\n");
 		return false;
+	} else {
+		return true;
 	}
 }
 
@@ -296,7 +291,7 @@ int main()
 
 #define FIND(k) \
 		do { \
-			splay(&root, k); \
+			find(&root, k); \
 			show_tree(root); \
 		} while (0)
 
