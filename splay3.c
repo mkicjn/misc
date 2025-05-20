@@ -18,6 +18,36 @@ enum dir {
 	NOWHERE,
 };
 
+////////////////////////////////////////////////////////////////////////////////
+
+void print_node(struct node *n, int depth, const char *s)
+{
+	if (n == NULL)
+		return;
+
+	for (int i = 1; i < depth; i++)
+		printf("| ");
+	printf("%s%lu\n", s, n->key);
+	print_node(n->child[LEFT], depth+1, "L:");
+	print_node(n->child[RIGHT], depth+1, "R:");
+}
+
+unsigned long comparisons = 0;
+unsigned long rotations = 0;
+void show_tree(struct node *root)
+{
+#ifdef SHOW_TREES
+	print_node(root, 0, "");
+	printf("comparisons: %lu\n", comparisons);
+	printf("rotations: %lu\n", rotations);
+	comparisons = 0;
+	rotations = 0;
+	printf("----------------------------------------\n");
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 /*
  * Move x where p was and swap links around
  * e.g., rotate(&g->child[LEFT], RIGHT);
@@ -32,7 +62,6 @@ enum dir {
  *
  * All types of splays have this in common
  */
-unsigned long rotations = 0;
 void rotate(struct node **p_ptr, int x_dir)
 {
 	rotations++;
@@ -45,7 +74,6 @@ void rotate(struct node **p_ptr, int x_dir)
 
 // Local search
 // Returns direction of X
-unsigned long comparisons = 0;
 static inline enum dir compare(struct node *n, unsigned long key)
 {
 	comparisons++;
@@ -60,54 +88,63 @@ static inline enum dir compare(struct node *n, unsigned long key)
 		return HERE;
 }
 
-// Handles even-parity cases of splay operation only
-// Returns direction of X relative to G, post-splay
+// Top-down strategy
 enum dir child_splay(struct node **g_ptr, unsigned long key)
 {
+	struct node *subtree[2] = {NULL, NULL};
+	struct node **extremum[2] = {&subtree[0], &subtree[1]};
+
+	for (;;) {
+		struct node *g = *g_ptr;
+		int p_dir = compare(g, key);
+		if (p_dir == NOWHERE)
+			break;
+		if (p_dir == HERE)
+			break;
+
+		struct node *p = g->child[p_dir];
+		int x_dir = compare(p, key);
+		if (x_dir == NOWHERE) {
+			// Not found: Rotate parent to root
+			rotate(g_ptr, p_dir);
+			break;
+		}
+
+		// Zig-zig only
+		if (x_dir == p_dir)
+			rotate(g_ptr, p_dir);
+
+		// All cases (Zig, Zig-zig, Zig-zag)
+		g = *g_ptr;
+		p = g->child[p_dir];
+		g->child[p_dir] = NULL;
+		*extremum[1-p_dir] = g;
+		 extremum[1-p_dir] = &g->child[p_dir];
+		*g_ptr = p;
+
+		// Zig only
+		if (x_dir == HERE)
+			break;
+	}
+
+	// Reconstruct tree
 	struct node *g = *g_ptr;
-
-	int p_dir = compare(g, key);
-	if (p_dir == NOWHERE)
-		return NOWHERE;
-	if (p_dir == HERE) {
-		// Even parity - G is already X; nothing to do
-		return HERE;
-	}
-
-	int x_dir = child_splay(&g->child[p_dir], key);
-	if (p_dir == NOWHERE)
-		return NOWHERE;
-	if (x_dir == HERE) {
-		// Odd parity - P is now (or was already) X; nothing to do
-		return p_dir;
-	}
-
-	if (p_dir == x_dir) {
-		// Even parity - Zig-zig case
-		rotate(g_ptr, p_dir);  // Splay P
-		rotate(g_ptr, x_dir);  // Splay X
-	} else {
-		// Even parity - Zig-zag case
-		rotate(&g->child[p_dir], x_dir);  // Splay X
-		rotate(g_ptr, p_dir);             // Splay X again
-	}
-	return HERE;
+	*extremum[LEFT] = g->child[LEFT];
+	g->child[LEFT] = subtree[LEFT];
+	*extremum[RIGHT] = g->child[RIGHT];
+	g->child[RIGHT] = subtree[RIGHT];
+	return (g->key == key) ? HERE : NOWHERE;
 }
 
-// Handles odd parity case of splay operation only (at the root)
 bool splay(struct node **p_ptr, unsigned long key)
 {
-	int x_dir = child_splay(p_ptr, key);
-	if (x_dir == NOWHERE)
-		return false;
-	if (x_dir == HERE) {
-		// Even parity case - root is now X; nothing to do
+	if (child_splay(p_ptr, key) == HERE) {
+		//printf("splay succeeded\n");
 		return true;
+	} else {
+		printf("splay failed\n");
+		return false;
 	}
-
-	// Odd parity - Zig case
-	rotate(p_ptr, x_dir); // Splay X
-	return true;
 }
 
 bool insert(struct node **root_ptr, struct node *x)
@@ -156,32 +193,6 @@ bool delete(struct node **root_ptr, unsigned long key)
 // TODO: Customizable node data (maybe take inspiration from BSD headers?)
 // TODO: Get/Set/Delete interface
 // TODO: More rigorous testing / benchmarking
-
-////////////////////////////////////////////////////////////////////////////////
-
-void print_node(struct node *n, int depth, const char *s)
-{
-	if (n == NULL)
-		return;
-
-	for (int i = 1; i < depth; i++)
-		printf("| ");
-	printf("%s%lu\n", s, n->key);
-	print_node(n->child[LEFT], depth+1, "L:");
-	print_node(n->child[RIGHT], depth+1, "R:");
-}
-
-void show_tree(struct node *root)
-{
-#ifdef SHOW_TREES
-	print_node(root, 0, "");
-	printf("comparisons: %lu\n", comparisons);
-	printf("rotations: %lu\n", rotations);
-	comparisons = 0;
-	rotations = 0;
-	printf("----------------------------------------\n");
-#endif
-}
 
 int main()
 {

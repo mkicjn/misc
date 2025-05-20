@@ -32,10 +32,17 @@ void print_node(struct node *n, int depth, const char *s)
 	print_node(n->child[RIGHT], depth+1, "R:");
 }
 
+unsigned long comparisons = 0;
+unsigned long rotations = 0;
 void show_tree(struct node *root)
 {
 #ifdef SHOW_TREES
 	print_node(root, 0, "");
+	printf("comparisons: %lu\n", comparisons);
+	printf("rotations: %lu\n", rotations);
+	comparisons = 0;
+	rotations = 0;
+	printf("----------------------------------------\n");
 #endif
 }
 
@@ -43,7 +50,7 @@ void show_tree(struct node *root)
 
 /*
  * Move x where p was and swap links around
- * e.g., splay1(&g->child[LEFT], RIGHT);
+ * e.g., rotate(&g->child[LEFT], RIGHT);
  *
  *      (g)           (g)
  *      / \           / \
@@ -55,8 +62,9 @@ void show_tree(struct node *root)
  *
  * All types of splays have this in common
  */
-void splay1(struct node **p_ptr, int x_dir)
+void rotate(struct node **p_ptr, int x_dir)
 {
+	rotations++;
 	struct node *p = *p_ptr;
 	struct node *x = p->child[x_dir];
 	p->child[x_dir] = x->child[1-x_dir];
@@ -66,8 +74,9 @@ void splay1(struct node **p_ptr, int x_dir)
 
 // Local search
 // Returns direction of X
-static inline enum dir get_dir(struct node *n, unsigned long key)
+static inline enum dir compare(struct node *n, unsigned long key)
 {
+	comparisons++;
 	if (n == NULL)
 		return NOWHERE;
 
@@ -85,35 +94,41 @@ static inline enum dir get_dir(struct node *n, unsigned long key)
 enum dir child_splay(struct node **g_ptr, unsigned long key)
 {
 	struct node *g = *g_ptr;
-	int p_dir = get_dir(g, key);
+	int p_dir = compare(g, key);
 	if (p_dir == NOWHERE)
 		return NOWHERE;
 	if (p_dir == HERE)
 		return HERE;
 
 	struct node *p = g->child[p_dir];
-	int x_dir = get_dir(p, key);
+	int x_dir = compare(p, key);
 	if (x_dir == NOWHERE)
 		return NOWHERE;
 	if (x_dir == HERE) {
 		// Zig case
-		splay1(g_ptr, p_dir);
+		rotate(g_ptr, p_dir);
 		return HERE;
 	} else if (x_dir == p_dir) {
 		// Zig-zig case
-		splay1(&g->child[p_dir], x_dir);
-		splay1(g_ptr, p_dir);
+		rotate(&g->child[p_dir], x_dir);
+		rotate(g_ptr, p_dir);
 	} else {
 		// Zig-zag case
-		splay1(&g->child[p_dir], x_dir);
-		splay1(g_ptr, p_dir);
+		rotate(&g->child[p_dir], x_dir);
+		rotate(g_ptr, p_dir);
 	}
 	return child_splay(g_ptr, key);
 }
 
 bool splay(struct node **p_ptr, unsigned long key)
 {
-	return (child_splay(p_ptr, key) == HERE);
+	if (child_splay(p_ptr, key) == HERE) {
+		//printf("splay succeeded\n");
+		return true;
+	} else {
+		printf("splay failed\n");
+		return false;
+	}
 }
 
 bool insert(struct node **root_ptr, struct node *x)
@@ -126,7 +141,7 @@ bool insert(struct node **root_ptr, struct node *x)
 	struct node **p_ptr = root_ptr;
 	while (*p_ptr != NULL) {
 		struct node *p = *p_ptr;
-		int x_dir = get_dir(p, x->key);
+		int x_dir = compare(p, x->key);
 		if (x_dir == HERE)
 			return false; // Already exists
 		p_ptr = &p->child[x_dir];
@@ -198,11 +213,69 @@ int main()
 	splay(&root, 2);
 	show_tree(root);
 
+	// Test splaying effect on unfavorably balanced trees
+	
+	// Oops, all zig-zig
+	root =
+		NODE(10,
+			NODE(9,
+				NODE(8,
+					NODE(7,
+						NODE(6,
+							NODE(5,
+								NODE(4,
+									NODE(3,
+										NODE(2,
+											NODE(1,
+												NULL,
+												NULL),
+											NULL),
+										NULL),
+									NULL),
+								NULL),
+							NULL),
+						NULL),
+					NULL),
+				NULL),
+			NULL);
+
+	show_tree(root);
+	splay(&root, 1);
+	show_tree(root);
+
+	// Oops, all zig-zag
+	root =
+		NODE(10,
+			NODE(1,
+				NULL, 
+				NODE(9,
+					NODE(2,
+						NULL,
+						NODE(8,
+							NODE(3,
+								NULL,
+								NODE(7,
+									NODE(4,
+										NULL,
+										NODE(6,
+											NODE(5,
+												NULL,
+												NULL),
+											NULL)),
+									NULL)),
+							NULL)),
+					NULL)),
+			NULL);
+
+	show_tree(root);
+	splay(&root, 5);
+	show_tree(root);
+
 	// Dynamic testing
 #ifndef IOTA
-#define IOTA 1000
+#define IOTA 100
 #endif
-	struct node *pool = malloc(sizeof(struct node [IOTA+1]));
+	struct node *pool = malloc(sizeof(struct node [IOTA]));
 	//static struct node pool[IOTA];
 	struct node *next_node = pool;
 
