@@ -98,8 +98,10 @@ enum dir child_splay(struct node **g_ptr, unsigned long key)
 bool splay(struct node **p_ptr, unsigned long key)
 {
 	int x_dir = child_splay(p_ptr, key);
-	if (x_dir == NOWHERE)
+	if (x_dir == NOWHERE) {
+		printf("splay failed\n");
 		return false;
+	}
 	if (x_dir == HERE) {
 		// Even parity case - root is now X; nothing to do
 		return true;
