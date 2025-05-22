@@ -1,44 +1,65 @@
-// A tiny reusable lexer that might be used for something eventually
-// TODO: Try to produce a similar thing for recursive descent parsing
+// A tiny lexer framework that might be useful for something eventually
+// TODO: Try to produce a similar sort of thing for recursive descent parsing / ASTs
 
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-// Token types: enum, match function, and description
-// NOTE: The order of the list may affect token recognition
-#define FOREACH_TOK_TYPE(X) \
-	X(TOK_EOF, lex_eof, "end of file") \
-	X(TOK_SPACE, lex_space, "whitespace") \
-	X(TOK_WORD, lex_word, "identifier") \
-	X(TOK_NUMBER, lex_number, "integer") \
-	X(TOK_ERROR, lex_error, "error")
+// Character classes
+#define WHITESPACE_CHARS \
+	"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10" \
+	"\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20"
 
-// Declare enum values based on the token types
+#define LETTER_CHARS "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+#define NUMBER_CHARS "0123456789"
+#define WORD_CHARS   "_" LETTER_CHARS NUMBER_CHARS
+
+// List of all token types: enum name, description, match function, and arguments (if any)
+// NOTE: The order of tokens in this list may affect token recognition
+#define FOREACH_TOK_TYPE(X) \
+	X(TOK_EOF, "end of file", lex_eof) \
+	X(TOK_COMMENT, "comment", lex_comment) \
+	X(TOK_STRING, "string literal", lex_string) \
+	X(TOK_CHAR, "character literal", lex_char) \
+	X(TOK_SPACE, "whitespace", sequence_of, WHITESPACE_CHARS) \
+	X(TOK_NUMBER, "integer", sequence_of, NUMBER_CHARS) \
+	X(TOK_WORD, "identifier", sequence_of, WORD_CHARS) \
+	X(TOK_PLUS, "plus sign", exact_match, "+") \
+	X(TOK_ARROW, "right arrow", exact_match, "->") \
+	X(TOK_MINUS, "minus sign", exact_match, "-") \
+	X(TOK_STAR, "asterisk", exact_match, "*") \
+	X(TOK_FSLASH, "forward slash", exact_match, "/") \
+	X(TOK_PERCENT, "percent sign", exact_match, "%") \
+	X(TOK_AMP, "ampersand", exact_match, "&") \
+	X(TOK_BAR, "vertical bar", exact_match, "|") \
+	X(TOK_CARET, "caret", exact_match, "^") \
+	X(TOK_LT, "less-than sign", exact_match, "<") \
+	X(TOK_GT, "greater-than sign", exact_match, ">") \
+	X(TOK_EQ, "equal sign", exact_match, "=") \
+	X(TOK_SEMICOL, "semicolon", exact_match, ";") \
+	X(TOK_QMARK, "question mark", exact_match, "?") \
+	X(TOK_EXCLAIM, "exclamation point", exact_match, "!") \
+	X(TOK_COLON, "colon", exact_match, ":") \
+	X(TOK_ELLIPSE, "ellipse", exact_match, "...") \
+	X(TOK_DOT, "period", exact_match, ".") \
+	X(TOK_COMMA, "comma", exact_match, ",") \
+	X(TOK_LPAREN, "left parenthesis", exact_match, "(") \
+	X(TOK_RPAREN, "right parenthesis", exact_match, ")") \
+	X(TOK_LBRACK, "left bracket", exact_match, "[") \
+	X(TOK_RBRACK, "right bracket", exact_match, "]") \
+	X(TOK_LBRACE, "left brace", exact_match, "{") \
+	X(TOK_RBRACE, "right brace", exact_match, "}") \
+	X(TOK_ERROR, "unknown", lex_error)
+
+// Declare enum values based on list of token types
 enum tok_type {
-#define LIST_ENUM(ENUM, FN, DESC) ENUM,
+#define LIST_ENUM(ENUM, DESC, FN, ...) ENUM,
 	FOREACH_TOK_TYPE(LIST_ENUM)
 };
 
-// Declare lexer functions ahead of time
-#define DECL_LEX_FN(ENUM, FN, DESC) \
-	static bool FN(void);
-FOREACH_TOK_TYPE(DECL_LEX_FN)
-
-// Function for calling each match function until one succeeds
-// NOTE: One of these should always succeed (e.g., have a catch-all error token at the end)
-static void try_matches(void)
-{
-#define TRY_LEX_FN(ENUM, FN, DESC) \
-		if (FN()) \
-			return;
-	FOREACH_TOK_TYPE(TRY_LEX_FN)
-}
-
-
 // Internal lexer variables
-#define MAX_TOK_LEN 1024
+#define MAX_TOK_LEN 4096
 static int buf[MAX_TOK_LEN];
 static size_t buf_len = 0;
 
@@ -49,8 +70,86 @@ size_t token_len = 0;
 enum tok_type token_type = TOK_ERROR;
 
 
-// Buffer management, the simplest possible way
-static void refill(void)
+////////////////////////////////////////////////////////////////////////////////
+// Match functions
+
+// General cases
+
+static size_t sequence_of(const char *chrs)
+{
+	size_t len;
+	for (len = 0; len < MAX_TOK_LEN; len++) {
+		if (buf[len] == EOF)
+			break;
+		if (strchr(chrs, token[len]) == NULL)
+			break;
+	}
+	return len;
+}
+
+static size_t exact_match(const char *str)
+{
+	size_t len = strlen(str);
+	if (strncmp(token, str, len) == 0)
+		return len;
+	return 0;
+}
+
+static size_t find_end(size_t whence, const char *str)
+{
+	size_t len = strlen(str);
+	for (size_t i = whence; i < MAX_TOK_LEN; i++) {
+		if (buf[i + len - 1] == EOF) {
+			return 0;
+		} else if (buf[i] == '\\') {
+			i++; // Skip escaped characters
+		} else if (strncmp(&token[i], str, len) == 0) {
+			return i + len;
+		}
+	}
+	return 0;
+}
+
+// Special cases
+
+static size_t lex_eof(void)
+{
+	return (buf[0] == EOF);
+}
+
+static size_t lex_error(void)
+{
+	return 1; // Skip problem characters
+}
+
+static size_t lex_string(void)
+{
+	if (exact_match("\""))
+		return find_end(1, "\"");
+	return 0;
+}
+
+static size_t lex_char(void)
+{
+	if (exact_match("'"))
+		return find_end(1, "'");
+	return 0;
+}
+
+static size_t lex_comment(void)
+{
+	if (exact_match("//") || exact_match("#"))
+		return find_end(1, "\n");
+	if (exact_match("/*"))
+		return find_end(2, "*/");
+	return 0;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Lexer driver - refill buffers and run match functions
+
+void token_next(void)
 {
 	// Slide everything over the last token
 	memmove(&token[0], &token[token_len], (MAX_TOK_LEN - token_len) * sizeof(char));
@@ -63,95 +162,15 @@ static void refill(void)
 		token[buf_len] = (char)c;
 		buf_len++;
 	}
-}
 
-// Lexer driver - refill buffers and run match functions
-enum tok_type token_next(void)
-{
-	refill();
-	try_matches();
-	return token_type;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-// Match functions
-// NOTE: All these have to do is check buf (or token) and update token_type and token_len on match
-
-// TODO: Simplify using "predicates" like sequence_of() and exact_match()
-
-static bool lex_eof(void)
-{
-	if (buf[0] == EOF) {
-		token_type = TOK_EOF;
-		token_len = 0;
-		return true;
-	}
-	return false;
-}
-
-static bool lex_error(void)
-{
-	token_type = TOK_ERROR;
-	token_len = 1; // Skip problematic characters
-	return true;
-}
-
-static bool lex_space(void)
-{
-	size_t len;
-	for (len = 0; len < MAX_TOK_LEN; len++) {
-		int c = buf[len];
-		if ('\0' <= c && c <= ' ')
-			continue;
-		break;
-	}
-	if (len > 0) {
-		token_type = TOK_SPACE;
-		token_len = len;
-		return true;
-	}
-	return false;
-}
-
-static bool lex_word(void)
-{
-	size_t len = 0;
-	for (len = 0; len < MAX_TOK_LEN; len++) {
-		int c = buf[len];
-		if ('0' <= c && c <= '9' && len > 0)
-			continue;
-		if ('A' <= c && c <= 'Z')
-			continue;
-		if ('_' == c)
-			continue;
-		if ('a' <= c && c <= 'z')
-			continue;
-		break;
-	}
-	if (len > 0) {
-		token_type = TOK_WORD;
-		token_len = len;
-		return true;
-	}
-	return false;
-}
-
-static bool lex_number(void)
-{
-	size_t len = 0;
-	for (len = 0; len < MAX_TOK_LEN; len++) {
-		int c = buf[len];
-		if ('0' <= c && c <= '9')
-			continue;
-		break;
-	}
-	if (len > 0) {
-		token_type = TOK_NUMBER;
-		token_len = len;
-		return true;
-	}
-	return false;
+	// Try all matching functions until one succeeds
+	// NOTE: One of these _must_ succeed, even if it's just a catch-all error token
+#define TRY_MATCH_FN(ENUM, DESC, FN, ...) \
+		token_type = ENUM; \
+		token_len = FN(__VA_ARGS__); \
+		if (token_len > 0) \
+			return;
+	FOREACH_TOK_TYPE(TRY_MATCH_FN)
 }
 
 
@@ -160,14 +179,22 @@ static bool lex_number(void)
 
 // Generate a table of descriptions for each token type
 const char *tok_desc[] = {
-#define LIST_DESC(ENUM, FN, DESC) DESC,
+#define LIST_DESC(ENUM, DESC, FN, ...) DESC,
 	FOREACH_TOK_TYPE(LIST_DESC)
 };
 
 int main()
 {
 	token_source = stdin;
-	while (token_next() != TOK_EOF) {
+	for (;;) {
+		token_next();
+		if (token_type == TOK_EOF)
+			break;
+		if (token_type == TOK_SPACE)
+			continue;
+		if (token_type == TOK_COMMENT)
+			continue;
 		printf("%s: %.*s\n", tok_desc[token_type], (int)token_len, token);
 	}
+	return 0;
 }
