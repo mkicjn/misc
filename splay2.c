@@ -178,7 +178,7 @@ bool delete(struct node **root_ptr, unsigned long key)
 // TODO: Get/Set/Delete interface
 // TODO: More rigorous testing / benchmarking
 
-int main()
+int main(int argc, char **argv)
 {
 	// Base case testing
 #define NODE(X, L, R) &(struct node){.key=(X), .child={(L), (R)}}
@@ -272,11 +272,10 @@ int main()
 	show_tree(root);
 
 	// Dynamic testing
-#ifndef IOTA
-#define IOTA 100
-#endif
-	struct node *pool = malloc(sizeof(struct node [IOTA]));
-	//static struct node pool[IOTA];
+	size_t num_trials = 1000;
+	if (argc > 1)
+		num_trials = atol(argv[1]);
+	struct node *pool = malloc(num_trials * sizeof(struct node));
 	struct node *next_node = pool;
 
 #define INSERT(k) \
@@ -316,33 +315,33 @@ int main()
 
 	// Try out the sequential access theorem experimentally (try `grep comparisons`)
 	dur = clock();
-	for (int i = 0; i < IOTA; i++) {
+	for (int i = 0; i < num_trials; i++) {
 		INSERT(i);
 	}
 	dur = (clock() - dur);
-	printf("Average sequential insert duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / IOTA * 1000.0);
+	printf("Average sequential insert duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
 
 	dur = clock();
-	for (int i = 0; i < IOTA; i++) {
+	for (int i = 0; i < num_trials; i++) {
 		FIND(i);
 	}
 	dur = (clock() - dur);
-	printf("Average sequential find duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / IOTA * 1000.0);
+	printf("Average sequential find duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
 
 	// Try out randomized accesses
 	dur = clock();
-	for (int i = 0; i < IOTA; i++) {
-		FIND(rand() % IOTA);
+	for (int i = 0; i < num_trials; i++) {
+		FIND(rand() % num_trials);
 	}
 	dur = (clock() - dur);
-	printf("Average randomized find duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / IOTA * 1000.0);
+	printf("Average randomized find duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
 
 	dur = clock();
-	for (int i = 0; i < IOTA; i++) {
+	for (int i = 0; i < num_trials; i++) {
 		DELETE(i);
 	}
 	dur = (clock() - dur);
-	printf("Average sequential delete duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / IOTA * 1000.0);
+	printf("Average sequential delete duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
 
 	// Manual testing, compare results online:
 	// https://www.cs.usfca.edu/%7Egalles/visualization/SplayTree.html
