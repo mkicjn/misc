@@ -1,3 +1,4 @@
+//usr/bin/tcc -run $0 $@; exit $?
 // A tiny lexer framework that might be useful for something eventually
 // TODO: Try to produce a similar sort of thing for recursive descent parsing / ASTs
 

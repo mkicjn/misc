@@ -1,3 +1,4 @@
+//usr/bin/tcc -run $0 $@; exit $?
 #include <stdio.h>
 #include <limits.h>
 
@@ -70,19 +71,13 @@ void rle_decode(FILE *in, FILE *out)
 
 int main(int argc, char **argv)
 {
-	// Parse command line option
-	char opt = argc == 2 ? argv[1][1] : 0;
-
-	// Show usage if invalid
-	if (opt != 'c' && opt != 'd') {
-		printf("Usage: %s <-c|-d>\n", argc > 0 ? argv[0] : "./lzp");
-		return 1;
-	}
+	(void)argv;
 
 	// Compress/decompress based on option
-	if (opt == 'c')
-		rle_encode(stdin, stdout);
-	else
+	if (argc > 1)
 		rle_decode(stdin, stdout);
+	else
+		rle_encode(stdin, stdout);
+
 	return 0;
 }

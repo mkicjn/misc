@@ -1,3 +1,4 @@
+//usr/bin/tcc -run $0 $@; exit $?
 #include <stdio.h>
 #include "aterm.h"
 
@@ -15,7 +16,7 @@ int main(int argc, char **argv)
 			int red   = 255 - ((float)x / size) * 255;
 			int green = 255 - ((float)y / size) * 255;
 			int blue  =       ((float)x / size) * 255;
-			printf(SGR(BG_COLR(CUSTOM RGB("%d","%d","%d"))) "  ",
+			printf(SGR(BG_COLR(CUSTOM COLR_RGB("%d","%d","%d"))) "  ",
 					red, green, blue);
 		}
 		printf(SGR(RESET) "\n");

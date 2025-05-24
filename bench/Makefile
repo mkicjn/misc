@@ -1,6 +1,7 @@
 ALL = \
 	collatz_fasm \
 	collatz_gcc \
+	collatz_tcc \
 	collatz_gforth-fast \
 	collatz_gforth \
 	collatz_gforth-itc \
@@ -33,6 +34,10 @@ collatz_fasm: src/collatz.asm
 
 collatz_gcc: src/collatz.c
 	gcc -Ofast $^ -o $@
+collatz_tcc: src/collatz.c
+	echo '//usr/bin/tcc -run $$0 $$@; exit $$?' > $@
+	cat $^ >> $@
+	chmod +x $@
 
 collatz_gforth-fast: src/collatz.fth
 	echo "#! /usr/bin/gforth-fast" > $@

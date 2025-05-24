@@ -1,3 +1,4 @@
+//usr/bin/tcc -run $0 $@; exit $?
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -120,7 +121,7 @@ static inline int opp_wall(int p1, int p2)
 	return p1 - (p2 - p1)/2;
 }
 
-bool make_step(struct maze *m, int p1, int p2)
+void make_step(struct maze *m, int p1, int p2)
 {
 	m->tile[p2] = ' ';
 	m->tile[wall(p1, p2)] = ' ';

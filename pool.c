@@ -1,3 +1,4 @@
+//usr/bin/tcc -run $0 $@; exit $?
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -93,14 +94,14 @@ int main()
 		arr[i] = v;
 	}
 	tick = clock();
-	printf("(pool) Time to alloc: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC);
+	printf("(pool) Time to alloc: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC * 1000 / OBJ_COUNT);
 
 	tock = clock();
 	for (int i = 0; i < OBJ_COUNT; i++) {
 		pool_free(p, arr[i]);
 	}
 	tick = clock();
-	printf("(pool) Time to free: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC);
+	printf("(pool) Time to free: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC * 1000 / OBJ_COUNT);
 
 	tock = clock();
 	for (int i = 0; i < OBJ_COUNT; i++) {
@@ -108,14 +109,14 @@ int main()
 		arr[i] = v;
 	}
 	tick = clock();
-	printf("(malloc) Time to alloc: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC);
+	printf("(malloc) Time to alloc: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC * 1000 / OBJ_COUNT);
 
 	tock = clock();
 	for (int i = 0; i < OBJ_COUNT; i++) {
 		free(arr[i]);
 	}
 	tick = clock();
-	printf("(malloc) Time to free: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC);
+	printf("(malloc) Time to free: %fs\n", (double)(tick-tock) / CLOCKS_PER_SEC * 1000 / OBJ_COUNT);
 	
 	
 	pool_destroy(p);
