@@ -1,4 +1,4 @@
-//usr/bin/tcc -run $0 $@; exit $?
+//usr/bin/env tcc -run $0 $@; exit $?
 #include <stdio.h>
 #include "aterm.h"
 
