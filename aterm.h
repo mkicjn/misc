@@ -67,7 +67,7 @@
 #define BG_BCOLR(S) "10" S
 
 #define CUSTOM           "8" AND
-#define COLR_RGB(R,G,B)  "2;" R AND G AND B
-#define COLR_8BIT(N)     "5;" N
+#define COLR_RGB(R,G,B)  "2" AND R AND G AND B
+#define COLR_8BIT(N)     "5" AND N
 
 #endif
