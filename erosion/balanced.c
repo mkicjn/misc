@@ -30,7 +30,7 @@ void grid_print(int grid[WIDTH][HEIGHT], int threshold)
 		for (int x = 0; x < WIDTH; x++) {
 			int shade = grid[x][y];
 			if (threshold >= 0)
-				shade = (shade > threshold ? 256 : 0);
+				shade = (shade > threshold ? 255 : 0);
 			printf(SGR(BG_COLR(CUSTOM COLR_RGB("%d","%d","%d"))) " ", shade, shade, shade);
 		}
 		printf(SGR(RESET) "\n");
