@@ -1,3 +1,4 @@
+//usr/bin/env tcc -run $0 $@; exit $?
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -36,13 +37,12 @@ bool base64_pad(int *c)
 		buf_len -= 6;
 		*c = base64_str[(buf << -buf_len) & 0x3f];
 		return true;
-	} else if (buf_len == 0) {
-		return false;
 	} else if (buf_len < 0) {
 		*c = '=';
 		buf_len += 2;
 		return true;
 	}
+	return false;
 }
 
 // Streaming base64 decoding
@@ -92,44 +92,23 @@ void putwrap(int c)
 
 int main(int argc, char **argv)
 {
-#ifndef DECODE
 	int c;
 	if (argc > 1) {
-		FILE *f = fopen(argv[1], "rb");
-		for (c = fgetc(f); c != EOF; c = fgetc(f)) {
-			base64_push(c);
-			while (base64_pull(&c))
-				putwrap(c);
+		base64d_str_init();
+		for (c = getchar(); c != EOF; c = getchar()) {
+			base64d_push(c);
+			while (base64d_pull(&c))
+				putchar(c);
 		}
-		fclose(f);
 	} else {
 		for (c = getchar(); c != EOF; c = getchar()) {
 			base64_push(c);
 			while (base64_pull(&c))
 				putwrap(c);
 		}
+		while (base64_pad(&c))
+			putwrap(c);
 	}
-	while (base64_pad(&c))
-		putwrap(c);
 	putchar('\n');
-#else
-	base64d_str_init();
-	int c;
-	if (argc > 1) {
-		FILE *f = fopen(argv[1], "rb");
-		for (c = fgetc(f); c != EOF; c = fgetc(f)) {
-			base64d_push(c);
-			while (base64d_pull(&c))
-				putchar(c);
-		}
-		fclose(f);
-	} else {
-		for (c = getchar(); c != EOF; c = getchar()) {
-			base64d_push(c);
-			while (base64d_pull(&c))
-				putchar(c);
-		}
-	}
-#endif
 	return 0;
 }
