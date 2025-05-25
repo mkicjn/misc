@@ -6,7 +6,7 @@ ALL = \
 	collatz_gforth \
 	collatz_gforth-itc \
 	collatz_sbcl \
-	collatz_pypy \
+	collatz_pypy3 \
 	collatz_python3 \
 	collatz_tclsh \
 	collatz_csc \
@@ -56,8 +56,8 @@ collatz_python3: src/collatz.py
 	echo "#!/usr/bin/python3" > $@
 	cat $^ >> $@
 	chmod +x $@
-collatz_pypy: src/collatz.py
-	echo "#!/usr/bin/pypy" > $@
+collatz_pypy3: src/collatz.py
+	echo "#!/usr/bin/pypy3" > $@
 	cat $^ >> $@
 	chmod +x $@
 
