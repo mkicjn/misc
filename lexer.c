@@ -26,18 +26,25 @@
 	X(TOK_SPACE, "whitespace", sequence_of, WHITESPACE_CHARS) \
 	X(TOK_NUMBER, "integer", sequence_of, NUMBER_CHARS) \
 	X(TOK_WORD, "identifier", sequence_of, WORD_CHARS) \
+	X(TOK_INC, "increment", exact_match, "++") \
 	X(TOK_PLUS, "plus sign", exact_match, "+") \
 	X(TOK_ARROW, "right arrow", exact_match, "->") \
+	X(TOK_DEC, "decrement", exact_match, "--") \
 	X(TOK_MINUS, "minus sign", exact_match, "-") \
 	X(TOK_STAR, "asterisk", exact_match, "*") \
 	X(TOK_FSLASH, "forward slash", exact_match, "/") \
 	X(TOK_PERCENT, "percent sign", exact_match, "%") \
-	X(TOK_AMP, "ampersand", exact_match, "&") \
-	X(TOK_BAR, "vertical bar", exact_match, "|") \
-	X(TOK_CARET, "caret", exact_match, "^") \
-	X(TOK_LT, "less-than sign", exact_match, "<") \
-	X(TOK_GT, "greater-than sign", exact_match, ">") \
-	X(TOK_EQ, "equal sign", exact_match, "=") \
+	X(TOK_AMPAMP, "logical and", exact_match, "&&") \
+	X(TOK_AMP, "bitwise and", exact_match, "&") \
+	X(TOK_BARBAR, "logical or", exact_match, "||") \
+	X(TOK_BAR, "bitwise or", exact_match, "|") \
+	X(TOK_CARET, "exclusive or", exact_match, "^") \
+	X(TOK_LTEQ, "less-than-or-equal-to", exact_match, "<=") \
+	X(TOK_LT, "less-than", exact_match, "<") \
+	X(TOK_GTEQ, "greater-than-or-equal-to", exact_match, ">=") \
+	X(TOK_GT, "greater-than", exact_match, ">") \
+	X(TOK_EQEQ, "equal-to", exact_match, "==") \
+	X(TOK_EQ, "assignment", exact_match, "=") \
 	X(TOK_SEMICOL, "semicolon", exact_match, ";") \
 	X(TOK_QMARK, "question mark", exact_match, "?") \
 	X(TOK_EXCLAIM, "exclamation point", exact_match, "!") \
@@ -184,6 +191,7 @@ const char *tok_desc[] = {
 	FOREACH_TOK_TYPE(LIST_DESC)
 };
 
+#ifndef NO_LEX_MAIN
 int main()
 {
 	token_source = stdin;
@@ -199,3 +207,4 @@ int main()
 	}
 	return 0;
 }
+#endif
