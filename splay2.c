@@ -1,9 +1,8 @@
-//usr/bin/env tcc -run $0 $@; exit $?
+//usr/bin/env tcc $CFLAGS -run $0 $@; exit $?
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
-#include <limits.h>
 
 struct node {
 	unsigned long key;
@@ -38,6 +37,7 @@ unsigned long comparisons = 0;
 unsigned long rotations = 0;
 void show_tree(struct node *root)
 {
+	(void)root;
 #ifdef SHOW_TREES
 	print_node(root, 0, "");
 	printf("comparisons: %lu\n", comparisons);
@@ -100,7 +100,7 @@ bool splay(struct node **root_ptr, unsigned long key)
 
 	for (;;) {
 		struct node *g = *root_ptr;
-		int dir = compare(g, key);
+		enum dir dir = compare(g, key);
 		if (dir == HERE)
 			break;
 
@@ -138,43 +138,38 @@ bool find(struct node **root_ptr, unsigned long key)
 bool insert(struct node **root_ptr, struct node *x)
 {
 	if (*root_ptr == NULL) {
-		// Trivial case with no root
 		*root_ptr = x;
 		return true;
 	}
-	struct node **p_ptr = root_ptr;
-	while (*p_ptr != NULL) {
-		struct node *p = *p_ptr;
-		int x_dir = compare(p, x->key);
-		if (x_dir == HERE)
-			return false; // Already exists
-		p_ptr = &p->child[x_dir];
-	}
-	*p_ptr = x;
-	splay(root_ptr, x->key);
-	return true;
-}
 
-static inline unsigned long max_key(struct node *n)
-{
-	while (n->child[RIGHT])
-		n = n->child[RIGHT];
-	return n->key;
+	if (splay(root_ptr, x->key))
+		return false;
+
+	struct node *g = *root_ptr;
+	int dir = compare(g, x->key);
+	x->child[1-dir] = g;
+	x->child[dir] = g->child[dir];
+	g->child[dir] = NULL;
+	*root_ptr = x;
+	return true;
 }
 
 bool delete(struct node **root_ptr, unsigned long key)
 {
 	if (!splay(root_ptr, key))
 		return false;
-	struct node *old_root = *root_ptr; // (To be removed)
+	struct node *del = *root_ptr; // (To be removed)
 
-	if (!old_root->child[LEFT]) {
-		*root_ptr = old_root->child[RIGHT];
+	if (!del->child[RIGHT]) {
+		*root_ptr = del->child[LEFT];
+		return true;
+	} else if (!del->child[LEFT]) {
+		*root_ptr = del->child[RIGHT];
 		return true;
 	}
-	*root_ptr = old_root->child[LEFT];
-	splay(root_ptr, max_key(*root_ptr));
-	(*root_ptr)->child[RIGHT] = old_root->child[RIGHT];
+	*root_ptr = del->child[RIGHT];
+	splay(root_ptr, 0); // 0 is the minimum unsigned value of any width
+	(*root_ptr)->child[LEFT] = del->child[LEFT];
 	return true;
 }
 
@@ -319,14 +314,14 @@ int main(int argc, char **argv)
 
 	// Try out the sequential access theorem experimentally (try `grep comparisons`)
 	dur = clock();
-	for (int i = 0; i < num_trials; i++) {
+	for (size_t i = 0; i < num_trials; i++) {
 		INSERT(i);
 	}
 	dur = (clock() - dur);
 	printf("Average sequential insert duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
 
 	dur = clock();
-	for (int i = 0; i < num_trials; i++) {
+	for (size_t i = 0; i < num_trials; i++) {
 		FIND(i);
 	}
 	dur = (clock() - dur);
@@ -334,8 +329,8 @@ int main(int argc, char **argv)
 
 	// Try out randomized accesses
 	dur = clock();
-	for (int i = 0; i < num_trials; i++) {
-		int n = rand() % (num_trials + 1);
+	for (size_t i = 0; i < num_trials; i++) {
+		unsigned long n = rand() % (num_trials + 1);
 		if (n >= num_trials)
 			printf("(Expected failure) ");
 		FIND(n);
@@ -344,7 +339,7 @@ int main(int argc, char **argv)
 	printf("Average randomized find duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
 
 	dur = clock();
-	for (int i = 0; i < num_trials; i++) {
+	for (size_t i = 0; i < num_trials; i++) {
 		DELETE(i);
 	}
 	dur = (clock() - dur);
@@ -371,7 +366,7 @@ int main(int argc, char **argv)
 	// Not found test
 	FREE_NODES();
 	printf("(Expected failure) ");
-	FIND(ULONG_MAX);
+	FIND(~0ul);
 
 	free(pool);
 	return 0;
