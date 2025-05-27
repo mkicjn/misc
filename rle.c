@@ -1,4 +1,4 @@
-//usr/bin/env tcc -run $0 $@; exit $?
+//usr/bin/env tcc $CFLAGS -run $0 $@; exit $?
 #include <stdio.h>
 #include <limits.h>
 
