@@ -2,76 +2,76 @@
 #include <stdio.h>
 #include <stdint.h>
 
-uint8_t in[8];
-size_t in_len;
-uint8_t pred[1 << 16] = {0};
-uint16_t hash = 0;
+static char pred[256][256] = {0};
+static int hist[2] = {0};
+
+int predict(void)
+{
+	// Query the prediction table
+	char *bucket = &pred[hist[0]][hist[1]];
+	return *bucket;
+}
+
+void confirm(int c)
+{
+	// Update the prediction table and history
+	char *bucket = &pred[hist[0]][hist[1]];
+	*bucket = c;
+	hist[1] = hist[0];
+	hist[0] = c;
+}
 
 void encode(void)
 {
-	for (;;) {
-		// Get up to 8 bytes
-		in_len = fread(in, 1, 8, stdin);
-
-		// For each byte:
-		uint8_t mask = 0;
-		for (int i = 0; i < in_len; i++) {
-			int c = in[i];
-			// Put a 1 in the mask if the predictor hit
-			if (pred[hash] == c)
-				mask |= (1 << i);
-			// Update the predictor and hash
-			pred[hash] = c;
-			hash = (hash << 8) | c;
+	while (!feof(stdin)) {
+		int mask = 0;
+		int miss[8], n_miss = 0;
+		for (int i = 0; i < 8; i++) {
+			int c = getchar();
+			if (c == EOF)
+				break;
+			// Are we going to predict correctly later?
+			if (predict() == c)
+				mask |= (1 << i); // Yes: set mask bit
+			else
+				miss[n_miss++] = c; // No: output correction
+			confirm(c);
 		}
-
-		// Output the mask and any missed bytes
 		putchar(mask);
-		for (int i = 0; i < in_len; i++)
-			if (~mask & (1 << i))
-				putchar(in[i]);
-		
-		// Quit if we ran out of bytes
-		if (in_len < 8)
-			return;
+		for (int i = 0; i < n_miss; i++)
+			putchar(miss[i]);
 	}
 }
 
 void decode(void)
 {
-	for (;;) {
-		// Expect a mask byte
+	while (!feof(stdin)) {
 		int mask = getchar();
 		if (mask == EOF)
-			return;
-
-		// For each byte predicted by the mask:
+			break;
 		for (int i = 0; i < 8; i++) {
-			int c = pred[hash];
-			// If the mask says we're going to miss, expect a correction
-			if (~mask & (1 << i)) {
-				c = getchar();
+			int c;
+			// Does the mask say we will predict correctly?
+			if (mask & (1 << i)) {
+				c = predict(); // Yes: use the prediction
+			} else {
+				c = getchar(); // No: expect a correction
 				if (c == EOF)
-					return;
+					break;
 			}
-			// Output the prediction
+			confirm(c);
 			putchar(c);
-			// Update the predictor and hash
-			pred[hash] = c;
-			hash = (hash << 8) | c;
 		}
-	};
+	}
 }
 
 int main(int argc, char **argv)
 {
 	(void)argv;
-
-	// Compress/decompress based on option
+	// Compress/decompress based on argument
 	if (argc > 1)
 		decode();
 	else
 		encode();
-
 	return 0;
 }
