@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
+#include <limits.h>
 
 struct node {
 	unsigned long key;
@@ -78,7 +79,9 @@ void rotate(struct node **p_ptr, int x_dir)
 static inline enum dir compare(struct node *n, unsigned long key)
 {
 	comparisons++;
-	if (key > n->key)
+	if (n == NULL)
+		return NOWHERE;
+	else if (key > n->key)
 		return RIGHT;
 	else if (key < n->key)
 		return LEFT;
@@ -100,8 +103,6 @@ bool splay(struct node **root_ptr, unsigned long key)
 		int dir = compare(g, key);
 		if (dir == HERE)
 			break;
-		if (g->child[dir] == NULL)
-			break;
 
 		struct node *p = g->child[dir];
 		if (compare(p, key) == dir) {
@@ -109,6 +110,8 @@ bool splay(struct node **root_ptr, unsigned long key)
 			rotate(root_ptr, dir);
 		}
 
+		if (g->child[dir] == NULL)
+			break;
 		*leaf[1-dir] = g;
 		leaf[1-dir] = &g->child[dir];
 		*root_ptr = g->child[dir];
@@ -125,7 +128,7 @@ bool splay(struct node **root_ptr, unsigned long key)
 bool find(struct node **root_ptr, unsigned long key)
 {
 	if (!splay(root_ptr, key)) {
-		printf("splay failed\n");
+		printf("lookup failed\n");
 		return false;
 	} else {
 		return true;
@@ -332,7 +335,10 @@ int main(int argc, char **argv)
 	// Try out randomized accesses
 	dur = clock();
 	for (int i = 0; i < num_trials; i++) {
-		FIND(rand() % num_trials);
+		int n = rand() % (num_trials + 1);
+		if (n >= num_trials)
+			printf("(Expected failure) ");
+		FIND(n);
 	}
 	dur = (clock() - dur);
 	printf("Average randomized find duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
@@ -364,8 +370,8 @@ int main(int argc, char **argv)
 
 	// Not found test
 	FREE_NODES();
-	printf("This lookup is expected to fail (but not segfault): ");
-	FIND(0);
+	printf("(Expected failure) ");
+	FIND(ULONG_MAX);
 
 	free(pool);
 	return 0;
