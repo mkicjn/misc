@@ -177,6 +177,24 @@ bool delete(struct node **root_ptr, unsigned long key)
 // TODO: Get/Set/Delete interface
 // TODO: More rigorous testing / benchmarking
 
+unsigned long levels = 0;
+void show_path(struct node *n, unsigned long key)
+{
+	int dir = compare(n, key);
+	switch (dir) {
+	case NOWHERE:
+		printf("?\n");
+		break;
+	case HERE:
+		printf(".\n");
+		break;
+	default:
+		levels++;
+		printf("%c", "lr"[dir]);
+		show_path(n->child[dir], key);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	// Base case testing
@@ -367,6 +385,23 @@ int main(int argc, char **argv)
 	FREE_NODES();
 	printf("(Expected failure) ");
 	FIND(~0ul);
+
+	// Character tree traversal test
+	if (argc > 2) {
+		for (int i = 0; i < 255; i++)
+			INSERT(i);
+		unsigned long cs = 0;
+		while (!feof(stdin)) {
+			int c = getchar();
+			if (c == EOF)
+				break;
+			show_path(root, c);
+			splay(&root, c);
+			cs++;
+		}
+		printf("characters: %lu\n", cs);
+		printf("traversals: %lu\n", levels);
+	}
 
 	free(pool);
 	return 0;
