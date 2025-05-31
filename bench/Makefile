@@ -15,7 +15,9 @@ ALL = \
 	collatz_newlisp \
 	collatz_lua \
 	collatz_luajit \
-	collatz_swipl
+	collatz_swipl \
+	collatz_java \
+	collatz_javac
 
 all: $(ALL)
 
@@ -100,4 +102,16 @@ collatz_luajit: src/collatz.lua
 collatz_swipl: src/collatz.pl
 	echo "#!/usr/bin/swipl" > $@
 	cat $^ >> $@
+	chmod +x $@
+
+collatz_java: src/collatz.java
+	echo "#!/usr/bin/java --source 11" > $@
+	cat $^ >> $@
+	chmod +x $@
+Collatz.class: src/collatz.java
+	javac $^
+	mv src/$@ .
+collatz_javac: Collatz.class
+	echo "#!/bin/bash" > $@
+	echo "java Collatz" >> $@
 	chmod +x $@
