@@ -1,4 +1,7 @@
 //$(which tcc) $CFLAGS -run $0 $@; exit $?
+
+// (Old bottom-up implementation)
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -19,37 +22,6 @@ enum dir {
 	NOWHERE,
 };
 
-////////////////////////////////////////////////////////////////////////////////
-
-void print_node(struct node *n, int depth, const char *s)
-{
-	if (n == NULL)
-		return;
-
-	for (int i = 1; i < depth; i++)
-		printf("| ");
-	printf("%s%lu\n", s, n->key);
-	print_node(n->child[LEFT], depth+1, "L:");
-	print_node(n->child[RIGHT], depth+1, "R:");
-}
-
-unsigned long comparisons = 0;
-unsigned long rotations = 0;
-void show_tree(struct node *root)
-{
-	(void)root;
-#ifdef SHOW_TREES
-	print_node(root, 0, "");
-	printf("comparisons: %lu\n", comparisons);
-	printf("rotations: %lu\n", rotations);
-	comparisons = 0;
-	rotations = 0;
-	printf("----------------------------------------\n");
-#endif
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
 /*
  * Move x where p was and swap links around
  * e.g., rotate(&g->child[LEFT], RIGHT);
@@ -64,6 +36,7 @@ void show_tree(struct node *root)
  *
  * All types of splays have this in common
  */
+unsigned long rotations = 0;
 void rotate(struct node **p_ptr, int x_dir)
 {
 	rotations++;
@@ -76,12 +49,14 @@ void rotate(struct node **p_ptr, int x_dir)
 
 // Local search
 // Returns direction of X
+unsigned long comparisons = 0;
 static inline enum dir compare(struct node *n, unsigned long key)
 {
 	comparisons++;
 	if (n == NULL)
 		return NOWHERE;
-	else if (key > n->key)
+
+	if (key > n->key)
 		return RIGHT;
 	else if (key < n->key)
 		return LEFT;
@@ -89,87 +64,98 @@ static inline enum dir compare(struct node *n, unsigned long key)
 		return HERE;
 }
 
-// Top-down strategy
-bool splay(struct node **root_ptr, unsigned long key)
+// Handles even-parity cases of splay operation only
+// Returns direction of X relative to G, post-splay
+enum dir child_splay(struct node **g_ptr, unsigned long key)
 {
-	if (*root_ptr == NULL)
-		return false;
+	struct node *g = *g_ptr;
 
-	struct node *subtree[2] = {NULL, NULL};
-	struct node **leaf[2] = {&subtree[0], &subtree[1]};
-
-	for (;;) {
-		struct node *g = *root_ptr;
-		enum dir dir = compare(g, key);
-		if (dir == HERE)
-			break;
-
-		struct node *p = g->child[dir];
-		if (compare(p, key) == dir) {
-			g = p;
-			rotate(root_ptr, dir);
-		}
-
-		if (g->child[dir] == NULL)
-			break;
-		*leaf[1-dir] = g;
-		leaf[1-dir] = &g->child[dir];
-		*root_ptr = g->child[dir];
+	int p_dir = compare(g, key);
+	if (p_dir == NOWHERE)
+		return NOWHERE;
+	if (p_dir == HERE) {
+		// Even parity - G is already X; nothing to do
+		return HERE;
 	}
 
-	struct node *g = *root_ptr;
-	*leaf[LEFT] = g->child[LEFT];
-	*leaf[RIGHT] = g->child[RIGHT];
-	g->child[LEFT] = subtree[LEFT];
-	g->child[RIGHT] = subtree[RIGHT];
-	return g->key == key;
+	int x_dir = child_splay(&g->child[p_dir], key);
+	if (p_dir == NOWHERE)
+		return NOWHERE;
+	if (x_dir == HERE) {
+		// Odd parity - P is now (or was already) X; nothing to do
+		return p_dir;
+	}
+
+	if (p_dir == x_dir) {
+		// Even parity - Zig-zig case
+		rotate(g_ptr, p_dir);  // Splay P
+		rotate(g_ptr, x_dir);  // Splay X
+	} else {
+		// Even parity - Zig-zag case
+		rotate(&g->child[p_dir], x_dir);  // Splay X
+		rotate(g_ptr, p_dir);             // Splay X again
+	}
+	return HERE;
 }
 
-bool find(struct node **root_ptr, unsigned long key)
+// Handles odd parity case of splay operation only (at the root)
+bool splay(struct node **p_ptr, unsigned long key)
 {
-	if (!splay(root_ptr, key)) {
-		printf("lookup failed\n");
+	int x_dir = child_splay(p_ptr, key);
+	if (x_dir == NOWHERE) {
+		printf("splay failed\n");
 		return false;
-	} else {
+	}
+	if (x_dir == HERE) {
+		// Even parity case - root is now X; nothing to do
 		return true;
 	}
+
+	// Odd parity - Zig case
+	rotate(p_ptr, x_dir); // Splay X
+	return true;
 }
 
 bool insert(struct node **root_ptr, struct node *x)
 {
 	if (*root_ptr == NULL) {
+		// Trivial case with no root
 		*root_ptr = x;
 		return true;
 	}
-
-	if (splay(root_ptr, x->key))
-		return false;
-
-	struct node *g = *root_ptr;
-	int dir = compare(g, x->key);
-	x->child[1-dir] = g;
-	x->child[dir] = g->child[dir];
-	g->child[dir] = NULL;
-	*root_ptr = x;
+	struct node **p_ptr = root_ptr;
+	while (*p_ptr != NULL) {
+		struct node *p = *p_ptr;
+		int x_dir = compare(p, x->key);
+		if (x_dir == HERE)
+			return false; // Already exists
+		p_ptr = &p->child[x_dir];
+	}
+	*p_ptr = x;
+	splay(root_ptr, x->key);
 	return true;
+}
+
+static inline unsigned long max_key(struct node *n)
+{
+	while (n->child[RIGHT])
+		n = n->child[RIGHT];
+	return n->key;
 }
 
 bool delete(struct node **root_ptr, unsigned long key)
 {
 	if (!splay(root_ptr, key))
 		return false;
-	struct node *del = *root_ptr; // (To be removed)
+	struct node *old_root = *root_ptr; // (To be removed)
 
-	if (!del->child[RIGHT]) {
-		*root_ptr = del->child[LEFT];
-		return true;
-	} else if (!del->child[LEFT]) {
-		*root_ptr = del->child[RIGHT];
+	if (!old_root->child[LEFT]) {
+		*root_ptr = old_root->child[RIGHT];
 		return true;
 	}
-	*root_ptr = del->child[RIGHT];
-	splay(root_ptr, 0); // 0 is the minimum unsigned value of any width
-	(*root_ptr)->child[LEFT] = del->child[LEFT];
+	*root_ptr = old_root->child[LEFT];
+	splay(root_ptr, max_key(*root_ptr));
+	(*root_ptr)->child[RIGHT] = old_root->child[RIGHT];
 	return true;
 }
 
@@ -177,22 +163,30 @@ bool delete(struct node **root_ptr, unsigned long key)
 // TODO: Get/Set/Delete interface
 // TODO: More rigorous testing / benchmarking
 
-unsigned long levels = 0;
-void show_path(struct node *n, unsigned long key)
+////////////////////////////////////////////////////////////////////////////////
+
+void print_node(struct node *n, int depth, const char *s)
 {
-	int dir = compare(n, key);
-	switch (dir) {
-	case NOWHERE:
-		printf("?\n");
-		break;
-	case HERE:
-		printf(".\n");
-		break;
-	default:
-		levels++;
-		printf("%c", "lr"[dir]);
-		show_path(n->child[dir], key);
-	}
+	if (n == NULL)
+		return;
+
+	for (int i = 1; i < depth; i++)
+		printf("| ");
+	printf("%s%lu\n", s, n->key);
+	print_node(n->child[LEFT], depth+1, "L:");
+	print_node(n->child[RIGHT], depth+1, "R:");
+}
+
+void show_tree(struct node *root)
+{
+#ifdef SHOW_TREES
+	print_node(root, 0, "");
+	printf("comparisons: %lu\n", comparisons);
+	printf("rotations: %lu\n", rotations);
+	comparisons = 0;
+	rotations = 0;
+	printf("----------------------------------------\n");
+#endif
 }
 
 int main(int argc, char **argv)
@@ -307,7 +301,7 @@ int main(int argc, char **argv)
 
 #define FIND(k) \
 		do { \
-			find(&root, k); \
+			splay(&root, k); \
 			show_tree(root); \
 		} while (0)
 
@@ -332,14 +326,14 @@ int main(int argc, char **argv)
 
 	// Try out the sequential access theorem experimentally (try `grep comparisons`)
 	dur = clock();
-	for (size_t i = 0; i < num_trials; i++) {
+	for (int i = 0; i < num_trials; i++) {
 		INSERT(i);
 	}
 	dur = (clock() - dur);
 	printf("Average sequential insert duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
 
 	dur = clock();
-	for (size_t i = 0; i < num_trials; i++) {
+	for (int i = 0; i < num_trials; i++) {
 		FIND(i);
 	}
 	dur = (clock() - dur);
@@ -347,17 +341,14 @@ int main(int argc, char **argv)
 
 	// Try out randomized accesses
 	dur = clock();
-	for (size_t i = 0; i < num_trials; i++) {
-		unsigned long n = rand() % (num_trials + 1);
-		if (n >= num_trials)
-			printf("(Expected failure) ");
-		FIND(n);
+	for (int i = 0; i < num_trials; i++) {
+		FIND(rand() % num_trials);
 	}
 	dur = (clock() - dur);
 	printf("Average randomized find duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
 
 	dur = clock();
-	for (size_t i = 0; i < num_trials; i++) {
+	for (int i = 0; i < num_trials; i++) {
 		DELETE(i);
 	}
 	dur = (clock() - dur);
@@ -383,25 +374,8 @@ int main(int argc, char **argv)
 
 	// Not found test
 	FREE_NODES();
-	printf("(Expected failure) ");
-	FIND(~0ul);
-
-	// Character tree traversal test
-	if (argc > 2) {
-		for (int i = 0; i < 255; i++)
-			INSERT(i);
-		unsigned long cs = 0;
-		while (!feof(stdin)) {
-			int c = getchar();
-			if (c == EOF)
-				break;
-			show_path(root, c);
-			splay(&root, c);
-			cs++;
-		}
-		printf("characters: %lu\n", cs);
-		printf("traversals: %lu\n", levels);
-	}
+	printf("This lookup is expected to fail (but not segfault): ");
+	FIND(0);
 
 	free(pool);
 	return 0;
