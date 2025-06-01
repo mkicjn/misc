@@ -46,7 +46,7 @@ int main()
 	while (!feof(stdin)) {
 		if (buf_len == buf_cap) {
 			buf_cap *= 2;
-			realloc(buf, buf_cap);
+			buf = realloc(buf, buf_cap);
 		}
 		ssize_t n_read = fread(&buf[buf_len], 1, buf_cap - buf_len, stdin);
 		if (n_read <= 0)
