@@ -411,7 +411,7 @@ int main(int argc, char **argv)
 		}
 		printf("characters: %lu\n", cs);
 		printf("traversals: %lu\n", levels);
-		//printf("estimated encoding length: %f\n", (1.64 * levels) / 8.0);
+		printf("estimated encoding length: %f\n", (1.64 * levels) / 8.0);
 	}
 
 	free(pool);
