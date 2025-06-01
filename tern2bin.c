@@ -19,12 +19,12 @@ int main()
 		int d = c - '0';
 		uint64_t m = (n << 1) + n + d;
 		if (m > UINT32_MAX) {
-			printf("%b", n);
+			printf("%lb", n);
 			n = 1;
 			n = (n << 1) + n + d;
 		} else {
 			n = m;
 		}
 	}
-	printf("%b\n", n);
+	printf("%lb\n", n);
 }
