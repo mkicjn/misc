@@ -149,18 +149,18 @@ struct node {
 };
 
 // (Reimplemented here for fun)
-#define OFFSET_OF(T, MEMB) ((char *)&((T *)NULL)->MEMB - (char *)((T *)NULL))
-#define CONTAINER_OF(PTR, T, MEMB) (T *)((char *)(PTR) - OFFSET_OF(T, MEMB))
+#define OFFSET_OF(T, MEMB) ((size_t)(&((T *)0)->MEMB))
+#define CONTAINER_OF(PTR, T, MEMB) ((T *)((char *)(PTR) - OFFSET_OF(T, MEMB)))
 
-enum splay_dir node_nav(const struct splay_link *l1, const void *l2)
+enum splay_dir node_nav(const struct splay_link *l, const void *arg)
 {
-	const struct node *n1 = CONTAINER_OF(l1, struct node, link);
-	const struct node *n2 = CONTAINER_OF(l2, struct node, link);
-	if (n1 == NULL)
+	const struct node *n = CONTAINER_OF(l, struct node, link);
+	const unsigned long *key = arg;
+	if (n == NULL)
 		return NOWHERE;
-	else if (n2->key > n1->key)
+	else if (*key > n->key)
 		return RIGHT;
-	else if (n2->key < n1->key)
+	else if (*key < n->key)
 		return LEFT;
 	else
 		return HERE;
@@ -168,8 +168,7 @@ enum splay_dir node_nav(const struct splay_link *l1, const void *l2)
 
 bool node_splay(struct splay_link **root, unsigned long key)
 {
-	const struct node dummy = (struct node){.key = key, .link = {0}};
-	return splay(root, node_nav, &dummy.link);
+	return splay(root, node_nav, &key);
 }
 
 void print_node(struct splay_link *l, int depth, const char *s)
@@ -192,7 +191,7 @@ void show_tree(struct splay_link *l)
 	printf("----------------------------------------\n");
 }
 
-int main(int argc, char **argv)
+int main()
 {
 	// Base case testing
 #define NODE(X, L, R) &(struct node){.key=(X), .link=(struct splay_link){.child={(L), (R)}}}.link
