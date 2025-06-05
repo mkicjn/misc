@@ -152,23 +152,33 @@ struct node {
 #define OFFSET_OF(T, MEMB) ((size_t)(&((T *)0)->MEMB))
 #define CONTAINER_OF(PTR, T, MEMB) ((T *)((char *)(PTR) - OFFSET_OF(T, MEMB)))
 
-enum splay_dir node_nav(const struct splay_link *l, const void *arg)
+enum splay_dir compare_key(unsigned long n1, unsigned long n2)
 {
-	const struct node *n = CONTAINER_OF(l, struct node, link);
-	const unsigned long *key = arg;
-	if (n == NULL)
-		return NOWHERE;
-	else if (*key > n->key)
+	if (n2 > n1)
 		return RIGHT;
-	else if (*key < n->key)
+	else if (n2 < n1)
 		return LEFT;
 	else
 		return HERE;
 }
 
-bool node_splay(struct splay_link **root, unsigned long key)
+enum splay_dir node_nav_by_node(const struct splay_link *l, const void *arg)
 {
-	return splay(root, node_nav, &key);
+	const struct node *n = CONTAINER_OF(l, struct node, link);
+	const struct node *n2 = CONTAINER_OF(arg, struct node, link);
+	return l == NULL ? NOWHERE : compare_key(n->key, n2->key);
+}
+
+enum splay_dir node_nav_by_key(const struct splay_link *l, const void *arg)
+{
+	const struct node *n = CONTAINER_OF(l, struct node, link);
+	const unsigned long *key = arg;
+	return l == NULL ? NOWHERE : compare_key(n->key, *key);
+}
+
+bool node_splay_key(struct splay_link **root, unsigned long key)
+{
+	return splay(root, node_nav_by_key, &key);
 }
 
 void print_node(struct splay_link *l, int depth, const char *s)
@@ -187,11 +197,15 @@ void print_node(struct splay_link *l, int depth, const char *s)
 
 void show_tree(struct splay_link *l)
 {
+#ifdef SHOW_TREES
 	print_node(l, 0, "");
 	printf("----------------------------------------\n");
+#else
+	(void)l;
+#endif
 }
 
-int main()
+int main(int argc, char **argv)
 {
 	// Base case testing
 #define NODE(X, L, R) &(struct node){.key=(X), .link=(struct splay_link){.child={(L), (R)}}}.link
@@ -208,7 +222,7 @@ int main()
 			NULL);
 
 	show_tree(root);
-	node_splay(&root, 1);
+	node_splay_key(&root, 1);
 	show_tree(root);
 
 	root = 
@@ -223,7 +237,7 @@ int main()
 		);
 
 	show_tree(root);
-	node_splay(&root, 2);
+	node_splay_key(&root, 2);
 	show_tree(root);
 
 	// Test splaying effect on unfavorably balanced trees
@@ -253,7 +267,7 @@ int main()
 			NULL);
 
 	show_tree(root);
-	node_splay(&root, 1);
+	node_splay_key(&root, 1);
 	show_tree(root);
 
 	// Oops, all zig-zag
@@ -281,8 +295,90 @@ int main()
 			NULL);
 
 	show_tree(root);
-	node_splay(&root, 5);
+	node_splay_key(&root, 5);
 	show_tree(root);
+
+	// Dynamic testing
+	size_t num_trials = 1000;
+	if (argc > 1)
+		num_trials = atol(argv[1]);
+
+#define INSERT(k) \
+		do { \
+			struct node *arg = next_node++; \
+			arg->key = k; \
+			arg->link.child[LEFT] = NULL; \
+			arg->link.child[RIGHT] = NULL; \
+			insert(&root, node_nav_by_node, &arg->link); \
+			show_tree(root); \
+		} while (0)
+
+#define FIND(k) \
+		do { \
+			unsigned long arg = k; \
+			find(&root, node_nav_by_key, &arg); \
+			show_tree(root); \
+		} while (0)
+
+#define DELETE(k) \
+		do { \
+			unsigned long arg = k; \
+			delete(&root, node_nav_by_key, &arg); \
+			show_tree(root); \
+		} while (0)
+
+#define FREE_NODES() \
+		do { \
+			root = NULL; \
+			next_node = pool; \
+		} while (0)
+
+#undef printf
+
+	srand(time(NULL));
+	clock_t dur = 0;
+
+	// Allocate nodes (as many as requested)
+	struct node *pool = malloc(num_trials * sizeof(struct node));
+	struct node *next_node = pool;
+
+	// Try out the sequential access theorem experimentally (try `grep comparisons`)
+	dur = clock();
+	for (size_t i = 0; i < num_trials; i++) {
+		INSERT(i);
+	}
+	dur = (clock() - dur);
+	printf("Average sequential insert duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
+
+	dur = clock();
+	for (size_t i = 0; i < num_trials; i++) {
+		FIND(i);
+	}
+	dur = (clock() - dur);
+	printf("Average sequential find duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
+
+	// Try out randomized accesses
+	dur = clock();
+	for (size_t i = 0; i < num_trials; i++) {
+		unsigned long n = rand() % (num_trials + 1);
+		if (n >= num_trials)
+			printf("(Expected failure) ");
+		FIND(n);
+	}
+	dur = (clock() - dur);
+	printf("Average randomized find duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
+
+	dur = clock();
+	for (size_t i = 0; i < num_trials; i++) {
+		DELETE(i);
+	}
+	dur = (clock() - dur);
+	printf("Average sequential delete duration: %fms\n", (dur / (double)CLOCKS_PER_SEC) / num_trials * 1000.0);
+
+	// Release node pool memory
+	free(pool);
+	pool = NULL;
+	FREE_NODES();
 
 	return 0;
 }
