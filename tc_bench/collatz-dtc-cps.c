@@ -1,4 +1,4 @@
-#include "../cpp_dict.c"
+#include "../fth_dict.c"
 
 int main()
 {

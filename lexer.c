@@ -66,6 +66,12 @@ enum tok_type {
 	FOREACH_TOK_TYPE(LIST_ENUM)
 };
 
+// Generate a table of descriptions for each token type
+const char *tok_desc[] = {
+#define LIST_DESC(ENUM, DESC, FN, ...) DESC,
+	FOREACH_TOK_TYPE(LIST_DESC)
+};
+
 // Internal lexer variables
 #define MAX_TOK_LEN 4096
 static int buf[MAX_TOK_LEN];
@@ -184,12 +190,6 @@ void token_next(void)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Test program
-
-// Generate a table of descriptions for each token type
-const char *tok_desc[] = {
-#define LIST_DESC(ENUM, DESC, FN, ...) DESC,
-	FOREACH_TOK_TYPE(LIST_DESC)
-};
 
 #ifndef NO_LEX_MAIN
 int main()

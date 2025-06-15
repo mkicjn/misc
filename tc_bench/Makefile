@@ -19,5 +19,5 @@ bench: all
 	$(foreach bench,$(ALL),echo;echo $(bench);time -f "\t%E" ./$(bench);)
 
 .PHONY: analysis
-analysis: cpp_dict.o
+analysis: fth_dict.o
 	$(CROSS_COMPILE)objdump -d $< | ./analyze.py
