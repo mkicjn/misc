@@ -17,7 +17,8 @@ ALL = \
 	collatz_luajit \
 	collatz_swipl \
 	collatz_java \
-	collatz_javac
+	collatz_javac \
+	collatz_rust
 
 all: $(ALL)
 
@@ -115,3 +116,6 @@ collatz_javac: Collatz.class
 	echo "#!/bin/bash" > $@
 	echo "java Collatz" >> $@
 	chmod +x $@
+
+collatz_rust: src/collatz.rs
+	rustc -O $< -o $@
