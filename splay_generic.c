@@ -36,7 +36,7 @@ typedef enum splay_dir (*splay_nav_fn)(const struct splay_link *n, const void *n
  *
  * All types of splays have this in common
  */
-void rotate(struct splay_link **p_ptr, int x_dir)
+static inline void rotate(struct splay_link **p_ptr, int x_dir)
 {
 	struct splay_link *p = *p_ptr;
 	struct splay_link *x = p->child[x_dir];
@@ -45,8 +45,8 @@ void rotate(struct splay_link **p_ptr, int x_dir)
 	*p_ptr = x;
 }
 
-// Top-down strategy
-bool splay(struct splay_link **root_ptr, splay_nav_fn nav, const void *nav_arg)
+// Top-down splaying strategy
+bool find(struct splay_link **root_ptr, splay_nav_fn nav, const void *nav_arg)
 {
 	if (*root_ptr == NULL)
 		return false;
@@ -61,7 +61,7 @@ bool splay(struct splay_link **root_ptr, splay_nav_fn nav, const void *nav_arg)
 			break;
 
 		struct splay_link *p = g->child[dir];
-		if (nav(p, nav_arg) == dir) {
+		if (p != NULL && nav(p, nav_arg) == dir) {
 			g = p;
 			rotate(root_ptr, dir);
 		}
@@ -82,16 +82,6 @@ bool splay(struct splay_link **root_ptr, splay_nav_fn nav, const void *nav_arg)
 	return nav(g, nav_arg) == HERE;
 }
 
-bool find(struct splay_link **root_ptr, splay_nav_fn nav, const void *nav_arg)
-{
-	if (!splay(root_ptr, nav, nav_arg)) {
-		printf("lookup failed\n");
-		return false;
-	} else {
-		return true;
-	}
-}
-
 bool insert(struct splay_link **root_ptr, splay_nav_fn nav, struct splay_link *x)
 {
 	if (*root_ptr == NULL) {
@@ -99,7 +89,7 @@ bool insert(struct splay_link **root_ptr, splay_nav_fn nav, struct splay_link *x
 		return true;
 	}
 
-	if (splay(root_ptr, nav, x))
+	if (find(root_ptr, nav, x))
 		return false;
 
 	struct splay_link *g = *root_ptr;
@@ -124,7 +114,7 @@ enum splay_dir splay_nav_to_min(const struct splay_link *n, const void *arg)
 
 bool delete(struct splay_link **root_ptr, splay_nav_fn nav, const void *nav_arg)
 {
-	if (!splay(root_ptr, nav, nav_arg))
+	if (!find(root_ptr, nav, nav_arg))
 		return false;
 	struct splay_link *del = *root_ptr;
 
@@ -136,17 +126,17 @@ bool delete(struct splay_link **root_ptr, splay_nav_fn nav, const void *nav_arg)
 		return true;
 	}
 	*root_ptr = del->child[RIGHT];
-	splay(root_ptr, splay_nav_to_min, NULL);
+	find(root_ptr, splay_nav_to_min, NULL);
 	(*root_ptr)->child[LEFT] = del->child[LEFT];
 	return true;
 }
 
+
+// ******************** No longer generic ********************
+
 // (Reimplemented here for fun)
 #define OFFSET_OF(T, MEMB) ((size_t)(&((T *)0)->MEMB))
 #define CONTAINER_OF(PTR, T, MEMB) ((T *)((char *)(PTR) - OFFSET_OF(T, MEMB)))
-
-
-// ******************** No longer generic ********************
 
 struct node {
 	unsigned long key;
@@ -155,9 +145,6 @@ struct node {
 
 enum splay_dir node_nav(const struct splay_link *l, const void *arg)
 {
-	if (l == NULL)
-		return NOWHERE;
-
 	const struct node *n1 = CONTAINER_OF(l, struct node, link);
 	const struct node *n2 = CONTAINER_OF(arg, struct node, link);
 	if (n2->key > n1->key)
@@ -200,7 +187,8 @@ int main(int argc, char **argv)
 #define FIND(k) \
 		do { \
 			struct node arg = {.key = k}; \
-			find(&root, node_nav, &arg.link); \
+			if (!find(&root, node_nav, &arg.link)) \
+				printf("Lookup failed\n"); \
 			show_tree(root); \
 		} while (0)
 
