@@ -18,7 +18,7 @@ void confirm(int c)
 	char *bucket = &pred[hist[0]][hist[1]];
 	*bucket = c;
 	hist[1] = hist[0];
-	hist[0] = c;
+	hist[0] = c & 0xff;
 }
 
 void showchar(int c)
