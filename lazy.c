@@ -1,3 +1,4 @@
+//$(which tcc) $CFLAGS -run $0 "$@"; exit $?
 #include <stdio.h>
 #include <stdbool.h>
 
@@ -57,7 +58,7 @@ void *cons(void *x, void *y)
 	return cell;
 }
 
-void *decons(void *x, void **a, void **d)
+void decons(void *x, void **a, void **d)
 {
 	if (!atom(x)) {
 		*a = *CAR(x);
