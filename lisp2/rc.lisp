@@ -1,4 +1,7 @@
-;;;; Basic list utilities
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Basic list utilities
+;;
 
 (define list (lambda args args))
 
@@ -16,7 +19,10 @@
 	(assoc s (cdr l))))))
 
 
-;;;; Macro expansion
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Macro support
+;;
 
 ; Which forms can be expanded? Not atoms, and not quotes
 (define non-expandable
@@ -61,20 +67,38 @@
 (defmacro (defun name/args body)
   (list 'define (car name/args) (list 'lambda (cdr name/args) body)))
 
-; Translate longer list accessors into shorter ones (add as needed)
-(defmacro (caar x) (list 'car (list 'car x)))
-(defmacro (cadr x) (list 'car (list 'cdr x)))
-(defmacro (cdar x) (list 'cdr (list 'car x)))
-(defmacro (cddr x) (list 'cdr (list 'cdr x)))
-(defmacro (cadar x) (list 'car (list 'cdar x)))
-(defmacro (caddr x) (list 'car (list 'cddr x)))
-(defmacro (cddar x) (list 'cdr (list 'cdar x)))
-(defmacro (cdddr x) (list 'cdr (list 'cddr x)))
-(defmacro (caddar x) (list 'car (list 'cddar x)))
-(defmacro (cadddr x) (list 'car (list 'cdddr x)))
+; Translate complex list accessors into primitive ones
+(defmacro (defchain name prim base)
+  (list 'defmacro (list name 'x)
+	(list 'list (list 'quote prim)
+	      (list 'list (list 'quote base) 'x))))
+
+(defchain caar car car) ; (Add to this list as needed) 
+(defchain cadr car cdr)
+(defchain cdar cdr car)
+(defchain cddr cdr cdr)
+(defchain cadar car cdar)
+(defchain caddr car cddr)
 
 ; Translate cond into `if` chain
 (defmacro (cond . qs-and-as)
   (if (atom qs-and-as) ()
     (list 'if (caar qs-and-as) (cadar qs-and-as)
 	  (cons 'cond (cdr qs-and-as)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Fun stuff
+;;
+
+; Applicative fixpoint combinator
+(define Z
+  (lambda (f)
+    ((lambda (g) (f (lambda args ((g g) . args)))) ; or (lambda (g) (g g))
+     (lambda (g) (f (lambda args ((g g) . args)))))))
+
+((lambda (last)
+   (last '(a b c d e f g h i j k l m n o p q r s t u v w x y z)))
+ (Z (lambda (last)
+      (lambda (l) (cond ((cdr l) (last (cdr l))) (t (car l)))))))
