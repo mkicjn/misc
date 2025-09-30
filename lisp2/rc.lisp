@@ -19,13 +19,13 @@
       (if (eq s (car (car l))) (car l)
 	(assoc s (cdr l))))))
 
-
 (define filter
   ((lambda (cont)
      (lambda (f l cont)
-       (cond ((atom l) l)
-	     ((f (car l)) (filter f (cdr l) (lambda (x) (cont (cons (car l) x)))))
-	     (t (filter f (cdr l) cont)))))
+       (if (atom l) (cont l)
+	 (if (f (car l))
+	   (filter f (cdr l) (lambda (x) (cont (cons (car l) x))))
+	   (filter f (cdr l) cont)))))
    ident))
 
 
