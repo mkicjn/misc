@@ -11,5 +11,7 @@ I did this because it might be fun to try to implement J-Bob from "The Little Pr
 but I figured not supporting `if` natively might make it a little awkward to translate.
 So, that's what this experimental interpreter might be used for eventually.
 
+Another possible use for this interpreter is to try translating Lisp into threaded code to make it faster, just like [one of my oldest projects](https://github.com/mkicjn/stacklisp). :)
+
 There are some other miscellaneous changes (such as removing fexprs), but there's no particular reason behind those.
 Ultimately, this is just here to preserve any experimental changes that shouldn't be pushed to c2kanren.

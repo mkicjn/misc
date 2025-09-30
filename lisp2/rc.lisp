@@ -1,22 +1,32 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Basic list utilities
+;; Basic list utilities needed to implement macros
 ;;
 
 (define list (lambda args args))
+(define ident (lambda (x) x))
 
 (define map
-  ((lambda (cont) ; note let-over-lambda + continuation passing style
-     (lambda (f l cont)
+  ((lambda (cont) ; Note technique: let-over-lambda for default arg
+     (lambda (f l cont) ; Note technique: continuation-passing style
        (if (atom l) (cont l)
 	 (map f (cdr l) (lambda (x) (cont (cons (f (car l)) x)))))))
-   (lambda (x) x)))
+   ident))
 
 (define assoc
   (lambda (s l)
     (if (atom l) ()
       (if (eq s (car (car l))) (car l)
 	(assoc s (cdr l))))))
+
+
+(define filter
+  ((lambda (cont)
+     (lambda (f l cont)
+       (cond ((atom l) l)
+	     ((f (car l)) (filter f (cdr l) (lambda (x) (cont (cons (car l) x)))))
+	     (t (filter f (cdr l) cont)))))
+   ident))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -63,13 +73,12 @@
 (define expand
   (lambda (form) (deep-expand form *expand-rules*)))
 
-; Enable `defun` with same syntax as `defmacro`
-(defmacro (defun name/args body)
-  (list 'define (car name/args) (list 'lambda (cdr name/args) body)))
+; Basic example: Logical not via comparison to nil
+(defmacro (not x) (list 'eq () x))
 
 ; Translate complex list accessors into primitive ones
 (defmacro (defchain name prim base)
-  (list 'defmacro (list name 'x)
+  (list 'defmacro (list name 'x) ; Note technique: macro-defining macro
 	(list 'list (list 'quote prim)
 	      (list 'list (list 'quote base) 'x))))
 
@@ -84,7 +93,20 @@
 (defmacro (cond . qs-and-as)
   (if (atom qs-and-as) ()
     (list 'if (caar qs-and-as) (cadar qs-and-as)
-	  (cons 'cond (cdr qs-and-as)))))
+	  (cons 'cond (cdr qs-and-as))))) ; Note technique: "recursive" macro
+
+; Let-syntax
+(defmacro (let binds body)
+  (cons (list 'lambda (map (lambda (x) (car x)) binds) body)
+	(map (lambda (x) (cadr x)) binds)))
+
+; Enable `defun` syntax, with default arguments implemented by let-over-lambda
+(defmacro (defun name/args body)
+  (let ((name (car name/args))
+	(args (map (lambda (x) (if (atom x) x (car x))) (cdr name/args)))
+	(defaults (filter (lambda (x) (not (atom x)))   (cdr name/args))))
+    (let ((fun (list 'lambda args body)))
+      (list 'define name (if defaults (list 'let defaults fun) fun)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -97,8 +119,3 @@
   (lambda (f)
     ((lambda (g) (f (lambda args ((g g) . args)))) ; or (lambda (g) (g g))
      (lambda (g) (f (lambda args ((g g) . args)))))))
-
-((lambda (last)
-   (last '(a b c d e f g h i j k l m n o p q r s t u v w x y z)))
- (Z (lambda (last)
-      (lambda (l) (cond ((cdr l) (last (cdr l))) (t (car l)))))))
