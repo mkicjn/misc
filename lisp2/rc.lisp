@@ -86,19 +86,18 @@
 (defchain cadr car cdr)
 (defchain cdar cdr car)
 (defchain cddr cdr cdr)
-(defchain caadr car cadr)
 (defchain cadar car cdar)
 (defchain caddr car cddr)
 
 ; Translate cond into `if` chain
 (defmacro (cond . qs-and-as)
   (if (atom qs-and-as) ()
-    (list 'if (caar qs-and-as) (cadar qs-and-as)
-	  ; Optimize t conditions in else branch
-	  (if (eq t (caadr qs-and-as))
-	    ; (cond (q0 a0) (t a1) (q2 a2)) => (if q0 a0 a1)
-	    (cadr (cadr qs-and-as)) ; a1
-	    ; (cond (q0 a0) (q1 a1) ...) => (if q0 a1 (cond (q1 a1) (q2 a2)))
+    ; Optimize away t conditions
+    (if (eq t (caar qs-and-as))
+      ; (cond (t x) ...) => x
+      (cadr (car qs-and-as))
+      ; (cond (q x) ...) => (if q x (cond ...))
+      (list 'if (caar qs-and-as) (cadar qs-and-as)
 	    (cons 'cond (cdr qs-and-as)))))) ; Note technique: "recursive" macro
 
 ; Let-syntax
