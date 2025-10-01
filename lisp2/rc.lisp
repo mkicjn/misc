@@ -9,7 +9,7 @@
 (define map
   ((lambda (cont) ; Note technique: let-over-lambda for default arg
      (lambda (f l cont) ; Note technique: continuation-passing style
-       (if (atom l) (cont l)
+       (if (atom l) (cont (if l (f l)))
 	 (map f (cdr l) (lambda (x) (cont (cons (f (car l)) x)))))))
    ident))
 
@@ -22,7 +22,7 @@
 (define filter
   ((lambda (cont)
      (lambda (f l cont)
-       (if (atom l) (cont l)
+       (if (atom l) (cont (if l (if (f l) l)))
 	 (if (f (car l))
 	   (filter f (cdr l) (lambda (x) (cont (cons (car l) x))))
 	   (filter f (cdr l) cont)))))
@@ -124,3 +124,23 @@
   (lambda (f)
     ((lambda (g) (f (lambda args ((g g) . args)))) ; or (lambda (g) (g g))
      (lambda (g) (f (lambda args ((g g) . args)))))))
+
+; Variadic append in one definition via Z combinator
+(defun (append . args)
+  ((Z (lambda (append-cps)
+	(lambda (cont l . ls)
+	  (if (atom l) (if (atom ls) (cont l) (append-cps cont . ls))
+	    (append-cps (lambda (x) (cont (cons (car l) x)))
+			(cdr l) . ls)))))
+   ident . args))
+
+; List flattening via append
+(defun (flatten l (cont ident))
+  (cond ((atom l) (cont l))
+	((atom (car l)) (flatten (cdr l) (lambda (x) (cont (cons (car l) x)))))
+	(t (flatten (cdr l) (lambda (x) (cont (append (flatten (car l)) x)))))))
+
+; Translation to postfix notation (naive)
+(defun (postfix l)
+  (if (atom l) l
+    (append (map postfix (cdr l)) (list (postfix (car l))))))
