@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+// FIXME: This implementation may be at a disadvantage because it lacks a TOS register
+
 int main()
 {
 	// : ITER  DUP 1 AND 0= IF  2/  ELSE  DUP 2* + 1+  THEN ;
@@ -75,52 +77,52 @@ next: asm("next:");
 docol: asm("docol:");
 	*(++rp) = ip+1; // DOCOL
 	ip = *ip;
-	goto next;
+	goto **(ip++);
 
 exit: asm("exit:");
 	ip = *(rp--); // EXIT
-	goto next;
+	goto **(ip++);
 
 
 dolit: asm("dolit:");
 	*(++sp) = *(intptr_t *)(ip++); // DOLIT
-	goto next;
+	goto **(ip++);
 
 inc: asm("inc:");
 	(*sp)++; // 1+
-	goto next;
+	goto **(ip++);
 
 dec: asm("dec:");
 	(*sp)--; // 1-
-	goto next;
+	goto **(ip++);
 
 div2: asm("div2:");
 	(*sp) >>= 1; // 2/
-	goto next;
+	goto **(ip++);
 
 mul2: asm("mul2:");
 	(*sp) <<= 1; // 2*
-	goto next;
+	goto **(ip++);
 
 add: asm("add:");
 	sp--; // +
 	sp[0] += sp[1];
-	goto next;
+	goto **(ip++);
 
 drop: asm("drop:");
 	sp--; // DROP
-	goto next;
+	goto **(ip++);
 
 dup: asm("dup:");
 	sp[1] = sp[0]; // DUP
 	sp++;
-	goto next;
+	goto **(ip++);
 
 swap: asm("swap:");
 	wr1 = sp[0]; // SWAP
 	sp[0] = sp[-1];
 	sp[-1] = wr1;
-	goto next;
+	goto **(ip++);
 
 rot: asm("rot:");
 	wr1 = sp[-1]; // ROT
@@ -128,18 +130,18 @@ rot: asm("rot:");
 	sp[0] = sp[-2];
 	sp[-2] = wr1;
 	sp[-1] = wr2;
-	goto next;
+	goto **(ip++);
 
 max: asm("max:");
 	wr1 = sp[0]; // MAX
 	wr2 = sp[-1];
 	sp[-1] = wr1 > wr2 ? wr1 : wr2;
 	sp--;
-	goto next;
+	goto **(ip++);
 
 jmp: asm("jmp:");
 	ip = *ip; // BRANCH
-	goto next;
+	goto **(ip++);
 
 jz: asm("jz:");
 	wr1 = *(sp--); // ?BRANCH
@@ -147,29 +149,29 @@ jz: asm("jz:");
 		ip = *ip;
 	else
 		ip++;
-	goto next;
+	goto **(ip++);
 
 zeq: asm("zeq:");
 	sp[0] = (sp[0] == 0); // 0=
-	goto next;
+	goto **(ip++);
 
 and: asm("and:");
 	sp--; // AND
 	sp[0] &= sp[1];
-	goto next;
+	goto **(ip++);
 
 gt: asm("gt:");
 	sp--; // >
 	sp[0] = (sp[0] > sp[1]);
-	goto next;
+	goto **(ip++);
 
 dot: asm("dot:");
 	printf("%ld ", *(sp--)); // .
-	goto next;
+	goto **(ip++);
 
 cr: asm("cr:");
 	putchar('\n');
-	goto next;
+	goto **(ip++);
 
 bye: asm("bye:");
 	return *sp; // BYE

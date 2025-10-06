@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdint.h>
 
+// FIXME: This implementation may be at a disadvantage because it lacks a TOS register
+// (Not that it really needs the help, to be honest)
+
 #define DOLIT(x) *(++sp) = x;
 
 register intptr_t *sp asm("rbx");
