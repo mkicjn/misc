@@ -35,7 +35,7 @@ intptr_t tt_interp(const intptr_t *prog)
 	register const intptr_t *ip = prog;
 	register intptr_t *sp = stack;
 	register intptr_t *rp = rstack;
-	register intptr_t tos = 0; // FIXME: This interpreter may have a slight advantage because the others lack this register
+	register intptr_t tos = 0;
 	register intptr_t wp = 0;
 	register intptr_t rot = 0;
 
