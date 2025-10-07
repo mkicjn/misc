@@ -1,28 +1,72 @@
-// (very WIP)
+//$(which tcc) $CFLAGS -run $0 $@; exit $?
 
-// Cell / List operations
+// (very WIP)
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
+
+#define ERROR ((void *)1)
+
+
+// Symbols / String Interning
+
+#define MAX_SYMS 100000
+char sym_space[MAX_SYMS];
+char *free_sym = &sym_space[0];
+
+static inline bool symbolp(char *x)
+{
+	return &sym_space[0] <= x && x < &sym_space[MAX_SYMS];
+}
+
+char *intern(char *cstr)
+{
+	size_t len = strlen(cstr);
+	if (len > 255)
+		len = 255;
+
+	for (char *sym = &sym_space[0]; sym < free_sym; sym += sym[0] + 1) {
+		if (sym[0] == len && memcmp(sym + 1, cstr, len) == 0)
+			return sym;
+	}
+
+	*(free_sym++) = len;
+	memcpy(free_sym, cstr, len);
+	free_sym += len;
+	return free_sym - (len + 1);
+}
+
+
+// Cells / List Operations
 
 #define MAX_CELLS 100000
 void *cell_space[MAX_CELLS];
-void **cells = &cell_space[0];
+void **free_cells = &cell_space[0];
 
-void *cons(void *a, void *d)
+static inline bool listp(void **x)
 {
-	void **c = cells;
-	cells += 2;
+	return &cell_space[0] <= x && x < &cell_space[MAX_CELLS];
+}
+
+static inline void *cons(void *a, void *d)
+{
+	void **c = free_cells;
+	free_cells += 2;
 	c[0] = a;
 	c[1] = d;
 	return c;
 }
 
-void *car(void **x)
+static inline void *car(void **x)
 {
-	return x[0];
+	return listp(x) ? x[0] : ERROR;
 }
 
-void *cdr(void **x)
+static inline void *cdr(void **x)
 {
-	return x[1];
+	return listp(x) ? x[1] : ERROR;
 }
 
 
@@ -77,16 +121,18 @@ void st_cons(void)
 }
 
 
-// Main (Test program)
+// Main (test program)
 
-struct vm_regs {
-	void **cells;
-	void **stack;
-	void ***frames;
-};
-// ^ ???
+// TODO: Is putting arguments on a stack going to be amenable to TCO?
 
 int main()
 {
+	char *sym_t = intern("t");
+	char *sym_nil = intern("nil");
+	char *sym_nil2 = intern("nil");
+	printf("%.*s\n", sym_t[0], sym_t+1);
+	printf("%.*s\n", sym_nil[0], sym_nil+1);
+	printf("%.*s\n", sym_nil2[0], sym_nil2+1);
+	printf("%p ... %p\n", sym_nil, sym_nil2);
 	return 0;
 }
