@@ -13,6 +13,7 @@ ALL = \
 	collatz_csi \
 	collatz_scheme \
 	collatz_newlisp \
+	collatz_racket \
 	collatz_lua \
 	collatz_luajit \
 	collatz_swipl \
@@ -81,6 +82,11 @@ collatz_scheme: src/collatz.scm
 	chmod +x $@
 collatz_newlisp: src/collatz.lsp
 	echo "#!/usr/bin/newlisp" > $@
+	cat $^ >> $@
+	chmod +x $@
+collatz_racket: src/collatz.scm
+	echo "#!/usr/bin/racket" > $@
+	echo "#lang racket/base" >> $@
 	cat $^ >> $@
 	chmod +x $@
 
