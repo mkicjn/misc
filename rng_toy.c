@@ -1,7 +1,11 @@
+//$(which tcc) $CFLAGS -run $0 "$@"; exit $?
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+
+#include <unistd.h>
+#include <sys/random.h>
 
 uint64_t cbrng(uint64_t n)
 { // Initially inspired by the middle square Weyl sequence and Squares
@@ -11,7 +15,7 @@ uint64_t cbrng(uint64_t n)
 	//   as long as it's big and not too repetitive in binary.
 #endif
 	static uint64_t const s = CBRNG_CONST;
-	
+
 	uint64_t x = n * s;
 	x *= x ^ s;
 	// Tacking on some elements from xorshift+ seems to result in better PractRand results, even using the full 64-bits
@@ -69,25 +73,39 @@ void std_seed(uint64_t s)
 {
 	srand(s);
 }
-
 uint32_t std_next(void)
 {
 	return rand();
 }
 
 
-
+#define rdrand 1
+#if RNG
+// ^ Try to prevent rdrand from being used if not selected
+// This breaks in compilers that don't support it, namely TCC.
 void rdrand_seed(uint64_t s)
 {
 }
-
 uint64_t rdrand_next(void)
 {
 	uint64_t a;
-	asm __volatile__ (
-			"rdrand %0"
-			: "=r"(a));
+	asm __volatile__ ("rdrand %0" : "=r"(a));
 	return a;
+}
+#endif
+#undef rdrand
+
+
+
+void getrandom_seed(uint64_t s)
+{
+}
+uint64_t getrandom_next(void)
+{
+	uint64_t n;
+	if (0 > getrandom(&n, sizeof(n), 0))
+		perror("getrandom()");
+	return n;
 }
 
 
@@ -98,7 +116,6 @@ uint64_t xorshift(uint64_t state)
 	state ^= state >> 7;
 	return state * CBRNG_CONST;
 }
-
 uint64_t xorshift_state = 1;
 void xorshift_seed(uint64_t s)
 {
@@ -164,8 +181,47 @@ int32_t vale_next()
 
 
 
+// Derived from https://prng.di.unimi.it/splitmix64.c
+uint64_t splitmix64_state = 0;
+uint64_t splitmix64(void)
+{
+	uint64_t z = (splitmix64_state += 0x9e3779b97f4a7c15);
+	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+	z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+	return z ^ (z >> 31);
+}
+void splitmix64_seed(uint64_t x)
+{
+	splitmix64_state = x;
+}
+uint64_t splitmix64_next()
+{
+	return splitmix64();
+}
+
+
+
+// New counter-based method for applying SplitMix?
+uint64_t splitmix64_ctr(uint64_t key, uint64_t ctr)
+{
+	uint64_t z = (key + ctr * 0x9e3779b97f4a7c15);
+	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+	z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+	return z ^ (z >> 31);
+}
+void splitmix64_ctr_seed(uint64_t x)
+{
+	key = x;
+}
+uint64_t splitmix64_ctr_next(void)
+{
+	return splitmix64_ctr(key, ctr++);
+}
+
+
+
 #ifndef RNG
-#define RNG cbrng
+#define RNG splitmix64_ctr
 #endif
 
 #define STR(x) #x
@@ -240,32 +296,28 @@ int main(int argc, char **argv)
 	if (!strcasecmp(argv[1], "pgm"))
 		fmt = PGM;
 
-	int x, y, n = 0;
+	int x = 0, y = 0, n = 0;
+	if (0 > getrandom(&n, sizeof(n), 0))
+		perror("getrandom()");
 	fprintf(stderr, "RNG=%s\n", RNG_STR);
+	fprintf(stderr, "sizeof(rng_next()): %lu\n", sizeof(rng_next()));
 	switch (fmt) {
 	case RAW:
-		if (argc < 3) {
-			printf("Not enough arguments\n");
+		if (isatty(fileno(stdout))) {
+			printf("Refusing to output binary data to terminal\n");
 			return 1;
 		}
-		sscanf(argv[2], "%d", &x);
-		if (argc > 3) {
+		if (argc > 2)
+			sscanf(argv[2], "%d", &x);
+		if (argc > 3)
 			sscanf(argv[3], "%d", &n);
-			rng_seed(n);
-		}
-		fprintf(stderr, "sizeof(rng_next()): %lu\n", sizeof(rng_next()));
-		if (x > 0) {
-			for (unsigned i = 0; i < x; i++) {
-				uint64_t u = rng_next();
-				fwrite(&u, sizeof(rng_next()), 1, stdout);
-			}
-		} else {
-			for (;;) {
-				uint64_t u = rng_next();
-				fwrite(&u, sizeof(rng_next()), 1, stdout);
-			}
+		rng_seed(n);
+		for (unsigned i = 0; x <= 0 || i < x; i++) {
+			uint64_t u = rng_next();
+			fwrite(&u, sizeof(rng_next()), 1, stdout);
 		}
 		break;
+
 	case CSV:
 		if (argc < 4) {
 			printf("Not enough arguments\n");
@@ -273,10 +325,9 @@ int main(int argc, char **argv)
 		}
 		sscanf(argv[2], "%d", &x);
 		sscanf(argv[3], "%d", &y);
-		if (argc > 4) {
+		if (argc > 4)
 			sscanf(argv[4], "%d", &n);
-			rng_seed(n);
-		}
+		rng_seed(n);
 		for (int i = 0; i < y; i++) {
 			for (int j = 0; j < x; j++) {
 				printf("%d", rng_next());
@@ -286,6 +337,7 @@ int main(int argc, char **argv)
 			putchar('\n');
 		}
 		break;
+
 	case PBM:
 		if (argc < 4) {
 			printf("Not enough arguments\n");
@@ -297,6 +349,7 @@ int main(int argc, char **argv)
 			sscanf(argv[4], "%d", &n);
 		random_pbm(x, y, n);
 		break;
+
 	case PGM:
 		if (argc < 4) {
 			printf("Not enough arguments\n");
@@ -308,6 +361,7 @@ int main(int argc, char **argv)
 			sscanf(argv[4], "%d", &n);
 		random_pgm(x, y, n);
 		break;
+
 	default:
 		printf("Invalid selection\n");
 		return 1;
