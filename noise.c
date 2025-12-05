@@ -1,70 +1,117 @@
 //$(which tcc) $CFLAGS -run $0 "$@"; exit $?
 #include <stdio.h>
 #include <stdint.h>
-#include <string.h>
+#include <time.h>
+#include <stdlib.h>
+#include <signal.h>
 
-// Try this:
-// ./a.out 100 100 3 2 > out.pgm
+#include <sys/random.h>
 
-uint32_t cbrng(uint64_t n)
-{ // Inspired by the middle square Weyl sequence and Squares
-	static uint64_t const s = 0xB5AD4ECEDA1CE2A9UL;
-	
-	uint64_t x = n * s;
-	x *= x ^ s;
-	return x >> 32;
+
+/* ******** COUNTER-BASED PRNG ******** */
+
+uint64_t splitmix64_ctr(uint64_t key, uint64_t ctr)
+{
+	uint64_t z = (key + ctr * 0x9e3779b97f4a7c15);
+	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+	z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+	return z ^ (z >> 31);
 }
 
-int noise(uint64_t seed, int width, int height, int x0, int y0, int range, int depth)
+/* ******** NOISE GENERATION ******** */
+
+#define VIRTUAL_WIDTH 100000
+#define WIDTH 80
+#define HEIGHT 60
+
+uint64_t noise_key = 0;
+int noise(int origin, int x, int y, int smoothing)
 {
-	(void)height;
-	uint64_t val_sum = 0;
-	uint64_t fac_sum = 0;
-#define ABS(X) ((X)<0?-(X):(X))
-#define MAX(X,Y) ((X)>(Y)?(X):(Y))
-	if (depth <= 0)
-		return cbrng(seed + x0 + y0 * width) & 0xff;
-	for (int dx = -range; dx <= range; dx++) {
-		for (int dy = -range; dy <= range; dy++) {
-			int64_t fac = (range*2)-1-ABS(dx)-ABS(dy);
-			if (fac <= 0)
-				continue;
+	// Here's the interesting idea: Procedurally generate in one step with recursion and counter-based RNG
+	if (smoothing <= 0) {
+		return splitmix64_ctr(noise_key, origin + x + y * VIRTUAL_WIDTH) & 0xff;
+	}
+	// Calculate average recursively based on smoothing level
+	int sum = 0;
+	for (int dy = -1; dy <= 1; dy++)
+		for (int dx = -1; dx <= 1; dx++)
+			sum += noise(origin, x + dx, y + dy, smoothing - 1);
+	return sum / 9;
+}
 
-			int x1 = x0 + dx, y1 = y0 + dy;
-			uint64_t val = noise(seed, width, height, x1, y1, range, depth-1);
-
-			val_sum += val * fac;
-			fac_sum += fac;
+void print_map(int origin, int erosion)
+{
+	for (int y = 0; y < HEIGHT; y++) {
+		for (int x = 0; x < WIDTH; x++) {
+			int n = noise(origin, x, y, erosion);
+			printf("\033[48;2;%d;%d;%dm  ", n, n, n);
 		}
+		printf("\033[m\n\r");
 	}
-	uint64_t avg = val_sum / fac_sum;
-	return avg;
 }
 
-void random_pgm(uint64_t seed, int width, int height, int range, int depth)
+
+/* ******** MAIN / INPUT LOOP ******** */
+
+void signal_handler(int signo)
 {
-	printf("P2\n%d %d\n", width, height);
-	printf("255\n");
-	for (int x = 0; x < width; x++) {
-		for (int y = 0; y < height; y++)
-			printf("%d ", noise(seed, width, height, x, y, range, depth));
-		printf("\n");
-	}
+	system("stty -raw echo");
+	exit(0);
 }
 
 int main(int argc, char **argv)
 {
-	uint64_t width, height, range, depth, seed = 0;
-	if (argc < 3) {
-		printf("Not enough arguments\n");
-		return 1;
+	int origin = 0;
+	char c;
+	int depth = 3;
+	if (argc > 1)
+		return 0;
+
+	if (0 > getrandom(&noise_key, sizeof(noise_key), 0))
+		perror("getrandom()");
+
+	signal(SIGINT, signal_handler);
+
+	// Notice: no storage of depth map anywhere means area is effectively "infinite" barring virtual width
+	// Could probably implement some interesting wrapping mechanism to simulate toroidal or other surfaces
+	system("stty raw -echo isig");
+	printf("\033[2J");
+	for (;;) {
+		printf("\033[1;1H");
+		print_map(origin, depth);
+		c = getchar();
+		switch (c) {
+		case '{':
+			noise_key++;
+			break;
+		case '}':
+			noise_key--;
+			break;
+		case '[':
+			depth -= (depth > 0);
+			break;
+		case ']':
+			depth += 1;
+			break;
+		case 'h':
+		case '4':
+			origin -= 4;
+			break;
+		case 'j':
+		case '2':
+			origin += 4 * VIRTUAL_WIDTH;
+			break;
+		case 'k':
+		case '8':
+			origin -= 4 * VIRTUAL_WIDTH;
+			break;
+		case 'l':
+		case '6':
+			origin += 4;
+			break;
+		case 'q':
+			system("stty -raw echo");
+			return 0;
+		}
 	}
-	sscanf(argv[1], "%lu", &width);
-	sscanf(argv[2], "%lu", &height);
-	sscanf(argv[3], "%lu", &range);
-	sscanf(argv[4], "%lu", &depth);
-	if (argc > 5)
-		sscanf(argv[5], "%lu", &seed);
-	random_pgm(seed, width, height, range, depth);
-	return 0;
 }
