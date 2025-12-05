@@ -1,3 +1,4 @@
+//$(which tcc) $CFLAGS -run $0 "$@"; exit $?
 // This is the old version I used to play with
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,7 +6,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <time.h>
-#include "aterm.h"
+#include "../aterm.h"
 
 struct grid {
 	int width, height;
@@ -66,7 +67,7 @@ void grid_erode(struct grid *g, bool binary)
 
 void grid_plot(struct grid *g, int min, int max)
 {
-	double factor = 256.0 / (double)(max - min);
+	double factor = 255.0 / (double)(max - min);
 	printf(ED("2") CUP("1","1"));
 	for (int y = 0; y < g->height; y++) {
 		for (int x = 0; x < g->width; x++) {

@@ -1,3 +1,4 @@
+//$(which tcc) $CFLAGS -run $0 "$@"; exit $?
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
