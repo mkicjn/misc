@@ -28,34 +28,14 @@ double cbrngf(uint64_t ctr)
 }
 
 
-// 2D vector operations
-
-struct vec2 {
-	double x, y;
-};
-
-double vec2dot(struct vec2 *a, struct vec2 *b)
-{
-	return (a->x * b->x) + (a->y * b->y);
-}
-
-void vec2sub(struct vec2 *a, struct vec2 *b)
-{
-	a->x -= b->x;
-	a->y -= b->y;
-}
-
-
-// 2D Perlin noise generation
+// Value noise generation
 // (Assuming implementation is correct)
 
 #define VIRT_WIDTH (1ul << 32)
 
-void gradient(uint64_t origin, int x, int y, struct vec2 *g)
+double value(uint64_t origin, int x, int y)
 {
-	double theta = cbrngf(origin + x + y * VIRT_WIDTH) * 2.0 * M_PI;
-	g->x = cos(theta);
-	g->y = sin(theta);
+	return cbrngf(origin + x + y * VIRT_WIDTH);
 }
 
 double smoothstep(double x)
@@ -65,30 +45,20 @@ double smoothstep(double x)
 
 int noise(uint64_t origin, int x, int y, unsigned period)
 {
-	struct vec2 p = {
-		.x = ((double)x) / period,
-		.y = ((double)y) / period,
-	};
 	int cx = x / period;
 	int cy = y / period;
-	double ix = smoothstep(p.x - cx);
-	double iy = smoothstep(p.y - cy);
+	double ix = smoothstep((double)x / period - cx);
+	double iy = smoothstep((double)y / period - cy);
 	double noise = 0.0;
 	for (int dy = 0; dy <= 1; dy++) {
 		for (int dx = 0; dx <= 1; dx++) {
-			struct vec2 g;
-			gradient(origin, cx + dx, cy + dy, &g);
-			struct vec2 dp = {
-				.x = cx + dx,
-				.y = cy + dy,
-			};
-			vec2sub(&dp, &p);
-			noise += vec2dot(&g, &dp)
+			double v = value(origin, cx + dx, cy + dy);
+			noise += v
 				* (dx == 0 ? 1.0 - ix : ix)
 				* (dy == 0 ? 1.0 - iy : iy);
 		}
 	}
-	return 128 + noise * 128;
+	return 256.0 * noise;
 }
 
 
