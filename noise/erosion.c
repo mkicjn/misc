@@ -1,6 +1,7 @@
 //$(which tcc) $CFLAGS -run $0 "$@"; exit $?
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <time.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -39,11 +40,13 @@ int noise(int origin, int x, int y, int smoothing)
 	return sum / 9;
 }
 
-void print_map(int origin, int erosion)
+void print_map(int origin, int erosion, int sealvl)
 {
 	for (int y = 0; y < HEIGHT; y++) {
 		for (int x = 0; x < WIDTH; x++) {
 			int n = noise(origin, x, y, erosion);
+			if (sealvl >= 0)
+				n = (n > sealvl ? 255 : 0);
 			printf("\033[48;2;%d;%d;%dm  ", n, n, n);
 		}
 		printf("\033[m\n\r");
@@ -71,7 +74,7 @@ int main(int argc, char **argv)
 		perror("getrandom()");
 
 #ifndef INTERACTIVE
-	print_map(origin, depth);
+	print_map(origin, depth, -1);
 	return 0;
 #else
 	signal(SIGINT, signal_handler);
@@ -80,9 +83,10 @@ int main(int argc, char **argv)
 	// Could probably implement some interesting wrapping mechanism to simulate toroidal or other surfaces
 	system("stty raw -echo isig");
 	printf("\033[2J");
+	int sealvl = -1;
 	for (;;) {
 		printf("\033[1;1H");
-		print_map(origin, depth);
+		print_map(origin, depth, sealvl);
 		c = getchar();
 		switch (c) {
 		case '{':
@@ -96,6 +100,15 @@ int main(int argc, char **argv)
 			break;
 		case ']':
 			depth += 1;
+			break;
+		case ' ':
+			sealvl = (sealvl >= 0 ? -1 : 128);
+			break;
+		case '+':
+			sealvl++;
+			break;
+		case '-':
+			sealvl--;
 			break;
 		case 'h':
 		case '4':
