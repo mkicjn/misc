@@ -70,6 +70,10 @@ int main(int argc, char **argv)
 	if (0 > getrandom(&noise_key, sizeof(noise_key), 0))
 		perror("getrandom()");
 
+#ifndef INTERACTIVE
+	print_map(origin, depth);
+	return 0;
+#else
 	signal(SIGINT, signal_handler);
 
 	// Notice: no storage of depth map anywhere means area is effectively "infinite" barring virtual width
@@ -114,4 +118,5 @@ int main(int argc, char **argv)
 			return 0;
 		}
 	}
+#endif
 }
