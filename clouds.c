@@ -1,0 +1,193 @@
+//$(which tcc) $CFLAGS -run $0 "$@"; exit $?
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <math.h>
+#include <signal.h>
+
+#include <sys/random.h>
+
+// Counter-based RNG
+
+uint64_t splitmix64_ctr(uint64_t key, uint64_t ctr)
+{
+	uint64_t z = (key + ctr * 0x9e3779b97f4a7c15);
+	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+	z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+	return z ^ (z >> 31);
+}
+
+uint64_t key = 0xdeadbeef;
+uint64_t cbrng(uint64_t ctr)
+{
+	return splitmix64_ctr(key, ctr);
+}
+
+double cbrngf(uint64_t ctr)
+{
+	return (cbrng(ctr) >> 11) * 0x1.0p-53;
+}
+
+
+// 2D vector operations
+
+struct vec2 {
+	double x, y;
+};
+
+double vec2dot(struct vec2 *a, struct vec2 *b)
+{
+	return (a->x * b->x) + (a->y * b->y);
+}
+
+void vec2sub(struct vec2 *a, struct vec2 *b)
+{
+	a->x -= b->x;
+	a->y -= b->y;
+}
+
+
+// 2D Perlin noise generation
+// (Assuming implementation is correct)
+
+#define VIRT_WIDTH (1ul << 32)
+
+void gradient(int x, int y, struct vec2 *g)
+{
+	double theta = cbrngf(x + y * VIRT_WIDTH) * 2.0 * M_PI;
+	g->x = cos(theta);
+	g->y = sin(theta);
+}
+
+double smoothstep(double x)
+{
+	return x * x * (3 - 2 * x);
+}
+
+double noise(int x, int y, double period)
+{
+	struct vec2 p = {
+		.x = ((double)x) / period,
+		.y = ((double)y) / period,
+	};
+	int cx = floor(p.x);
+	int cy = floor(p.y);
+	double ix = smoothstep(p.x - cx);
+	double iy = smoothstep(p.y - cy);
+	double noise = 0.0;
+	for (int dy = 0; dy <= 1; dy++) {
+		for (int dx = 0; dx <= 1; dx++) {
+			struct vec2 g;
+			gradient(cx + dx, cy + dy, &g);
+			struct vec2 dp = {
+				.x = cx + dx,
+				.y = cy + dy,
+			};
+			vec2sub(&dp, &p);
+			noise += vec2dot(&g, &dp)
+				* (dx == 0 ? 1.0 - ix : ix)
+				* (dy == 0 ? 1.0 - iy : iy);
+		}
+	}
+	return noise;
+}
+
+
+// Terminal display
+
+#define CLAMP(x, min, max) ((x) < (min) ? (min) : (x) > (max) ? (max) : (x))
+
+void shade_px(double n, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+	n = CLAMP(n, -1.0, 1.0);
+	int i = 128 + n * 127;
+	*r = i;
+	*g = i;
+	*b = (i + 255) / 2;
+}
+
+#define WIDTH 80
+#define HEIGHT 60
+
+void screen(int x, int y, double period)
+{
+	printf("\033[1;1H");
+	for (int dy = 0; dy < HEIGHT; dy++) {
+		for (int dx = 0; dx < WIDTH; dx++) {
+			double n = noise(x + dx, y + dy, period);
+			n += noise(x + dx, y + dy, period * 2.0) * 2.0;
+			n += noise(x + dx, y + dy, period / 2.0) / 2.0;
+			n += noise(x + dx, y + dy, period / 4.0) / 4.0;
+
+			uint8_t r, g, b;
+			shade_px(n, &r, &g, &b);
+			printf("\033[48;2;%d;%d;%dm  ", r, g, b);
+		}
+		printf("\033[m\r\n");
+	}
+}
+
+void sig_handler(int signo)
+{
+	system("stty sane");
+	exit(0);
+}
+
+int main(int argc, char **argv)
+{
+	if (0 > getrandom(&key, sizeof(key), 0))
+		perror("getrandom()");
+
+	double period = 16;
+	if (argc > 1)
+		period = atoi(argv[1]);
+
+	signal(SIGINT, sig_handler);
+	system("stty raw -echo isig");
+	printf("\033[2J");
+
+#ifdef SHOW_SHADE_RANGE
+	printf("\033[%d;1H", HEIGHT + 2);
+	for (int x = 0; x < WIDTH; x++) {
+		double n = (2.0 * x / WIDTH) - 1.0;
+		uint8_t r, g, b;
+		shade_px(n, &r, &g, &b);
+		printf("\033[48;2;%d;%d;%dm  ", r, g, b);
+	}
+#endif
+
+	int x = 0, y = 0;
+	for (;;) {
+		screen(x, y, period);
+		switch (getchar()) {
+		case '{':
+			key--;
+			break;
+		case '}':
+			key++;
+			break;
+		case '[':
+			period--;
+			break;
+		case ']':
+			period++;
+			break;
+		case 'h':
+			x--;
+			break;
+		case 'j':
+			y++;
+			break;
+		case 'k':
+			y--;
+			break;
+		case 'l':
+			x++;
+			break;
+		case 'q':
+			raise(SIGINT);
+			break;
+		}
+	}
+	return 0;
+}
