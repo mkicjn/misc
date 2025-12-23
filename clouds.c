@@ -95,15 +95,29 @@ double noise(int x, int y, double period)
 
 // Terminal display
 
+int interp(double f, int a, int b)
+{
+	return (int)((1.0 - f) * a + f * b);
+}
+
 #define CLAMP(x, min, max) ((x) < (min) ? (min) : (x) > (max) ? (max) : (x))
 
 void shade_px(double n, uint8_t *r, uint8_t *g, uint8_t *b)
 {
-	n = CLAMP(n, -1.0, 1.0);
-	int i = 128 + n * 127;
-	*r = i;
-	*g = i;
-	*b = (i + 255) / 2;
+	n = (CLAMP(n, -1.0, 1.0) + 1.0) / 2.0;
+	const double thresh = 0.35;
+	if (n < thresh) {
+		n /= thresh;
+		*r = interp(n,  96, 255);
+		*g = interp(n, 128, 255);
+		*b = interp(n, 192, 255);
+	} else {
+		n -= thresh;
+		n /= (1.0 - thresh);
+		*r = interp(n, 255, 128);
+		*g = interp(n, 255, 128);
+		*b = interp(n, 255, 128);
+	}
 }
 
 #define WIDTH 80
@@ -134,11 +148,10 @@ void sig_handler(int signo)
 }
 
 int main(int argc, char **argv)
-{
-	if (0 > getrandom(&key, sizeof(key), 0))
+{ if (0 > getrandom(&key, sizeof(key), 0))
 		perror("getrandom()");
 
-	double period = 16;
+	double period = 20;
 	if (argc > 1)
 		period = atoi(argv[1]);
 
