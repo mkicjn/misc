@@ -144,14 +144,13 @@ void shade_px(double n, uint8_t *r, uint8_t *g, uint8_t *b)
 
 #define CLAMP(x, min, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 
-#define WIDTH 80
-#define HEIGHT 60
-
+int screen_width = 160;
+int screen_height = 60;
 void screen(int x, int y, double period)
 {
 	printf("\033[1;1H");
-	for (int dy = 0; dy < HEIGHT; dy++) {
-		for (int dx = 0; dx < WIDTH; dx++) {
+	for (int dy = 0; dy < screen_height - 1; dy++) {
+		for (int dx = 0; dx < screen_width / 2; dx++) {
 			double n = noise(x + dx, y + dy, period);
 			n += noise(x + dx, y + dy, period * 2.0) * 2.0;
 			n += noise(x + dx, y + dy, period / 2.0) / 2.0;
@@ -166,10 +165,25 @@ void screen(int x, int y, double period)
 	}
 }
 
+void get_term_size(int *rows, int *cols)
+{
+	printf("\033[999;999H");
+	printf("\033[6n");
+	fflush(stdout);
+	scanf("\033[%d;%dR", rows, cols);
+}
+
 void sig_handler(int signo)
 {
-	system("stty sane");
-	exit(0);
+	switch (signo) {
+	case SIGWINCH:
+		get_term_size(&screen_height, &screen_width);
+		break;
+	default:
+		system("stty sane");
+		exit(0);
+		break;
+	}
 }
 
 int main(int argc, char **argv)
@@ -195,7 +209,9 @@ int main(int argc, char **argv)
 
 	if (isatty(fileno(stdin))) {
 		signal(SIGINT, sig_handler);
+		signal(SIGWINCH, sig_handler);
 		system("stty raw -echo isig");
+		raise(SIGWINCH);
 	}
 
 	int x = 0, y = 0;
