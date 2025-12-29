@@ -127,9 +127,11 @@ cell_t erosion(struct grid *g, size_t c)
 int get_dim(int x_factor, int y_factor)
 {
 	int x, y;
+	system("stty raw");
 	printf(CUP("999", "999") DSR);
 	printf("\nPress enter to continue\n");
 	printf("%d\n", scanf(CSI "%d" AND "%d" "R", &y, &x));
+	system("stty sane");
 	return (x-1) * x_factor + (y-1) * y_factor;
 }
 
