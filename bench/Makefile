@@ -6,6 +6,7 @@ ALL = \
 	collatz_gforth \
 	collatz_gforth-itc \
 	collatz_sbcl \
+	collatz_sbcl_noopt \
 	collatz_pypy3 \
 	collatz_python3 \
 	collatz_tclsh \
@@ -25,7 +26,7 @@ all: $(ALL)
 
 .PHONY: bench
 bench: all
-	$(foreach bench,$(ALL),echo;echo $(bench);time -f "\t%E" ./$(bench);)
+	$(foreach bench,$(ALL),echo;echo $(bench);sh -c "time ./$(bench)";)
 
 .PHONY: clean
 clean:
@@ -68,6 +69,10 @@ collatz_pypy3: src/collatz.py
 collatz_sbcl: src/collatz.lisp
 	echo "#!/usr/bin/sbcl --script" > $@
 	cat $^ >> $@
+	chmod +x $@
+collatz_sbcl_noopt: src/collatz.lisp
+	echo "#!/usr/bin/sbcl --script" > $@
+	cat $^ | grep -v declare >> $@
 	chmod +x $@
 
 collatz_csc: src/collatz.scm
