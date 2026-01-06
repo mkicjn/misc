@@ -4,6 +4,8 @@ let
 in
 pkgs.mkShell {
   packages = with pkgs; [
+    gcc
+    fasm
     gforth
     python3
     pypy3
