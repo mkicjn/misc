@@ -1,4 +1,4 @@
-//$(which tcc) $CFLAGS -run $0 "$@"; exit $?
+//usr/bin/env tcc $CFLAGS -run $0 "$@"; exit $?
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -121,6 +121,7 @@ static inline bool range_normalize(double *n, double lo, double hi)
 	return false;
 }
 
+double thresh = 0.35;
 void shade_px(double n, uint8_t *r, uint8_t *g, uint8_t *b)
 {
 	if (!range_normalize(&n, -1.0, 1.0)) {
@@ -130,7 +131,6 @@ void shade_px(double n, uint8_t *r, uint8_t *g, uint8_t *b)
 		*b = 255;
 	}
 
-	double thresh = 0.35;
 	if (range_normalize(&n, 0.0, thresh)) {
 		*r = interpolate(n,  96, 255);
 		*g = interpolate(n, 128, 255);
@@ -188,6 +188,7 @@ void sig_handler(int signo)
 
 int main(int argc, char **argv)
 {
+
 	if (0 > getrandom(&key, sizeof(key), 0))
 		perror("getrandom()");
 
@@ -229,6 +230,12 @@ int main(int argc, char **argv)
 			break;
 		case ']':
 			period++;
+			break;
+		case '>':
+			thresh += 0.05;
+			break;
+		case '<':
+			thresh -= 0.05;
 			break;
 		case 'h':
 			x--;

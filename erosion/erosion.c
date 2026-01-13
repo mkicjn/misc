@@ -1,4 +1,4 @@
-//$(which tcc) $CFLAGS -run $0 "$@"; exit $?
+//usr/bin/env tcc $CFLAGS -run $0 "$@"; exit $?
 // This is the old version I used to play with
 #include <stdio.h>
 #include <stdlib.h>

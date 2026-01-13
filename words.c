@@ -1,4 +1,4 @@
-//$(which tcc) $CFLAGS -run $0 "$@"; exit $?
+//usr/bin/env tcc $CFLAGS -run $0 "$@"; exit $?
 //
 // Faster wordlist generation from large texts
 // Processes the King James Bible in 150ms (~5.3M words/second)

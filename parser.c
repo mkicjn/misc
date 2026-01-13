@@ -1,4 +1,4 @@
-//$(which tcc) $CFLAGS -run $0 "$@"; exit $?
+//usr/bin/env tcc $CFLAGS -run $0 "$@"; exit $?
 #define NO_LEX_MAIN
 #include "lexer.c"
 

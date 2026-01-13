@@ -40,7 +40,7 @@ collatz_fasm: src/collatz.asm
 collatz_gcc: src/collatz.c
 	gcc -Ofast $^ -o $@
 collatz_tcc: src/collatz.c
-	echo '//$$(which tcc) $$CFLAGS -run $$0 "$$@"; exit $$?' > $@
+	echo '//usr/bin/env tcc $$CFLAGS -run $$0 "$$@"; exit $$?' > $@
 	cat $^ >> $@
 	chmod +x $@
 
