@@ -6,6 +6,7 @@ pkgs.mkShell {
   packages = with pkgs; [
     gcc
     fasm
+    tinycc
     gforth
     python3
     pypy3
