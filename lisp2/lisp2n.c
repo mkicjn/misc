@@ -47,7 +47,11 @@
 	X("\006define", sym_define) \
 	X("\004eval", sym_eval) \
 	X("\006expand", sym_expand) \
-	X("\006gensym", sym_gensym)
+	X("\006gensym", sym_gensym) \
+	X("\001+", sym_add) \
+	X("\001-", sym_sub) \
+	X("\001*", sym_mul) \
+	X("\001/", sym_div)
 
 // Declare character pointer variables for each built-in symbol
 #define DECLARE_SYMVAR(sym, id) char *id;
@@ -130,14 +134,21 @@ static inline void *cdr(void *l)
 #define NUM double
 #endif
 
-extern char ASSERT_NUM_NOT_BIGGER_THAN_PTR[1/!(sizeof(NUM) > sizeof(void *))];
+extern char ASSERT_NUM_FITS_IN_PTR[1/!(sizeof(NUM) > sizeof(void *))];
 
 #ifndef NUM_FMT
 #define NUM_FMT "%lf"
 #endif
 
-#define WRAP(x) cons(NUMBER, *(void **)(&(x)))
-#define UNWRAP(x) *(double *)(CDR(x))
+union cell {
+	NUM as_num;
+	void *as_ptr;
+};
+
+#define TO_NUM(x) (union cell){.as_ptr = (x)}.as_num
+#define TO_PTR(x) (union cell){.as_num = (x)}.as_ptr
+#define UNWRAP(x) TO_NUM(*CDR(x))
+#define WRAP(x) cons(NUMBER, TO_PTR(x))
 
 // Value printing
 void print(void *x)
@@ -315,11 +326,11 @@ void **pre_eval = cells;
 void *copy(void *x, ptrdiff_t diff)
 {
 	// Copy an object, offsetting all cell pointers
-	if (atom(x) || (void **)x < pre_eval) // No need to copy values below the pre-eval point
+	if (!IN(x, cells) || (void **)x < pre_eval) // No need to copy values below the pre-eval point
 		return x;
-	if (car(x) == FORWARD) // No need to copy values that have already been copied
+	if (*CAR(x) == FORWARD) // No need to copy values that have already been copied
 		return cdr(x);
-	if (car(x) == NUMBER) // Do not deep copy numeric values due to invalid pointer
+	if (*CAR(x) == NUMBER) // Do not deep copy numeric values due to invalid pointer
 		return WRAP(UNWRAP(x));
 	// Deep copy the value normally
 	void *a = copy(car(x), diff);
@@ -419,6 +430,18 @@ void *eval_base(void *x, void *env)
 		return get(x, env);
 	if (atom(x))
 		return x;
+
+#define DO_BINOP(op) \
+	WRAP(UNWRAP(eval(cadr(x), env)) \
+	  op UNWRAP(eval(caddr(x), env)))
+	if (car(x) == sym_add)
+		return DO_BINOP(+);
+	if (car(x) == sym_sub)
+		return DO_BINOP(-);
+	if (car(x) == sym_mul)
+		return DO_BINOP(*);
+	if (car(x) == sym_div)
+		return DO_BINOP(/);
 
 	// Handle primitive functions
 	if (car(x) == sym_quote) // quote
