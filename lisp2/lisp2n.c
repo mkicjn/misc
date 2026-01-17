@@ -51,7 +51,9 @@
 	X("\001+", sym_add) \
 	X("\001-", sym_sub) \
 	X("\001*", sym_mul) \
-	X("\001/", sym_div)
+	X("\001/", sym_div) \
+	X("\001%", sym_mod) \
+	X("\001>", sym_gt)
 
 // Declare character pointer variables for each built-in symbol
 #define DECLARE_SYMVAR(sym, id) char *id;
@@ -130,23 +132,20 @@ static inline void *cdr(void *l)
 
 // Number-related definitions and compile-time check
 
-#ifndef NUM
-#define NUM double
-#endif
+#define NUM intptr_t
+#define NUM_FMT "%ld"
 
-extern char ASSERT_NUM_FITS_IN_PTR[1/!(sizeof(NUM) > sizeof(void *))];
+// For non-intptr_t NUM types
+//extern char ASSERT_NUM_FITS_IN_PTR[1/!(sizeof(NUM) > sizeof(void *))];
+//union cell {
+//	NUM as_num;
+//	void *as_ptr;
+//};
+//#define TO_NUM(x) (union cell){.as_ptr = (x)}.as_num
+//#define TO_PTR(x) (union cell){.as_num = (x)}.as_ptr
 
-#ifndef NUM_FMT
-#define NUM_FMT "%lf"
-#endif
-
-union cell {
-	NUM as_num;
-	void *as_ptr;
-};
-
-#define TO_NUM(x) (union cell){.as_ptr = (x)}.as_num
-#define TO_PTR(x) (union cell){.as_num = (x)}.as_ptr
+#define TO_NUM(x) (NUM)(x)
+#define TO_PTR(x) (void *)(x)
 #define UNWRAP(x) TO_NUM(*CDR(x))
 #define WRAP(x) cons(NUMBER, TO_PTR(x))
 
@@ -330,11 +329,9 @@ void *copy(void *x, ptrdiff_t diff)
 		return x;
 	if (*CAR(x) == FORWARD) // No need to copy values that have already been copied
 		return cdr(x);
-	if (*CAR(x) == NUMBER) // Do not deep copy numeric values due to invalid pointer
-		return WRAP(UNWRAP(x));
 	// Deep copy the value normally
-	void *a = copy(car(x), diff);
-	void *d = copy(cdr(x), diff);
+	void *a = *CAR(x) == NUMBER ?  NUMBER : copy(car(x), diff);
+	void *d = *CAR(x) == NUMBER ? *CDR(x) : copy(cdr(x), diff);
 	void *res = (void **)cons(a, d) - diff;
 	// Leave a forward pointer to indicate that the cell has already been copied
 	*CAR(x) = FORWARD;
@@ -431,17 +428,19 @@ void *eval_base(void *x, void *env)
 	if (atom(x))
 		return x;
 
-#define DO_BINOP(op) \
-	WRAP(UNWRAP(eval(cadr(x), env)) \
-	  op UNWRAP(eval(caddr(x), env)))
+#define NUMARG(acc) (UNWRAP(eval(acc(x), env)))
 	if (car(x) == sym_add)
-		return DO_BINOP(+);
+		return WRAP(NUMARG(cadr) + NUMARG(caddr));
 	if (car(x) == sym_sub)
-		return DO_BINOP(-);
+		return WRAP(NUMARG(cadr) - NUMARG(caddr));
 	if (car(x) == sym_mul)
-		return DO_BINOP(*);
+		return WRAP(NUMARG(cadr) * NUMARG(caddr));
 	if (car(x) == sym_div)
-		return DO_BINOP(/);
+		return WRAP(NUMARG(cadr) / NUMARG(caddr));
+	if (car(x) == sym_mod)
+		return WRAP(NUMARG(cadr) % NUMARG(caddr));
+	if (car(x) == sym_gt)
+		return (NUMARG(cadr) > NUMARG(caddr)) ? sym_t : NULL;
 
 	// Handle primitive functions
 	if (car(x) == sym_quote) // quote
