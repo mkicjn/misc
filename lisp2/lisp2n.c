@@ -130,24 +130,11 @@ static inline void *cdr(void *l)
 #define cadr(x) car(cdr(x))
 #define cdar(x) cdr(car(x))
 
-// Number-related definitions and compile-time check
-
+// Number-related definitions
 #define NUM intptr_t
 #define NUM_FMT "%ld"
-
-// For non-intptr_t NUM types
-//extern char ASSERT_NUM_FITS_IN_PTR[1/!(sizeof(NUM) > sizeof(void *))];
-//union cell {
-//	NUM as_num;
-//	void *as_ptr;
-//};
-//#define TO_NUM(x) (union cell){.as_ptr = (x)}.as_num
-//#define TO_PTR(x) (union cell){.as_num = (x)}.as_ptr
-
-#define TO_NUM(x) (NUM)(x)
-#define TO_PTR(x) (void *)(x)
-#define UNWRAP(x) TO_NUM(*CDR(x))
-#define WRAP(x) cons(NUMBER, TO_PTR(x))
+#define UNWRAP(x) (NUM)(*CDR(x))
+#define WRAP(x) cons(NUMBER, (void *)(x))
 
 // Value printing
 void print(void *x)
