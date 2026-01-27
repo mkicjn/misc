@@ -31,35 +31,41 @@ double cbrngf(uint64_t ctr)
 }
 
 
-// 2D vector operations
+// 3D vector operations
 
-struct vec2 {
-	double x, y;
+struct vec3 {
+	double x, y, z;
 };
 
-double vec2dot(struct vec2 *a, struct vec2 *b)
+double vec3dot(struct vec3 *a, struct vec3 *b)
 {
-	return (a->x * b->x) + (a->y * b->y);
+	return (a->x * b->x) + (a->y * b->y) + (a->z * b->z);
 }
 
-void vec2sub(struct vec2 *a, struct vec2 *b)
+void vec3sub(struct vec3 *a, struct vec3 *b)
 {
 	a->x -= b->x;
 	a->y -= b->y;
+	a->z -= b->z;
 }
 
 
-// 2D Perlin noise generation
+// 3D Perlin noise generation
 // (Assuming implementation is correct)
 
-#define VIRT_WIDTH (1ul << 32)
+#define VIRT_WIDTH (1ul << 20)
+#define VIRT_HEIGHT (1ul << 20)
+#define COORD(x, y, z) \
+	(((z) * VIRT_HEIGHT + (y)) * VIRT_WIDTH + (x))
 
-void gradient(int x, int y, struct vec2 *g)
+void gradient(int x, int y, int z, struct vec3 *g)
 {
-	// Pseudo-randomly generate a randomly-oriented unit vector
-	double theta = cbrngf(x + y * VIRT_WIDTH) * 2.0 * M_PI;
-	g->x = cos(theta);
-	g->y = sin(theta);
+	// https://mathworld.wolfram.com/SpherePointPicking.html
+	double theta = cbrngf(COORD(x, y, z) * 2) * 2.0 * M_PI;
+	double u = cbrngf(COORD(x, y, z) * 2 + 1) * 2.0 - 1.0;
+	g->x = sqrt(1 - u * u) * cos(theta);
+	g->y = sqrt(1 - u * u) * sin(theta);
+	g->z = u;
 }
 
 double smoothstep(double x)
@@ -67,36 +73,43 @@ double smoothstep(double x)
 	return x * x * (3 - 2 * x);
 }
 
-double noise(int x, int y, double period)
+double noise(int x, int y, int z, double period)
 {
 	// Scale input coordinate according to noise period
-	struct vec2 p = {
+	struct vec3 p = {
 		.x = ((double)x) / period,
 		.y = ((double)y) / period,
+		.z = ((double)z) / period,
 	};
 	// Find cell origin as floor of input coordinates
 	int cx = floor(p.x);
 	int cy = floor(p.y);
+	int cz = floor(p.z);
 	// Pre-calculate interpolation factor for cell origin (smoothed via smoothstep)
 	double ix = smoothstep(p.x - cx);
 	double iy = smoothstep(p.y - cy);
+	double iz = smoothstep(p.z - cz);
 	// For each vertex of the current cell:
 	double noise = 0.0;
-	for (int dy = 0; dy <= 1; dy++) {
-		for (int dx = 0; dx <= 1; dx++) {
-			// Determine the gradient vector at the current vertex
-			struct vec2 g;
-			gradient(cx + dx, cy + dy, &g);
-			// Calculate the difference vector from the input point to the current vertex
-			struct vec2 dp = {
-				.x = cx + dx,
-				.y = cy + dy,
-			};
-			vec2sub(&dp, &p);
-			// Calculate the dot product between these, interpolate the result, and add to total
-			noise += vec2dot(&g, &dp)
-				* (dx == 0 ? 1.0 - ix : ix)
-				* (dy == 0 ? 1.0 - iy : iy);
+	for (int dz = 0; dz <= 1; dz++) {
+		for (int dy = 0; dy <= 1; dy++) {
+			for (int dx = 0; dx <= 1; dx++) {
+				// Determine the gradient vector at the current vertex
+				struct vec3 g;
+				gradient(cx + dx, cy + dy, cz + dz, &g);
+				// Calculate the difference vector from the input point to the current vertex
+				struct vec3 dp = {
+					.x = cx + dx,
+					.y = cy + dy,
+					.z = cz + dz,
+				};
+				vec3sub(&dp, &p);
+				// Calculate the dot product between these, interpolate the result, and add to total
+				noise += vec3dot(&g, &dp)
+					* (dx == 0 ? 1.0 - ix : ix)
+					* (dy == 0 ? 1.0 - iy : iy)
+					* (dz == 0 ? 1.0 - iz : iz);
+			}
 		}
 	}
 	// Return total
@@ -146,15 +159,15 @@ void shade_px(double n, uint8_t *r, uint8_t *g, uint8_t *b)
 
 int screen_width = 160;
 int screen_height = 60;
-void screen(int x, int y, double period)
+void screen(int x, int y, int z, double period)
 {
 	printf("\033[1;1H");
 	for (int dy = 0; dy < screen_height - 1; dy++) {
 		for (int dx = 0; dx < screen_width / 2; dx++) {
-			double n = noise(x + dx, y + dy, period);
-			n += noise(x + dx, y + dy, period * 2.0) * 2.0;
-			n += noise(x + dx, y + dy, period / 2.0) / 2.0;
-			n += noise(x + dx, y + dy, period / 4.0) / 4.0;
+			double n = noise(x + dx, y + dy, z, period);
+			n += noise(x + dx, y + dy, z, period * 2.0) * 2.0;
+			n += noise(x + dx, y + dy, z, period / 2.0) / 2.0;
+			n += noise(x + dx, y + dy, z, period / 4.0) / 4.0;
 			n = CLAMP(n, -1.0, 1.0);
 
 			uint8_t r, g, b;
@@ -188,7 +201,6 @@ void sig_handler(int signo)
 
 int main(int argc, char **argv)
 {
-
 	if (0 > getrandom(&key, sizeof(key), 0))
 		perror("getrandom()");
 
@@ -215,9 +227,9 @@ int main(int argc, char **argv)
 		raise(SIGWINCH);
 	}
 
-	int x = 0, y = 0;
+	int x = 0, y = 0, z = 0;
 	for (;;) {
-		screen(x, y, period);
+		screen(x, y, z, period);
 		switch (getchar()) {
 		case '{':
 			key--;
@@ -226,9 +238,15 @@ int main(int argc, char **argv)
 			key++;
 			break;
 		case '[':
-			period--;
+			z--;
 			break;
 		case ']':
+			z++;
+			break;
+		case ',':
+			period--;
+			break;
+		case '.':
 			period++;
 			break;
 		case '>':
