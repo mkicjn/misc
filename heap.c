@@ -1,3 +1,4 @@
+//usr/bin/env tcc $CFLAGS -run $0 "$@"; exit $?
 #include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>
