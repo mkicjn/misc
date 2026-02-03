@@ -140,7 +140,13 @@
 	((atom (car l)) (flatten (cdr l) (lambda (x) (cont (cons (car l) x)))))
 	(t (flatten (cdr l) (lambda (x) (cont (append (flatten (car l)) x)))))))
 
-; Translation to postfix notation (naive)
-(defun (postfix l)
-  (if (atom l) l
-    (append (map postfix (cdr l)) (list (postfix (car l))))))
+; Quasiquote syntax
+(defmacro (` . args)
+  ((Z (lambda (qq)
+       (lambda (args)
+	 (cond ((atom args) args)
+	       ((not (atom (car args))) (list 'cons (qq (car args)) (qq (cdr args))))
+	       ((eq ', (car args)) (list 'cons (cadr args) (qq (cddr args))))
+	       ((eq ',@ (car args)) (list 'append (cadr args) (qq (cddr args))))
+	       (t (list 'cons (list 'quote (car args)) (qq (cdr args))))))))
+   args))
