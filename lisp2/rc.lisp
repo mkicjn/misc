@@ -119,6 +119,10 @@
 ;; Fun stuff
 ;;
 
+; Currying
+(defun (curry f a)
+  (lambda args (f a . args)))
+
 ; Applicative fixpoint combinator
 (define Z
   (lambda (f)
@@ -148,5 +152,61 @@
 	       ((not (atom (car args))) (list 'cons (qq (car args)) (qq (cdr args))))
 	       ((eq ', (car args)) (list 'cons (cadr args) (qq (cddr args))))
 	       ((eq ',@ (car args)) (list 'append (cadr args) (qq (cddr args))))
+	       ((eq ',. (car args)) (cadr args))
 	       (t (list 'cons (list 'quote (car args)) (qq (cdr args))))))))
    args))
+
+; Folds
+(defun (fold-right f i l (cont ident))
+  (cond ((not l) (cont i))
+	((atom l) (cont l))
+	(t (fold-right f i (cdr l) (lambda (x) (cont (f (car l) x)))))))
+
+(defun (fold-left f i l)
+  (cond ((not l) i)
+	((atom l) l)
+	(t (fold-left f (f i (car l)) (cdr l)))))
+
+; Pattern matching (WIP - TODO: Testing)
+(defun (matches data pattern)
+  (cond ((atom pattern) (eq data pattern))
+	((eq (car pattern) ',) (matches (cdr data) (cddr pattern)))
+	(t (if (matches (car data) (car pattern))
+	       (matches (cdr data) (cdr pattern))
+	       ()))))
+
+(defun (pattern-holes pattern (acc ()))
+  (cond ((atom pattern)())
+	((eq (car pattern) ',)
+	 (cons
+	   (cons (cadr pattern) (cons 'a acc))
+	   (pattern-holes (cddr pattern) (cons 'd acc))))
+	(t (append (pattern-holes (car pattern) (cons 'a acc))
+		   (pattern-holes (cdr pattern) (cons 'd acc))))))
+
+(defun (pattern-hole-to-let-elem var hole)
+  (list (car hole)
+	(fold-right
+	  (lambda (l x)
+	    (cond ((eq l 'a) (list 'car x))
+		  ((eq l 'd) (list 'cdr x))
+		  (t ())))
+	  var
+	  (cdr hole))))
+
+(defun (pattern-to-let var pattern expr)
+  (list 'let (map (curry pattern-hole-to-let-elem var) (pattern-holes pattern))
+	expr))
+
+(defun (pattern-to-cond-elem var pattern expr)
+  (` (matches , var (quote , pattern)) , (pattern-to-let var pattern expr)))
+
+(defmacro (match expr . patterns/cases)
+  (let ((var (gensym)))
+    (` let ((, var , expr))
+       (cond ,. (map (lambda (pattern/case)
+		       (pattern-to-cond-elem
+			 var
+			 (car pattern/case)
+			 (cadr pattern/case)))
+		     patterns/cases)))))
