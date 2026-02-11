@@ -167,7 +167,7 @@
 	((atom l) l)
 	(t (fold-left f (f i (car l)) (cdr l)))))
 
-; Pattern matching (WIP - TODO: Testing)
+; Pattern matching
 (defun (matches data pattern)
   (cond ((eq pattern '_) t)
 	((atom pattern) (eq data pattern))
