@@ -169,7 +169,8 @@
 
 ; Pattern matching (WIP - TODO: Testing)
 (defun (matches data pattern)
-  (cond ((atom pattern) (eq data pattern))
+  (cond ((eq pattern '_) t)
+	((atom pattern) (eq data pattern))
 	((eq (car pattern) ',) (matches (cdr data) (cddr pattern)))
 	(t (if (matches (car data) (car pattern))
 	       (matches (cdr data) (cdr pattern))
