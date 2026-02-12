@@ -170,9 +170,7 @@
 ; And/Or
 (defmacro (and . args)
   (if (atom (cdr args)) (car args)
-    (let ((name (gensym)))
-      (` let ((, name , (car args)))
-	 (if , name (and ,. (cdr args)) ())))))
+    (` if , (car args) (and ,. (cdr args)) ())))
 
 (defmacro (or . args)
   (if (atom args) ()
