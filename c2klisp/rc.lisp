@@ -116,8 +116,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Fun stuff
+;; Fun/optional stuff
 ;;
+
+; List equality
+(defun (equal a b)
+  (cond ((atom a) (eq a b))
+	((atom b) (eq a b))
+	(t (if (equal (car a) (car b))
+	     (equal (cdr a) (cdr b))
+	     ()))))
 
 ; Currying
 (defun (curry f a)
@@ -156,17 +164,6 @@
 	       (t (list 'cons (list 'quote (car args)) (qq (cdr args))))))))
    args))
 
-; Folds
-(defun (fold-right f i l (cont ident))
-  (cond ((not l) (cont i))
-	((atom l) (cont l))
-	(t (fold-right f i (cdr l) (lambda (x) (cont (f (car l) x)))))))
-
-(defun (fold-left f i l)
-  (cond ((not l) i)
-	((atom l) l)
-	(t (fold-left f (f i (car l)) (cdr l)))))
-
 ; And/Or
 (defmacro (and . args)
   (if (atom (cdr args)) (car args)
@@ -177,6 +174,17 @@
     (let ((name (gensym)))
       (` let ((, name , (car args)))
 	 (if , name , name (or ,. (cdr args)))))))
+
+; Folds
+(defun (fold-right f i l (cont ident))
+  (cond ((not l) (cont i))
+	((atom l) (cont l))
+	(t (fold-right f i (cdr l) (lambda (x) (cont (f (car l) x)))))))
+
+(defun (fold-left f i l)
+  (cond ((not l) i)
+	((atom l) l)
+	(t (fold-left f (f i (car l)) (cdr l)))))
 
 ; Pattern matching
 (defun (matches data pattern)
