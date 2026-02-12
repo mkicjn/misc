@@ -92,18 +92,23 @@ void *cons(void *x, void *y)
 #define CAR(l) ((void **)(l))
 #define CDR(l) ((void **)(l) + 1)
 
+static inline bool atom(void *l)
+{
+	return !IN(l, cells);
+}
+
 static inline void *car(void *l)
 {
 	if (!l)
 		return NULL;
-	return IN(l, cells) ? *CAR(l) : ERROR;
+	return !atom(l) ? *CAR(l) : ERROR;
 }
 
 static inline void *cdr(void *l)
 {
 	if (!l)
 		return NULL;
-	return IN(l, cells) ? *CDR(l) : ERROR;
+	return !atom(l) ? *CDR(l) : ERROR;
 }
 
 // Convenience macros
@@ -128,7 +133,7 @@ void print(void *x)
 		printf("(");
 		print(car(x));
 		// Then print successive elements until encountering NIL or atom
-		for (x = cdr(x); IN(x, cells); x = cdr(x)) {
+		for (x = cdr(x); !atom(x); x = cdr(x)) {
 			printf(" ");
 			print(car(x));
 		}
@@ -245,7 +250,7 @@ void *symbol(void)
 	if (next_sym == s) // Disallow empty symbols
 		return ERROR;
 	*s = next_sym - s;
-	next_sym++;
+	*(++next_sym) = '\0';
 	return intern(s);
 }
 
@@ -287,7 +292,7 @@ void *copy(void *x, ptrdiff_t diff)
 	// Copy an object, offsetting all cell pointers
 	if (!IN(x, cells) || (void **)x < pre_eval) // No need to copy values below the pre-eval point
 		return x;
-	if (car(x) == FORWARD) // No need to copy values that have already been copied
+	if (*CAR(x) == FORWARD) // No need to copy values that have already been copied
 		return cdr(x);
 	// Deep copy the value normally
 	void *a = copy(car(x), diff);
@@ -340,7 +345,7 @@ void *globals = NULL;
 
 void *get(void *s, void *env)
 {
-	for (void *kvps = env; IN(kvps, cells); kvps = cdr(kvps))
+	for (void *kvps = env; !atom(kvps); kvps = cdr(kvps))
 		if (s == caar(kvps))
 			return cdar(kvps);
 	if (env != globals)
@@ -352,14 +357,14 @@ void *map(void *(*f)(void *x, void *env), void *l, void *env)
 {
 	if (!l)
 		return NULL;
-	if (!IN(l, cells))
+	if (atom(l))
 		return f(l, env);
 	return cons(f(car(l), env), map(f, cdr(l), env));
 }
 
 void *pairlis(void *ks, void *vs, void *env)
 {
-	for (; IN(ks, cells) && IN(vs, cells); ks = cdr(ks), vs = cdr(vs))
+	for (; !atom(ks) && !atom(vs); ks = cdr(ks), vs = cdr(vs))
 		env = set(car(ks), car(vs), env);
 	if (!ks)
 		return env;
@@ -385,7 +390,7 @@ void *eval_base(void *x, void *env)
 		return x;
 	if (IN(x, syms)) // symbol
 		return get(x, env);
-	if (!IN(x, cells)) // sentinel value
+	if (atom(x))
 		return x;
 
 	// Handle primitive functions
@@ -396,7 +401,7 @@ void *eval_base(void *x, void *env)
 	if (car(x) == sym_cdr) // cdr
 		return cdr(eval(cadr(x), env));
 	if (car(x) == sym_atom) // atom
-		return !IN(eval(cadr(x), env), cells) ? sym_t : NULL;
+		return atom(eval(cadr(x), env)) ? sym_t : NULL;
 	if (car(x) == sym_eq) // eq
 		return eval(cadr(x), env) == eval(caddr(x), env) ? sym_t : NULL;
 	if (car(x) == sym_cons) // cons
@@ -469,7 +474,7 @@ int main(int argc, char **argv)
 		void *expr = read();
 		DEBUG(printf("\033[34mRead: "); print(expr); printf("\033[m\n");)
 		void *expand = get(sym_expand, globals);
-		if (IN(expand, cells)) {
+		if (!atom(expand)) {
 			expr = eval(list2(sym_expand, list2(sym_quote, expr)), NULL);
 			gc(&expr, &globals);
 			DEBUG(printf("\033[35mExpanded to: "); print(expr); printf("\033[m\n");)
