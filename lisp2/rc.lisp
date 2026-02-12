@@ -167,6 +167,19 @@
 	((atom l) l)
 	(t (fold-left f (f i (car l)) (cdr l)))))
 
+; And/Or
+(defmacro (and . args)
+  (if (atom (cdr args)) (car args)
+    (let ((name (gensym)))
+      (` let ((, name , (car args)))
+	 (if , name (and ,. (cdr args)) ())))))
+
+(defmacro (or . args)
+  (if (atom args) ()
+    (let ((name (gensym)))
+      (` let ((, name , (car args)))
+	 (if , name , name (or ,. (cdr args)))))))
+
 ; Pattern matching
 (defun (matches data pattern)
   (cond ((eq pattern '_) t)
