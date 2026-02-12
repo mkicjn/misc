@@ -53,7 +53,8 @@
 	X("\001*", sym_mul) \
 	X("\001/", sym_div) \
 	X("\001%", sym_mod) \
-	X("\001>", sym_gt)
+	X("\001>", sym_grt) \
+	X("\001=", sym_equ)
 
 // Declare character pointer variables for each built-in symbol
 #define DECLARE_SYMVAR(sym, id) char *id;
@@ -133,6 +134,7 @@ static inline void *cdr(void *l)
 // Number-related definitions
 #define NUM intptr_t
 #define NUM_FMT "%ld"
+#define ISNUM(x) (IN((x),cells) && *CAR(x) == NUMBER)
 #define UNWRAP(x) (NUM)(*CDR(x))
 #define WRAP(x) cons(NUMBER, (void *)(x))
 
@@ -415,19 +417,22 @@ void *eval_base(void *x, void *env)
 	if (atom(x))
 		return x;
 
-#define NUMARG(acc) (UNWRAP(eval(acc(x), env)))
-	if (car(x) == sym_add)
-		return WRAP(NUMARG(cadr) + NUMARG(caddr));
-	if (car(x) == sym_sub)
-		return WRAP(NUMARG(cadr) - NUMARG(caddr));
-	if (car(x) == sym_mul)
-		return WRAP(NUMARG(cadr) * NUMARG(caddr));
-	if (car(x) == sym_div)
-		return WRAP(NUMARG(cadr) / NUMARG(caddr));
-	if (car(x) == sym_mod)
-		return WRAP(NUMARG(cadr) % NUMARG(caddr));
-	if (car(x) == sym_gt)
-		return (NUMARG(cadr) > NUMARG(caddr)) ? sym_t : NULL;
+#define TOBOOL(x) ((x) ? sym_t : NULL)
+#define BINOP(sym, op, conv) \
+	if (car(x) == sym) { \
+		void *a = eval(cadr(x), env); \
+		void *b = eval(caddr(x), env); \
+		if (ISNUM(a) && ISNUM(b)) \
+			return conv(UNWRAP(a) op UNWRAP(b)); \
+		return ERROR; \
+	}
+	BINOP(sym_add,  +, WRAP)
+	BINOP(sym_sub,  -, WRAP)
+	BINOP(sym_mul,  *, WRAP)
+	BINOP(sym_div,  /, WRAP)
+	BINOP(sym_mod,  %, WRAP)
+	BINOP(sym_grt,  >, TOBOOL)
+	BINOP(sym_equ, ==, TOBOOL)
 
 	// Handle primitive functions
 	if (car(x) == sym_quote) // quote
