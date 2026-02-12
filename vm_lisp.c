@@ -1,6 +1,6 @@
 //usr/bin/env tcc $CFLAGS -run $0 $@; exit $?
 
-// (very WIP)
+// (Stack-based Lisp VM idea - dormant)
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -124,6 +124,7 @@ void st_cons(void)
 // Main (test program)
 
 // TODO: Is putting arguments on a stack going to be amenable to TCO?
+// Seems to be potentially a fatal flaw of this idea...
 
 int main()
 {
