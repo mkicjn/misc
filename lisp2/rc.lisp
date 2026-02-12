@@ -171,7 +171,9 @@
 (defun (matches data pattern)
   (cond ((eq pattern '_) t)
 	((atom pattern) (eq data pattern))
+	((atom    data) (eq data pattern))
 	((eq (car pattern) ',) (matches (cdr data) (cddr pattern)))
+	((eq (car pattern) ',.) t)
 	(t (if (matches (car data) (car pattern))
 	       (matches (cdr data) (cdr pattern))
 	       ()))))
@@ -182,6 +184,8 @@
 	 (cons
 	   (cons (cadr pattern) (cons 'a acc))
 	   (pattern-holes (cddr pattern) (cons 'd acc))))
+	((eq (car pattern) ',.)
+	 (list (cons (cadr pattern) acc)))
 	(t (append (pattern-holes (car pattern) (cons 'a acc))
 		   (pattern-holes (cdr pattern) (cons 'd acc))))))
 
