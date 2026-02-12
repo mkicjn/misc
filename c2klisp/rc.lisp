@@ -202,7 +202,7 @@
 
 (defun (pattern-hole-to-let-elem var hole)
   (list (car hole)
-	(fold-right
+	(fold-right ; Idea: This fold generalizes uses of defchain. Refactor?
 	  (lambda (l x)
 	    (cond ((eq l 'a) (list 'car x))
 		  ((eq l 'd) (list 'cdr x))
@@ -211,18 +211,15 @@
 	  (cdr hole))))
 
 (defun (pattern-to-let var pattern expr)
-  (list 'let (map (curry pattern-hole-to-let-elem var) (pattern-holes pattern))
-	expr))
+  (list 'let (map (curry pattern-hole-to-let-elem var) (pattern-holes pattern)) expr))
 
-(defun (pattern-to-cond-elem var pattern expr)
-  (` (matches , var (quote , pattern)) , (pattern-to-let var pattern expr)))
+(defun (case-to-cond-elem var case)
+  (let ((pattern (car case))
+	(expr (cadr case)))
+    (` (matches , var (quote , pattern))
+       , (pattern-to-let var pattern expr))))
 
-(defmacro (match expr . patterns/cases)
+(defmacro (match expr . cases)
   (let ((var (gensym)))
     (` let ((, var , expr))
-       (cond ,. (map (lambda (pattern/case)
-		       (pattern-to-cond-elem
-			 var
-			 (car pattern/case)
-			 (cadr pattern/case)))
-		     patterns/cases)))))
+       (cond ,. (map (curry case-to-cond-elem var) cases)))))
