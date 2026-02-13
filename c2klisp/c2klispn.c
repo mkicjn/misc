@@ -62,10 +62,9 @@ FOREACH_SYMVAR(DECLARE_SYMVAR)
 
 // Designated sentinel values (for when a value is needed that cannot be mistaken for an ordinary input or computation)
 #define ERROR     ((void *)1)  // used as a generic error value
-#define LAMBDA    ((void *)2)  // used to distinguish evaluated lambda expressions (i.e., closures) from unevaluated ones
-#define FORWARD   ((void *)3)  // used for signaling that a cell has already been copied by garbage collection
-#define CONTINUE  ((void *)4)  // used for signaling that an expression should be tail call optimized
-#define NUMBER    ((void *)5)  // used for signaling that a cell's cdr has a raw numeric value
+#define FORWARD   ((void *)2)  // used for signaling that a cell has already been copied by garbage collection
+#define CONTINUE  ((void *)3)  // used for signaling that an expression should be tail call optimized
+#define NUMBER    ((void *)4)  // used for signaling that a cell's cdr has a raw numeric value
 
 
 // **************** Memory regions and region-based type inference ****************
@@ -168,8 +167,6 @@ void print(void *x)
 			printf("_%lu_", s - syms);
 		else
 			printf("%.*s", *s, s + 1);
-	} else if (x == LAMBDA) {
-		printf("λ");
 	} else if (x == ERROR) {
 		printf("\033[31m{error}\033[m");
 	} else {
@@ -398,7 +395,7 @@ void *pairlis(void *ks, void *vs, void *env)
 void *eval(void *x, void *env);
 void *apply(void *f, void *args, void **env)
 {
-	if (caar(f) == LAMBDA) { // lambda -> continue from body after evaluating and binding args
+	if (caar(f) == sym_lambda) { // lambda -> continue from body after evaluating and binding args
 		*env = pairlis(cadar(f), map(eval, args, *env), cdr(f));
 		return caddar(f);
 	}
@@ -448,7 +445,7 @@ void *eval_base(void *x, void *env)
 	if (car(x) == sym_cons) // cons
 		return cons(eval(cadr(x), env), eval(caddr(x), env));
 	if (car(x) == sym_lambda) // lambda
-		return cons(cons(LAMBDA, cdr(x)), env);
+		return cons(x, env);
 	if (car(x) == sym_gensym) { // gensym
 		next_sym[0] = 0;
 		return (next_sym++);
