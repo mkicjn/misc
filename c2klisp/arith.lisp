@@ -1,16 +1,14 @@
 ; WIP implementation of languages from Ch. 3 of TAPL (Pierce)
 ; Run with, e.g., `./c2klisp.c rc.lisp arith.lisp -`
 
-;; Reflexive transitive closure over single-step evaluation
-
-; TODO: Technically only a transitive closure, since each single-step is already reflexive
-; See if the single-step eval can return 'stuck or something when no derivations are possible
+; (Note that the arrow names are a little bit of a misnomer,
+;  since they're functions instead of relations on the set of terms)
 
 (defun (make->* ->)
   (Z (lambda (->*)
        (lambda (t0)
 	 (let ((t0` (-> t0)))
-	   (if (equal t0` t0) t0` (->* t0`)))))))
+	   (if (eq t0` 'stuck) t0 (->* t0`)))))))
 
 
 ;; Bool language (B)
@@ -20,7 +18,7 @@
 	 ((if true then , t2 else _) t2)
 	 ((if false then _ else , t3) t3)
 	 ((if , t1 then , t2 else , t3) (` if , (-B-> t1) then , t2 else , t3))
-	 (_ t0)))
+	 (_ 'stuck)))
 
 (define -B->* (make->* -B->))
 
@@ -41,15 +39,14 @@
 	 ((if true then , t2 else _) t2)
 	 ((if false then _ else , t3) t3)
 	 ((if , t1 then , t2 else , t3) (` if , (-NB-> t1) then , t2 else , t3))
-	 ((succ , t1) t0 when (is-nv t1))
-	 ((succ , t1) (` succ , (-NB-> t1)))
+	 ((succ , t1) (` succ , (-NB-> t1)) when (not (is-nv t1)))
 	 ((pred zero) 'zero)
 	 ((pred (succ , nv)) nv when (is-nv nv))
 	 ((pred , t1) (` pred , (-NB-> t1)))
 	 ((iszero zero) 'true)
 	 ((iszero (succ nv)) 'false when (is-nv nv))
 	 ((iszero , t1) (` iszero , (-NB-> t1)))
-	 (_ t0)))
+	 (_ 'stuck)))
 
 (define -NB->* (make->* -NB->))
 
@@ -57,5 +54,4 @@
 (is-nv 'zero)
 (is-nv '(succ (succ zero)))
 
-(equal (-NB->* '(if (iszero (pred (succ zero))) then (succ zero) else zero))
-       '(succ zero))
+(equal (-NB->* '(if (iszero (pred (succ zero))) then (succ zero) else zero)) '(succ zero))
