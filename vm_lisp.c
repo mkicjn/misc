@@ -1,4 +1,4 @@
-//usr/bin/env tcc $CFLAGS -run $0 $@; exit $?
+//`which tcc` $CFLAGS -run $0 $@; exit $?
 
 // (Stack-based Lisp VM idea - dormant)
 #include <stdio.h>

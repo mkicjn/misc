@@ -1,4 +1,4 @@
-//usr/bin/env tcc $CFLAGS -run $0 "$@"; exit $?
+//`which tcc` $CFLAGS -run $0 "$@"; exit $?
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -111,7 +111,7 @@ double noise(int x, int y, int z, unsigned period)
 
 #define WIDTH 80
 #define HEIGHT 60
-#define DEPTH 120
+#define DEPTH 65535
 
 #define ANIM_PERIOD 0.05e6
 
