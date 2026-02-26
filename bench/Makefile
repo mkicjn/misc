@@ -20,7 +20,16 @@ ALL = \
 	collatz_swipl \
 	collatz_java \
 	collatz_javac \
-	collatz_rust
+	collatz_rust \
+	collatz_ocaml \
+	collatz_ocamlc \
+	collatz_ocamlopt
+
+ALSO_CLEAN = \
+	Collatz.class \
+	src/collatz.cmi \
+	src/collatz.cmo \
+	src/collatz.cmx
 
 all: $(ALL)
 
@@ -30,7 +39,7 @@ bench: all
 
 .PHONY: clean
 clean:
-	rm -f $(ALL)
+	rm -f $(ALL) $(ALSO_CLEAN)
 
 
 collatz_fasm: src/collatz.asm
@@ -130,3 +139,12 @@ collatz_javac: Collatz.class
 
 collatz_rust: src/collatz.rs
 	rustc -O $< -o $@
+
+collatz_ocaml: src/collatz.ml
+	echo "#!/usr/bin/ocaml" > $@
+	cat $^ >> $@
+	chmod +x $@
+collatz_ocamlc: src/collatz.ml
+	ocamlc -o $@ $^
+collatz_ocamlopt: src/collatz.ml
+	ocamlopt -o $@ $^

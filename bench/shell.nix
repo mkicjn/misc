@@ -21,5 +21,6 @@ pkgs.mkShell {
     swi-prolog
     openjdk
     rustc
+    ocaml
   ];
 }

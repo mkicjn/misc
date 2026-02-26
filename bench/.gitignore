@@ -1,2 +1,5 @@
 collatz_*
 Collatz.class
+src/collatz.cmi
+src/collatz.cmo
+src/collatz.cmx
