@@ -32,13 +32,7 @@ enum tok_type {
 #define DEF_ENUM_VAL(e, f, ...) TOK_##e,
 	FOREACH_TOKEN(DEF_ENUM_VAL)
 	NUM_TOKS
-};
-const char *tok_desc[NUM_TOKS] = {
-	"ERROR",
-	"EOF",
-#define DEF_DESC_VAL(e, f, ...) #e,
-	FOREACH_TOKEN(DEF_DESC_VAL)
-};
+} tok = TOK_ERROR;
 
 #define MAX_TOK_LEN 127
 char tok_buf[MAX_TOK_LEN] = {0};
@@ -54,7 +48,7 @@ bool sequence_of(const char *cs)
 	return tok_len >= 1 && strspn(tok_buf, cs) == tok_len;
 }
 
-enum tok_type lex(void)
+void lex(void)
 {
 	tok_buf[0] = (tok_len > 0 ? tok_buf[tok_len] : getchar());
 	tok_len = 0;
@@ -64,17 +58,16 @@ enum tok_type lex(void)
 		tok_buf[tok_len + 1] = '\0';
 
 #define TRY_LEX(e, f, ...) \
-		if (f(__VA_ARGS__)) \
-			return TOK_##e;
+		if (f(__VA_ARGS__)) { \
+			tok = TOK_##e;\
+			return; \
+		}
 		FOREACH_TOKEN(TRY_LEX)
 	}
-	return tok_buf[0] == '\0' ? TOK_EOF : TOK_ERROR;
+	tok = (tok_buf[0] == '\0' ? TOK_EOF : TOK_ERROR);
 }
 
-
-/******** Parser ********/
-
-#define panic(...) do {printf(__VA_ARGS__); exit(1);} while (0)
+/******** String Interning ********/
 
 #define SYMS_SPACE 100000
 char syms[SYMS_SPACE] = {0};
@@ -90,30 +83,41 @@ char *intern(const char *str, size_t len)
 	return &sym[1];
 }
 
-enum tok_type cur_tok = TOK_ERROR; // TODO: Move this to lexer
 
-bool have(enum tok_type expected)
+/******** Parser ********/
+
+// (Basic utilities)
+#define panic(...) do {printf(__VA_ARGS__); exit(1);} while (0)
+
+const char *tok_desc[NUM_TOKS] = {
+	"ERROR",
+	"EOF",
+#define DEF_DESC_VAL(e, f, ...) #e,
+	FOREACH_TOKEN(DEF_DESC_VAL)
+};
+
+static inline bool have(enum tok_type expected)
 {
-	return cur_tok == expected;
+	return tok == expected;
 }
 
-void expect(enum tok_type expected)
+static inline void expect(enum tok_type expected)
 {
 	if (!have(expected))
-		panic("Expected %s, got %s\n", tok_desc[expected], tok_desc[cur_tok]);
+		panic("Expected %s, got %s\n", tok_desc[expected], tok_desc[tok]);
 }
 
 void consume(enum tok_type expected)
 {
 	expect(expected);
 	do {
-		cur_tok = lex();
-	} while (cur_tok == TOK_SPACE);
-	//printf("%s: %.*s\n", tok_desc[cur_tok], tok_len, tok_buf);
+		lex();
+	} while (tok == TOK_SPACE);
+	//printf("%s: %.*s\n", tok_desc[tok], tok_len, tok_buf);
 }
 
 
-// Grammar
+// (Grammar)
 #define TERMS_SPACE 100000
 struct term {
 	enum {
@@ -184,7 +188,7 @@ struct term *parse_term(void)
 {
 	struct term *t = parse_basic_term();
 	if (!t)
-		panic("Unexpected %s\n", tok_desc[cur_tok]);
+		panic("Unexpected %s\n", tok_desc[tok]);
 
 	for (;;) {
 		struct term *t2 = parse_basic_term();
@@ -202,6 +206,7 @@ struct term *parse_term(void)
 
 
 /******** Reduction (destructive) ********/
+// FIXME: Implement translation to de Bruijn indices
 
 void substitute(struct term *x, struct term *v, struct term **tp)
 {
@@ -254,12 +259,13 @@ bool eval1(struct term **tp)
 	}
 }
 
+
 /******** Main ********/
 
 void lex_test(void)
 {
 	for (;;) {
-		enum tok_type tok = lex();
+		lex();
 		if (tok == TOK_SPACE)
 			continue;
 		printf("%s: %.*s\n", tok_desc[tok], tok_len, tok_buf);
