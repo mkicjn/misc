@@ -74,6 +74,8 @@ enum tok_type lex(void)
 
 /******** Parser ********/
 
+#define panic(...) do {printf(__VA_ARGS__); exit(1);} while (0)
+
 #define SYMS_SPACE 100000
 char syms[SYMS_SPACE] = {0};
 char *intern(const char *str, size_t len)
@@ -97,10 +99,8 @@ bool have(enum tok_type expected)
 
 void expect(enum tok_type expected)
 {
-	if (!have(expected)) {
-		printf("Expected %s, got %s\n", tok_desc[expected], tok_desc[cur_tok]);
-		exit(1);
-	}
+	if (!have(expected))
+		panic("Expected %s, got %s\n", tok_desc[expected], tok_desc[cur_tok]);
 }
 
 void consume(enum tok_type expected)
@@ -137,9 +137,9 @@ struct term {
 } terms[TERMS_SPACE];
 struct term *next_term = terms;
 
-struct term *scan_term(void);
+struct term *parse_term(void);
 
-struct term *scan_var(void)
+struct term *parse_var(void)
 {
 	expect(TOK_WORD);
 	char *x = intern(tok_buf, tok_len);
@@ -151,12 +151,12 @@ struct term *scan_var(void)
 	return t;
 }
 
-struct term *scan_abs(void)
+struct term *parse_abs(void)
 {
 	consume(TOK_LAMBDA);
-	struct term *x = scan_var();
+	struct term *x = parse_var();
 	consume(TOK_DOT);
-	struct term *t1 = scan_term();
+	struct term *t1 = parse_term();
 
 	struct term *t = next_term++;
 	t->type = TERM_ABS;
@@ -165,30 +165,39 @@ struct term *scan_abs(void)
 	return t;
 }
 
-struct term *scan_app(void)
+struct term *parse_basic_term(void)
 {
-	consume(TOK_LPAREN);
-	struct term *t1 = scan_term();
-	struct term *t2 = scan_term();
-	consume(TOK_RPAREN);
-
-	struct term *t = next_term++;
-	t->type = TERM_APP;
-	t->as.app.func = t1;
-	t->as.app.arg = t2;
-	return t;
+	if (have(TOK_LAMBDA)) {
+		return parse_abs();
+	} else if (have(TOK_WORD)) {
+		return parse_var();
+	} else if (have(TOK_LPAREN)) {
+		consume(TOK_LPAREN);
+		struct term *t = parse_term();
+		consume(TOK_RPAREN);
+		return t;
+	}
+	return NULL;
 }
 
-struct term *scan_term(void)
+struct term *parse_term(void)
 {
-	if (have(TOK_WORD))
-		return scan_var();
-	if (have(TOK_LAMBDA))
-		return scan_abs();
-	if (have(TOK_LPAREN))
-		return scan_app();
-	consume(TOK_EOF);
-	return NULL;
+	struct term *t = parse_basic_term();
+	if (!t)
+		panic("Unexpected %s\n", tok_desc[cur_tok]);
+
+	for (;;) {
+		struct term *t2 = parse_basic_term();
+		if (t2 == NULL)
+			break;
+
+		struct term *app = next_term++;
+		app->type = TERM_APP;
+		app->as.app.func = t;
+		app->as.app.arg = t2;
+		t = app;
+	}
+	return t;
 }
 
 
@@ -210,19 +219,24 @@ void lex_test(void)
 
 void print_term(struct term *t)
 {
+	if (!t) {
+		printf("NULL");
+		return;
+	}
+
 	switch (t->type) {
 	case TERM_VAR:
-		printf("(Variable %s)", t->as.var.name);
+		printf("(Var %s)", t->as.var.name);
 		break;
 	case TERM_ABS:
-		printf("(Abstraction ");
+		printf("(Abs ");
 		print_term(t->as.abs.var);
 		printf(" ");
 		print_term(t->as.abs.body);
 		printf(")");
 		break;
 	case TERM_APP:
-		printf("(Application ");
+		printf("(App ");
 		print_term(t->as.app.func);
 		printf(" ");
 		print_term(t->as.app.arg);
@@ -234,7 +248,7 @@ void print_term(struct term *t)
 void parse_test(void)
 {
 	consume(TOK_ERROR);
-	print_term(scan_term());
+	print_term(parse_term());
 	printf("\n");
 	consume(TOK_EOF);
 }
