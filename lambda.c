@@ -201,6 +201,59 @@ struct term *parse_term(void)
 }
 
 
+/******** Reduction (destructive) ********/
+
+void substitute(struct term *x, struct term *v, struct term **tp)
+{
+	struct term *t = *tp;
+	if (x->type != TERM_VAR)
+		panic("Substitution variable is not a variable\n");
+
+	switch (t->type) {
+	case TERM_VAR:
+		if (x->as.var.name != t->as.var.name)
+			return;
+		*tp = v;
+		break;
+	case TERM_ABS:
+		if (t->as.abs.var->type != TERM_VAR)
+			panic("Abstraction variable is not a variable\n");
+		if (t->as.abs.var->as.var.name == x->as.var.name)
+			return;
+		substitute(x, v, &t->as.abs.body);
+		break;
+	case TERM_APP:
+		substitute(x, v, &t->as.app.func);
+		substitute(x, v, &t->as.app.arg);
+		break;
+	}
+}
+
+bool eval1(struct term **tp)
+{
+	struct term *t = *tp;
+	switch (t->type) {
+	case TERM_VAR:
+		return false;
+	case TERM_ABS:
+		return false;
+	case TERM_APP:
+		if (eval1(&t->as.app.func))
+			return true;
+		if (eval1(&t->as.app.arg))
+			return true;
+		if (t->as.app.func->type != TERM_ABS)
+			return false;
+		struct term *func = t->as.app.func;
+		struct term *arg  = t->as.app.arg;
+		substitute(func->as.abs.var, arg, &func->as.abs.body);
+		*tp = func->as.abs.body;
+		return true;
+	default:
+		return false;
+	}
+}
+
 /******** Main ********/
 
 void lex_test(void)
@@ -248,9 +301,13 @@ void print_term(struct term *t)
 void parse_test(void)
 {
 	consume(TOK_ERROR);
-	print_term(parse_term());
-	printf("\n");
+	struct term *t = parse_term();
 	consume(TOK_EOF);
+
+	do {
+		print_term(t);
+		printf("\n");
+	} while (eval1(&t));
 }
 
 int main()
