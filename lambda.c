@@ -1,8 +1,9 @@
 //`which tcc` $CFLAGS -run $0 "$@"; exit $?
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <stdlib.h>
+#include <stdint.h>
 
 /******** Lexer ********/
 
@@ -73,13 +74,14 @@ void lex(void)
 char syms[SYMS_SPACE] = {0};
 char *intern(const char *str, size_t len)
 {
+	char l = len > 127 ? 127 : len;
 	char *sym;
 	for (sym = syms; sym[0] > 0; sym += sym[0] + 2)
-		if (sym[0] == len && memcmp(&sym[1], str, len) == 0)
+		if (sym[0] == l && memcmp(&sym[1], str, l) == 0)
 			return &sym[1];
-	sym[0] = len;
-	memcpy(&sym[1], str, len);
-	sym[1 + len] = '\0';
+	sym[0] = l;
+	memcpy(&sym[1], str, l);
+	sym[1 + l] = '\0';
 	return &sym[1];
 }
 
@@ -87,7 +89,7 @@ char *intern(const char *str, size_t len)
 /******** Parser ********/
 
 // (Basic utilities)
-#define panic(...) do {printf(__func__ ": " __VA_ARGS__); exit(1);} while (0)
+#define panic(...) do {printf(__VA_ARGS__); exit(1);} while (0)
 
 const char *tok_desc[NUM_TOKS] = {
 	"ERROR",
@@ -140,7 +142,7 @@ struct term {
 			struct term *body;
 		} abs, nabs;
 		struct {
-			struct term *func;
+			struct term *fun;
 			struct term *arg;
 		} app, napp;
 	} as;
@@ -203,7 +205,7 @@ struct term *parse_term(void)
 
 		struct term *app = next_term++;
 		app->type = TERM_APP;
-		app->as.app.func = t;
+		app->as.app.fun = t;
 		app->as.app.arg = t2;
 		t = app;
 	}
@@ -214,7 +216,7 @@ struct term *parse_term(void)
 /******** Reduction (destructive) ********/
 // FIXME: Implement translation to de Bruijn indices
 
-void substitute(struct term *x, struct term *v, struct term **tp)
+void subst(struct term *x, struct term *v, struct term **tp)
 {
 	struct term *t = *tp;
 	if (x->type != TERM_VAR)
@@ -231,16 +233,16 @@ void substitute(struct term *x, struct term *v, struct term **tp)
 			panic("Abstraction variable is not a variable\n");
 		if (t->as.abs.var->as.var.name == x->as.var.name)
 			return;
-		substitute(x, v, &t->as.abs.body);
+		subst(x, v, &t->as.abs.body);
 		break;
 	case TERM_APP:
-		substitute(x, v, &t->as.app.func);
-		substitute(x, v, &t->as.app.arg);
+		subst(x, v, &t->as.app.fun);
+		subst(x, v, &t->as.app.arg);
 		break;
 	}
 }
 
-bool eval1(struct term **tp)
+bool eval(struct term **tp)
 {
 	struct term *t = *tp;
 	switch (t->type) {
@@ -249,23 +251,23 @@ bool eval1(struct term **tp)
 	case TERM_ABS:
 		return false;
 	case TERM_APP:
-		if (eval1(&t->as.app.func))
+		if (eval(&t->as.app.fun))
 			return true;
-		if (eval1(&t->as.app.arg))
+		if (eval(&t->as.app.arg))
 			return true;
-		if (t->as.app.func->type != TERM_ABS)
+		if (t->as.app.fun->type != TERM_ABS)
 			return false;
-		struct term *func = t->as.app.func;
+		struct term *fun = t->as.app.fun;
 		struct term *arg  = t->as.app.arg;
-		substitute(func->as.abs.var, arg, &func->as.abs.body);
-		*tp = func->as.abs.body;
+		subst(fun->as.abs.var, arg, &fun->as.abs.body);
+		*tp = fun->as.abs.body;
 		return true;
 	default:
 		return false;
 	}
 }
 
-void remove_name(struct term *t, struct term *x, int level)
+void remove_name(struct term *t, struct term *x, intptr_t level)
 {
 	switch (t->type) {
 	case TERM_VAR:
@@ -280,7 +282,7 @@ void remove_name(struct term *t, struct term *x, int level)
 		remove_name(t->as.abs.body, x, level + 1);
 		break;
 	case TERM_APP:
-		remove_name(t->as.app.func, x, level);
+		remove_name(t->as.app.fun, x, level);
 		remove_name(t->as.app.arg, x, level);
 		break;
 	default:
@@ -300,12 +302,54 @@ void remove_names(struct term *t)
 		t->type = TERM_NABS;
 		break;
 	case TERM_APP:
-		remove_names(t->as.app.func);
+		remove_names(t->as.app.fun);
 		remove_names(t->as.app.arg);
 		t->type = TERM_NAPP;
 		break;
 	default:
 		break;
+	}
+}
+
+void nl_subst(struct term **tp, struct term *arg, int k)
+{
+	struct term *t = *tp;
+	switch (t->type) {
+	case TERM_NVAR:
+		if (t->as.nvar.idx == k)
+			*tp = arg;
+		break;
+	case TERM_NABS:
+		nl_subst(&t->as.nabs.body, arg, k + 1);
+		break;
+	case TERM_NAPP:
+		nl_subst(&t->as.napp.fun, arg, k);
+		nl_subst(&t->as.napp.arg, arg, k);
+		break;
+	}
+}
+
+bool nl_eval(struct term **tp)
+{
+	struct term *t = *tp;
+	switch (t->type) {
+	case TERM_NVAR:
+		return false;
+	case TERM_NABS:
+		// TODO: Try to 
+		return false;
+	case TERM_NAPP:
+		if (nl_eval(&t->as.napp.fun))
+			return true;
+		if (nl_eval(&t->as.napp.arg))
+			return true;
+		struct term *fun = t->as.napp.fun;
+		struct term *arg = t->as.napp.arg;
+		nl_subst(&fun->as.nabs.body, arg, 0);
+		*tp = fun->as.nabs.body;
+		return true;
+	default:
+		return false;
 	}
 }
 
@@ -318,7 +362,7 @@ void lex_test(void)
 		lex();
 		if (tok == TOK_SPACE)
 			continue;
-		printf("%s: %.*s\n", tok_desc[tok], tok_len, tok_buf);
+		printf("%s: %.*s\n", tok_desc[tok], (int)tok_len, tok_buf);
 		if (tok == TOK_WORD)
 			printf("%p\n", intern(tok_buf, tok_len));
 		if (tok == TOK_ERROR || tok == TOK_EOF)
@@ -346,7 +390,7 @@ void print_term(struct term *t)
 		break;
 	case TERM_APP:
 		printf("(App ");
-		print_term(t->as.app.func);
+		print_term(t->as.app.fun);
 		printf(" ");
 		print_term(t->as.app.arg);
 		printf(")");
@@ -355,14 +399,16 @@ void print_term(struct term *t)
 		printf("%ld", t->as.nvar.idx);
 		break;
 	case TERM_NABS:
-		printf("[");
+		printf("(λ ");
 		print_term(t->as.nabs.body);
-		printf("]");
+		printf(")");
 		break;
 	case TERM_NAPP:
-		print_term(t->as.napp.func);
+		printf("(");
+		print_term(t->as.napp.fun);
 		printf(" ");
 		print_term(t->as.napp.arg);
+		printf(")");
 		break;
 	}
 }
@@ -380,13 +426,17 @@ void eval_test(struct term *t)
 	do {
 		print_term(t);
 		printf("\n");
-	} while (eval1(&t));
+	} while (nl_eval(&t));
 }
 
 int main()
 {
 	struct term *t = parse_test();
-	remove_names(t);
 	print_term(t);
 	printf("\n");
+	remove_names(t);
+	eval_test(t);
 }
+
+// Things to try:
+// (λplus. λc2. plus c2 c2) (λm.λn.λs.λz. m s (n s z)) (λs.λz. s (s z))
