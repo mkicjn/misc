@@ -146,8 +146,9 @@ struct term {
 			struct term *arg;
 		} app, napp;
 	} as;
-} terms[TERMS_SPACE];
-struct term *next_term = terms;
+} terms[2][TERMS_SPACE];
+size_t bank = 0;
+struct term *next_term = terms[0];
 
 struct term *parse_term(void);
 
@@ -214,7 +215,6 @@ struct term *parse_term(void)
 
 
 /******** Name removal ********/
-// TODO: Implement reduction (to do so properly will probably require GC)
 
 void remove_name(struct term *t, struct term *x, intptr_t level)
 {
@@ -258,6 +258,102 @@ void remove_names(struct term *t)
 	default:
 		break;
 	}
+}
+
+
+/******** Term Reduction ********/
+
+struct term *shift(struct term *t, int d, int c)
+{
+	// Makes a deep copy of t, shifted by d (initially, c = 0)
+	struct term *new = next_term++;
+	switch (t->type) {
+	case TERM_NVAR:
+		new->type = TERM_NVAR;
+		new->as.nvar.idx = t->as.nvar.idx;
+		if (t->as.nvar.idx >= c)
+			new->as.nvar.idx += d;
+		return new;
+	case TERM_NABS:
+		new->type = TERM_NABS;
+		new->as.nabs.body = shift(t->as.nabs.body, d, c + 1);
+		return new;
+	case TERM_NAPP:
+		new->type = TERM_NAPP;
+		new->as.napp.fun = shift(t->as.napp.fun, d, c);
+		new->as.napp.arg = shift(t->as.napp.arg, d, c);
+		return new;
+	default:
+		panic("shift(): Expected nameless term\n");
+		return NULL;
+	}
+}
+
+struct term *subst(struct term *t, int k, struct term *v)
+{
+	// Makes a deep copy of t, but every variable k is substituted with v
+	struct term *new;
+	switch (t->type) {
+	case TERM_NVAR:
+		if (t->as.nvar.idx == k)
+			return v;
+		new = next_term++;
+		new->type = TERM_NVAR;
+		new->as.nvar.idx = t->as.nvar.idx;
+		return new;
+	case TERM_NABS:
+		new = next_term++;
+		new->type = TERM_NABS;
+		new->as.nabs.body = subst(t->as.nabs.body, k + 1, shift(v, 1, 0));
+		return new;
+	case TERM_NAPP:
+		new = next_term++;
+		new->type = TERM_NAPP;
+		new->as.napp.fun = subst(t->as.napp.fun, k, v);
+		new->as.napp.arg = subst(t->as.napp.arg, k, v);
+		return new;
+	default:
+		panic("subst(): Expected nameless term\n");
+		return NULL;
+	}
+}
+
+bool reduce(struct term **tp)
+{
+	// Perform a single normal-order reduction
+	struct term *t = *tp;
+	switch (t->type) {
+	case TERM_NVAR:
+		return false;
+	case TERM_NABS:
+		if (reduce(&t->as.nabs.body))
+			return true;
+		return false;
+	case TERM_NAPP:
+		if (t->as.napp.fun->type == TERM_NABS) {
+			struct term *f = t->as.napp.fun;
+			struct term *a = t->as.napp.arg;
+			a = shift(a, 1, 0);
+			t = subst(f->as.nabs.body, 0, a);
+			*tp = shift(t, -1, 0);
+			return true;
+		}
+		if (reduce(&t->as.napp.fun))
+			return true;
+		if (reduce(&t->as.napp.arg))
+			return true;
+		return false;
+	default:
+		return false;
+	}
+}
+
+struct term *gc(struct term *t)
+{
+	// Simplistic copying GC
+	bank = 1 - bank;
+	next_term = terms[bank];
+	return shift(t, 0, 0);
 }
 
 
@@ -331,11 +427,18 @@ struct term *parse_test(void)
 int main()
 {
 	struct term *t = parse_test();
+
 	print_term(t);
 	printf("\n");
+
 	remove_names(t);
-	print_term(t);
-	printf("\n");
+	do {
+		t = gc(t);
+		print_term(t);
+		printf("\n");
+	} while (reduce(&t));
+
+	return 0;
 }
 
 // Things to try:
