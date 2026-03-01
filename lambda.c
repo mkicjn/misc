@@ -213,59 +213,8 @@ struct term *parse_term(void)
 }
 
 
-/******** Reduction (destructive) ********/
-// FIXME: Implement translation to de Bruijn indices
-
-void subst(struct term *x, struct term *v, struct term **tp)
-{
-	struct term *t = *tp;
-	if (x->type != TERM_VAR)
-		panic("Substitution variable is not a variable\n");
-
-	switch (t->type) {
-	case TERM_VAR:
-		if (x->as.var.name != t->as.var.name)
-			return;
-		*tp = v;
-		break;
-	case TERM_ABS:
-		if (t->as.abs.var->type != TERM_VAR)
-			panic("Abstraction variable is not a variable\n");
-		if (t->as.abs.var->as.var.name == x->as.var.name)
-			return;
-		subst(x, v, &t->as.abs.body);
-		break;
-	case TERM_APP:
-		subst(x, v, &t->as.app.fun);
-		subst(x, v, &t->as.app.arg);
-		break;
-	}
-}
-
-bool eval(struct term **tp)
-{
-	struct term *t = *tp;
-	switch (t->type) {
-	case TERM_VAR:
-		return false;
-	case TERM_ABS:
-		return false;
-	case TERM_APP:
-		if (eval(&t->as.app.fun))
-			return true;
-		if (eval(&t->as.app.arg))
-			return true;
-		if (t->as.app.fun->type != TERM_ABS)
-			return false;
-		struct term *fun = t->as.app.fun;
-		struct term *arg  = t->as.app.arg;
-		subst(fun->as.abs.var, arg, &fun->as.abs.body);
-		*tp = fun->as.abs.body;
-		return true;
-	default:
-		return false;
-	}
-}
+/******** Name removal ********/
+// TODO: Implement reduction (to do so properly will probably require GC)
 
 void remove_name(struct term *t, struct term *x, intptr_t level)
 {
@@ -308,48 +257,6 @@ void remove_names(struct term *t)
 		break;
 	default:
 		break;
-	}
-}
-
-void nl_subst(struct term **tp, struct term *arg, int k)
-{
-	struct term *t = *tp;
-	switch (t->type) {
-	case TERM_NVAR:
-		if (t->as.nvar.idx == k)
-			*tp = arg;
-		break;
-	case TERM_NABS:
-		nl_subst(&t->as.nabs.body, arg, k + 1);
-		break;
-	case TERM_NAPP:
-		nl_subst(&t->as.napp.fun, arg, k);
-		nl_subst(&t->as.napp.arg, arg, k);
-		break;
-	}
-}
-
-bool nl_eval(struct term **tp)
-{
-	struct term *t = *tp;
-	switch (t->type) {
-	case TERM_NVAR:
-		return false;
-	case TERM_NABS:
-		// TODO: Try to 
-		return false;
-	case TERM_NAPP:
-		if (nl_eval(&t->as.napp.fun))
-			return true;
-		if (nl_eval(&t->as.napp.arg))
-			return true;
-		struct term *fun = t->as.napp.fun;
-		struct term *arg = t->as.napp.arg;
-		nl_subst(&fun->as.nabs.body, arg, 0);
-		*tp = fun->as.nabs.body;
-		return true;
-	default:
-		return false;
 	}
 }
 
@@ -421,21 +328,14 @@ struct term *parse_test(void)
 	return t;
 }
 
-void eval_test(struct term *t)
-{
-	do {
-		print_term(t);
-		printf("\n");
-	} while (nl_eval(&t));
-}
-
 int main()
 {
 	struct term *t = parse_test();
 	print_term(t);
 	printf("\n");
 	remove_names(t);
-	eval_test(t);
+	print_term(t);
+	printf("\n");
 }
 
 // Things to try:
