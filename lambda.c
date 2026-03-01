@@ -87,7 +87,7 @@ char *intern(const char *str, size_t len)
 /******** Parser ********/
 
 // (Basic utilities)
-#define panic(...) do {printf(__VA_ARGS__); exit(1);} while (0)
+#define panic(...) do {printf(__func__ ": " __VA_ARGS__); exit(1);} while (0)
 
 const char *tok_desc[NUM_TOKS] = {
 	"ERROR",
@@ -124,19 +124,25 @@ struct term {
 		TERM_VAR,
 		TERM_ABS,
 		TERM_APP,
+		TERM_NVAR,
+		TERM_NABS,
+		TERM_NAPP,
 	} type;
 	union {
 		struct {
 			char *name;
 		} var;
 		struct {
+			intptr_t idx;
+		} nvar;
+		struct {
 			struct term *var;
 			struct term *body;
-		} abs;
+		} abs, nabs;
 		struct {
 			struct term *func;
 			struct term *arg;
-		} app;
+		} app, napp;
 	} as;
 } terms[TERMS_SPACE];
 struct term *next_term = terms;
@@ -259,6 +265,50 @@ bool eval1(struct term **tp)
 	}
 }
 
+void remove_name(struct term *t, struct term *x, int level)
+{
+	switch (t->type) {
+	case TERM_VAR:
+		if (t->as.var.name != x->as.var.name)
+			break;
+		t->type = TERM_NVAR;
+		t->as.nvar.idx = level;
+		break;
+	case TERM_ABS:
+		if (t->as.abs.var->as.var.name == x->as.var.name)
+			break;
+		remove_name(t->as.abs.body, x, level + 1);
+		break;
+	case TERM_APP:
+		remove_name(t->as.app.func, x, level);
+		remove_name(t->as.app.arg, x, level);
+		break;
+	default:
+		break;
+	}
+}
+
+void remove_names(struct term *t)
+{
+	switch (t->type) {
+	case TERM_VAR:
+		panic("Term is not closed\n");
+		break;
+	case TERM_ABS:
+		remove_name(t->as.abs.body, t->as.abs.var, 0);
+		remove_names(t->as.abs.body);
+		t->type = TERM_NABS;
+		break;
+	case TERM_APP:
+		remove_names(t->as.app.func);
+		remove_names(t->as.app.arg);
+		t->type = TERM_NAPP;
+		break;
+	default:
+		break;
+	}
+}
+
 
 /******** Main ********/
 
@@ -301,15 +351,32 @@ void print_term(struct term *t)
 		print_term(t->as.app.arg);
 		printf(")");
 		break;
+	case TERM_NVAR:
+		printf("%ld", t->as.nvar.idx);
+		break;
+	case TERM_NABS:
+		printf("[");
+		print_term(t->as.nabs.body);
+		printf("]");
+		break;
+	case TERM_NAPP:
+		print_term(t->as.napp.func);
+		printf(" ");
+		print_term(t->as.napp.arg);
+		break;
 	}
 }
 
-void parse_test(void)
+struct term *parse_test(void)
 {
 	consume(TOK_ERROR);
 	struct term *t = parse_term();
 	consume(TOK_EOF);
+	return t;
+}
 
+void eval_test(struct term *t)
+{
 	do {
 		print_term(t);
 		printf("\n");
@@ -318,5 +385,8 @@ void parse_test(void)
 
 int main()
 {
-	parse_test();
+	struct term *t = parse_test();
+	remove_names(t);
+	print_term(t);
+	printf("\n");
 }
