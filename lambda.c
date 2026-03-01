@@ -441,5 +441,13 @@ int main()
 	return 0;
 }
 
-// Things to try:
+// Arithmetic examples to try:
+//
+// 2+2=4
 // (λplus. λc2. plus c2 c2) (λm.λn.λs.λz. m s (n s z)) (λs.λz. s (s z))
+//
+// 2*3=6
+// (λtimes. λc2. λc3. times c2 c3) ((λplus. λc0. λm. λn. m (plus n) c0) (λm.λn.λs.λz. m s (n s z)) (λs.λz.z)) (λs.λz. s (s z)) (λs.λz. s (s (s z)))
+//
+// 2^3=8
+// (λpow. λc2. λc3. pow c2 c3) (λm.λn. n m) (λs.λz. s (s z)) (λs.λz. s (s (s z)))
