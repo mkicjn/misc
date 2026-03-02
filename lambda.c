@@ -15,7 +15,7 @@
 #define NUMBER_CHARS "0123456789"
 #define WORD_CHARS   "_" LETTER_CHARS NUMBER_CHARS
 
-#define FOREACH_TOKEN(X) \
+#define FOREACH_TOK_TYPE(X) \
 	X(LAMBDA, exact_match, "λ") \
 	X(COLON, exact_match, ":") \
 	X(DOT, exact_match, ".") \
@@ -30,8 +30,8 @@
 enum tok_type {
 	TOK_ERROR,
 	TOK_EOF,
-#define DEF_ENUM_VAL(e, f, ...) TOK_##e,
-	FOREACH_TOKEN(DEF_ENUM_VAL)
+#define DEF_TOK_ENUM(e, f, ...) TOK_##e,
+	FOREACH_TOK_TYPE(DEF_TOK_ENUM)
 	NUM_TOK_TYPES
 } tok = TOK_ERROR;
 
@@ -63,7 +63,7 @@ void lex(void)
 			tok = TOK_##e;\
 			return; \
 		}
-		FOREACH_TOKEN(TRY_LEX)
+		FOREACH_TOK_TYPE(TRY_LEX)
 	}
 	tok = (tok_buf[0] == '\0' ? TOK_EOF : TOK_ERROR);
 }
@@ -89,13 +89,13 @@ char *intern(const char *str, size_t len)
 /******** Parser ********/
 
 // (Basic utilities)
-#define panic(...) do {printf(__VA_ARGS__); exit(1);} while (0)
+#define PANIC(...) do {printf(__VA_ARGS__); exit(1);} while (0)
 
 const char *tok_desc[NUM_TOK_TYPES] = {
 	"ERROR",
 	"EOF",
-#define DEF_DESC_VAL(e, f, ...) #e,
-	FOREACH_TOKEN(DEF_DESC_VAL)
+#define DEF_TOK_DESC(e, f, ...) #e,
+	FOREACH_TOK_TYPE(DEF_TOK_DESC)
 };
 
 static inline bool have(enum tok_type expected)
@@ -106,7 +106,7 @@ static inline bool have(enum tok_type expected)
 static inline void expect(enum tok_type expected)
 {
 	if (!have(expected))
-		panic("Expected %s, got %s\n", tok_desc[expected], tok_desc[tok]);
+		PANIC("Expected %s, got %s\n", tok_desc[expected], tok_desc[tok]);
 }
 
 void consume(enum tok_type expected)
@@ -178,7 +178,7 @@ struct term *parse_abs(void)
 	return t;
 }
 
-struct term *parse_basic_term(void)
+struct term *parse_base_term(void)
 {
 	if (have(TOK_LAMBDA)) {
 		return parse_abs();
@@ -195,12 +195,12 @@ struct term *parse_basic_term(void)
 
 struct term *parse_term(void)
 {
-	struct term *t = parse_basic_term();
+	struct term *t = parse_base_term();
 	if (!t)
-		panic("Unexpected %s\n", tok_desc[tok]);
+		PANIC("Unexpected token type %s\n", tok_desc[tok]);
 
 	for (;;) {
-		struct term *t2 = parse_basic_term();
+		struct term *t2 = parse_base_term();
 		if (t2 == NULL)
 			break;
 
@@ -215,6 +215,9 @@ struct term *parse_term(void)
 
 
 /******** Name removal ********/
+
+#define UNEXPECTED_TERM(t) PANIC("%s: Unexpected term type %d\n", __func__, (t)->type)
+// ^ Simply print the enum's integer value, since this is probably programmer error
 
 void remove_name(struct term *t, struct term *x, intptr_t level)
 {
@@ -234,7 +237,12 @@ void remove_name(struct term *t, struct term *x, intptr_t level)
 		remove_name(t->as.app.fun, x, level);
 		remove_name(t->as.app.arg, x, level);
 		break;
+	case TERM_NVAR:
+		break;
+	case TERM_NABS:
+		break;
 	default:
+		UNEXPECTED_TERM(t);
 		break;
 	}
 }
@@ -254,7 +262,12 @@ void remove_names(struct term *t)
 		remove_names(t->as.app.fun);
 		remove_names(t->as.app.arg);
 		break;
+	case TERM_NVAR:
+		break;
+	case TERM_NABS:
+		break;
 	default:
+		UNEXPECTED_TERM(t);
 		break;
 	}
 }
@@ -283,7 +296,7 @@ struct term *shift(struct term *t, int d, int c)
 		new->as.app.arg = shift(t->as.app.arg, d, c);
 		return new;
 	default:
-		panic("shift(): Unexpected term type\n");
+		UNEXPECTED_TERM(t);
 		return NULL;
 	}
 }
@@ -312,7 +325,7 @@ struct term *subst(struct term *t, int k, struct term *v)
 		new->as.app.arg = subst(t->as.app.arg, k, v);
 		return new;
 	default:
-		panic("subst(): Unexpected term type\n");
+		UNEXPECTED_TERM(t);
 		return NULL;
 	}
 }
@@ -322,8 +335,6 @@ bool reduce(struct term **tp)
 	// Perform a single normal-order reduction
 	struct term *t = *tp;
 	switch (t->type) {
-	case TERM_NVAR:
-		return false;
 	case TERM_NABS:
 		if (reduce(&t->as.nabs.body))
 			return true;
@@ -404,6 +415,9 @@ void print_term(struct term *t)
 		printf("(λ ");
 		print_term(t->as.nabs.body);
 		printf(")");
+		break;
+	default:
+		UNEXPECTED_TERM(t);
 		break;
 	}
 }
