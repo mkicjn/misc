@@ -279,19 +279,20 @@ struct term *shift(struct term *t, int d, int c)
 {
 	// Makes a deep copy of t, shifted by d (initially, c = 0)
 	struct term *new = next_term++;
+	new->type = t->type;
 	switch (t->type) {
+	case TERM_VAR:
+		new->as.var.name = t->as.var.name;
+		return new;
 	case TERM_NVAR:
-		new->type = TERM_NVAR;
 		new->as.nvar.idx = t->as.nvar.idx;
 		if (t->as.nvar.idx >= c)
 			new->as.nvar.idx += d;
 		return new;
 	case TERM_NABS:
-		new->type = TERM_NABS;
 		new->as.nabs.body = shift(t->as.nabs.body, d, c + 1);
 		return new;
 	case TERM_APP:
-		new->type = TERM_APP;
 		new->as.app.fun = shift(t->as.app.fun, d, c);
 		new->as.app.arg = shift(t->as.app.arg, d, c);
 		return new;
@@ -303,24 +304,23 @@ struct term *shift(struct term *t, int d, int c)
 
 struct term *subst(struct term *t, int k, struct term *v)
 {
-	// Makes a deep copy of t, but every variable k is substituted with v
-	struct term *new;
+	// Makes a deep copy of t, but de Bruijn index k is substituted with v
+	if (t->type == TERM_NVAR && t->as.nvar.idx == k)
+		return v;
+
+	struct term *new = next_term++;
+	new->type = t->type;
 	switch (t->type) {
+	case TERM_VAR:
+		new->as.var.name = t->as.var.name;
+		return new;
 	case TERM_NVAR:
-		if (t->as.nvar.idx == k)
-			return v;
-		new = next_term++;
-		new->type = TERM_NVAR;
 		new->as.nvar.idx = t->as.nvar.idx;
 		return new;
 	case TERM_NABS:
-		new = next_term++;
-		new->type = TERM_NABS;
 		new->as.nabs.body = subst(t->as.nabs.body, k + 1, shift(v, 1, 0));
 		return new;
 	case TERM_APP:
-		new = next_term++;
-		new->type = TERM_APP;
 		new->as.app.fun = subst(t->as.app.fun, k, v);
 		new->as.app.arg = subst(t->as.app.arg, k, v);
 		return new;
