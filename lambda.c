@@ -32,7 +32,7 @@ enum tok_type {
 	TOK_EOF,
 #define DEF_ENUM_VAL(e, f, ...) TOK_##e,
 	FOREACH_TOKEN(DEF_ENUM_VAL)
-	NUM_TOKS
+	NUM_TOK_TYPES
 } tok = TOK_ERROR;
 
 #define MAX_TOK_LEN 127
@@ -91,7 +91,7 @@ char *intern(const char *str, size_t len)
 // (Basic utilities)
 #define panic(...) do {printf(__VA_ARGS__); exit(1);} while (0)
 
-const char *tok_desc[NUM_TOKS] = {
+const char *tok_desc[NUM_TOK_TYPES] = {
 	"ERROR",
 	"EOF",
 #define DEF_DESC_VAL(e, f, ...) #e,
@@ -122,13 +122,13 @@ void consume(enum tok_type expected)
 // (Grammar)
 #define TERMS_SPACE 100000
 struct term {
-	enum {
+	enum term_type {
 		TERM_VAR,
 		TERM_ABS,
 		TERM_APP,
 		TERM_NVAR,
 		TERM_NABS,
-		TERM_NAPP,
+		NUM_TERM_TYPES
 	} type;
 	union {
 		struct {
@@ -144,7 +144,7 @@ struct term {
 		struct {
 			struct term *fun;
 			struct term *arg;
-		} app, napp;
+		} app;
 	} as;
 } terms[2][TERMS_SPACE];
 size_t bank = 0;
@@ -243,17 +243,16 @@ void remove_names(struct term *t)
 {
 	switch (t->type) {
 	case TERM_VAR:
-		panic("Term is not closed\n");
 		break;
 	case TERM_ABS:
 		remove_name(t->as.abs.body, t->as.abs.var, 0);
 		remove_names(t->as.abs.body);
+		t->as.abs.var = NULL;
 		t->type = TERM_NABS;
 		break;
 	case TERM_APP:
 		remove_names(t->as.app.fun);
 		remove_names(t->as.app.arg);
-		t->type = TERM_NAPP;
 		break;
 	default:
 		break;
@@ -278,13 +277,13 @@ struct term *shift(struct term *t, int d, int c)
 		new->type = TERM_NABS;
 		new->as.nabs.body = shift(t->as.nabs.body, d, c + 1);
 		return new;
-	case TERM_NAPP:
-		new->type = TERM_NAPP;
-		new->as.napp.fun = shift(t->as.napp.fun, d, c);
-		new->as.napp.arg = shift(t->as.napp.arg, d, c);
+	case TERM_APP:
+		new->type = TERM_APP;
+		new->as.app.fun = shift(t->as.app.fun, d, c);
+		new->as.app.arg = shift(t->as.app.arg, d, c);
 		return new;
 	default:
-		panic("shift(): Expected nameless term\n");
+		panic("shift(): Unexpected term type\n");
 		return NULL;
 	}
 }
@@ -306,14 +305,14 @@ struct term *subst(struct term *t, int k, struct term *v)
 		new->type = TERM_NABS;
 		new->as.nabs.body = subst(t->as.nabs.body, k + 1, shift(v, 1, 0));
 		return new;
-	case TERM_NAPP:
+	case TERM_APP:
 		new = next_term++;
-		new->type = TERM_NAPP;
-		new->as.napp.fun = subst(t->as.napp.fun, k, v);
-		new->as.napp.arg = subst(t->as.napp.arg, k, v);
+		new->type = TERM_APP;
+		new->as.app.fun = subst(t->as.app.fun, k, v);
+		new->as.app.arg = subst(t->as.app.arg, k, v);
 		return new;
 	default:
-		panic("subst(): Expected nameless term\n");
+		panic("subst(): Unexpected term type\n");
 		return NULL;
 	}
 }
@@ -329,18 +328,18 @@ bool reduce(struct term **tp)
 		if (reduce(&t->as.nabs.body))
 			return true;
 		return false;
-	case TERM_NAPP:
-		if (t->as.napp.fun->type == TERM_NABS) {
-			struct term *f = t->as.napp.fun;
-			struct term *a = t->as.napp.arg;
+	case TERM_APP:
+		if (t->as.app.fun->type == TERM_NABS) {
+			struct term *f = t->as.app.fun;
+			struct term *a = t->as.app.arg;
 			a = shift(a, 1, 0);
 			t = subst(f->as.nabs.body, 0, a);
 			*tp = shift(t, -1, 0);
 			return true;
 		}
-		if (reduce(&t->as.napp.fun))
+		if (reduce(&t->as.app.fun))
 			return true;
-		if (reduce(&t->as.napp.arg))
+		if (reduce(&t->as.app.arg))
 			return true;
 		return false;
 	default:
@@ -382,17 +381,17 @@ void print_term(struct term *t)
 
 	switch (t->type) {
 	case TERM_VAR:
-		printf("(Var %s)", t->as.var.name);
+		printf("%s", t->as.var.name);
 		break;
 	case TERM_ABS:
-		printf("(Abs ");
+		printf("(λ");
 		print_term(t->as.abs.var);
-		printf(" ");
+		printf(". ");
 		print_term(t->as.abs.body);
 		printf(")");
 		break;
 	case TERM_APP:
-		printf("(App ");
+		printf("(");
 		print_term(t->as.app.fun);
 		printf(" ");
 		print_term(t->as.app.arg);
@@ -404,13 +403,6 @@ void print_term(struct term *t)
 	case TERM_NABS:
 		printf("(λ ");
 		print_term(t->as.nabs.body);
-		printf(")");
-		break;
-	case TERM_NAPP:
-		printf("(");
-		print_term(t->as.napp.fun);
-		printf(" ");
-		print_term(t->as.napp.arg);
 		printf(")");
 		break;
 	}
