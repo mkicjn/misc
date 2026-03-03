@@ -403,6 +403,11 @@ struct term *subst(struct term *t, int k, struct term *v)
 		new->as.app.fun = subst(t->as.app.fun, k, v);
 		new->as.app.arg = subst(t->as.app.arg, k, v);
 		return new;
+	case TERM_COND:
+		new->as.cond.test = subst(t->as.cond.test, k, v);
+		new->as.cond.when_t = subst(t->as.cond.when_t, k, v);
+		new->as.cond.when_f = subst(t->as.cond.when_f, k, v);
+		return new;
 	case TERM_TRUE:
 		return new;
 	case TERM_FALSE:
