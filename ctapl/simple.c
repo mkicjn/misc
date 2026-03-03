@@ -518,9 +518,9 @@ void print_term(struct term *t)
 	case TERM_COND:
 		printf("(if ");
 		print_term(t->as.cond.test);
-		printf(" ");
+		printf(" then ");
 		print_term(t->as.cond.when_t);
-		printf(" ");
+		printf(" else ");
 		print_term(t->as.cond.when_f);
 		printf(")");
 		break;
