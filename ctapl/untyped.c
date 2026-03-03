@@ -17,13 +17,9 @@
 
 #define FOREACH_TOK_TYPE(X) \
 	X(LAMBDA, exact_match, "λ") \
-	X(COLON, exact_match, ":") \
 	X(DOT, exact_match, ".") \
-	X(SUCC, exact_match, "succ") \
-	X(ZERO, exact_match, "0") \
 	X(LPAREN, exact_match, "(") \
 	X(RPAREN, exact_match, ")") \
-	X(NUMBER, sequence_of, NUMBER_CHARS) \
 	X(WORD, sequence_of, WORD_CHARS) \
 	X(SPACE, sequence_of, SPACE_CHARS)
 
@@ -195,8 +191,8 @@ struct term *parse_base_term(void)
 
 struct term *parse_term(void)
 {
-	struct term *t = parse_base_term();
-	if (!t)
+	struct term *t1 = parse_base_term();
+	if (t1 == NULL)
 		PANIC("Unexpected token type %s\n", tok_desc[tok]);
 
 	for (;;) {
@@ -206,11 +202,11 @@ struct term *parse_term(void)
 
 		struct term *app = next_term++;
 		app->type = TERM_APP;
-		app->as.app.fun = t;
+		app->as.app.fun = t1;
 		app->as.app.arg = t2;
-		t = app;
+		t1 = app;
 	}
-	return t;
+	return t1;
 }
 
 
@@ -224,26 +220,26 @@ void remove_name(struct term *t, struct term *x, intptr_t level)
 	switch (t->type) {
 	case TERM_VAR:
 		if (t->as.var.name != x->as.var.name)
-			break;
+			return;
 		t->type = TERM_NVAR;
 		t->as.nvar.idx = level;
-		break;
+		return;
 	case TERM_ABS:
 		if (t->as.abs.var->as.var.name == x->as.var.name)
-			break;
+			return;
 		remove_name(t->as.abs.body, x, level + 1);
-		break;
+		return;
 	case TERM_APP:
 		remove_name(t->as.app.fun, x, level);
 		remove_name(t->as.app.arg, x, level);
-		break;
+		return;
 	case TERM_NVAR:
-		break;
+		return;
 	case TERM_NABS:
-		break;
+		return;
 	default:
 		UNEXPECTED_TERM(t);
-		break;
+		return;
 	}
 }
 
@@ -251,24 +247,24 @@ void remove_names(struct term *t)
 {
 	switch (t->type) {
 	case TERM_VAR:
-		break;
+		return;
 	case TERM_ABS:
 		remove_name(t->as.abs.body, t->as.abs.var, 0);
 		remove_names(t->as.abs.body);
 		t->as.abs.var = NULL;
 		t->type = TERM_NABS;
-		break;
+		return;
 	case TERM_APP:
 		remove_names(t->as.app.fun);
 		remove_names(t->as.app.arg);
-		break;
+		return;
 	case TERM_NVAR:
-		break;
+		return;
 	case TERM_NABS:
-		break;
+		return;
 	default:
 		UNEXPECTED_TERM(t);
-		break;
+		return;
 	}
 }
 
