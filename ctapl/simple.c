@@ -739,7 +739,7 @@ int main()
 // λx:Bool. if x then (λy:Bool. if y then false else true) else (λz:Bool. z)
 //
 // (Bool -> Bool) -> Bool -> Bool
-// λf : Bool->Bool. λx: Bool. if (f x) then false else true
+// λf : Bool->Bool. λx: Bool. if f x then false else true
 //
 // Bool
-// (λf : Bool->Bool. λx: Bool. if (f x) then false else true) (λx: Bool. x) false
+// (λf : Bool->Bool. λx: Bool. if f x then false else true) (λx: Bool. x) false
