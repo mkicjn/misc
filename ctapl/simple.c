@@ -699,24 +699,17 @@ void print_term(struct term *t)
 	}
 }
 
-struct term *parse_test(void)
-{
-	consume(TOK_ERROR);
-	struct term *t = parse_term();
-	consume(TOK_EOF);
-	return t;
-}
-
 int main()
 {
-	struct term *t = parse_test();
+	lex();
+	struct term *t = parse_term();
+	consume(TOK_EOF);
 
+	printf("⊢ ");
 	print_term(t);
-	printf("\n");
+	printf(" : ");
 
 	remove_names(t);
-
-	printf("Type: ");
 	struct term *ty = type_of(t, NULL);
 	print_term(ty);
 	printf("\n");
