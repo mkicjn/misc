@@ -211,7 +211,6 @@ struct term *parse_type(void)
 		ty->type = TERM_ARROW;
 		ty->as.arrow.from = from;
 		ty->as.arrow.to = to;
-		return ty;
 	}
 
 	return ty;
