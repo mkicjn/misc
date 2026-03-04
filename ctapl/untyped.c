@@ -273,7 +273,7 @@ void remove_names(struct term *t)
 
 struct term *shift(struct term *t, int d, int c)
 {
-	// Makes a deep copy of t, shifted by d (initially, c = 0)
+	// Makes a deep copy of t, shifting de Bruijn indices by d (initially, c = 0)
 	struct term *new = next_term++;
 	new->type = t->type;
 	switch (t->type) {

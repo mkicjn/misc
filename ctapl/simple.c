@@ -565,7 +565,7 @@ struct term *type_ctx_lookup(struct type_ctx *gamma, intptr_t k)
 
 struct term *type_of(struct term *t, struct type_ctx *gamma)
 {
-	// The typing context Γ is a linked list generated on the fly
+	// The typing context Γ is a linked list generated on the stack (initially, gamma = NULL)
 	struct type_ctx gamma_prime;
 	gamma_prime.next = gamma;
 
