@@ -569,17 +569,22 @@ struct term *type_of(struct term *t, struct type_ctx *gamma)
 	struct type_ctx gamma_prime;
 	gamma_prime.next = gamma;
 
-	struct term *ty = NULL, *ty1, *ty2, *ty3;
+	struct term *ty, *ty1, *ty2, *ty3;
 	switch (t->type) {
+	case TERM_VAR:
+		return NULL;
 	case TERM_NVAR:
 		return type_ctx_lookup(gamma, t->as.nvar.idx);
 	case TERM_NABS:
+		gamma_prime.type = t->as.nabs.type;
+		ty1 = t->as.nabs.type;
+		ty2 = type_of(t->as.nabs.body, &gamma_prime);
+		if (ty2 == NULL)
+			return NULL;
 		ty = next_term++;
 		ty->type = TERM_ARROW;
-		ty->as.arrow.from = t->as.nabs.type;
-		gamma_prime.next = gamma;
-		gamma_prime.type = t->as.nabs.type;
-		ty->as.arrow.to = type_of(t->as.nabs.body, &gamma_prime);
+		ty->as.arrow.from = ty1;
+		ty->as.arrow.to = ty2;
 		return ty;
 	case TERM_APP:
 		ty1 = type_of(t->as.app.fun, gamma);
