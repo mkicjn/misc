@@ -28,6 +28,8 @@
 	X(ZERO, exact_match, "0") \
 	X(LPAREN, exact_match, "(") \
 	X(RPAREN, exact_match, ")") \
+	X(BOOL, exact_match, "Bool") \
+	X(ARROW, exact_match, "->") \
 	X(NUMBER, sequence_of, NUMBER_CHARS) \
 	X(WORD, sequence_of, WORD_CHARS) \
 	X(SPACE, sequence_of, SPACE_CHARS)
@@ -136,6 +138,8 @@ struct term {
 		TERM_COND,
 		TERM_TRUE,
 		TERM_FALSE,
+		TERM_BOOL,
+		TERM_ARROW,
 		NUM_TERM_TYPES
 	} type;
 	union {
@@ -147,6 +151,7 @@ struct term {
 		} nvar;
 		struct {
 			struct term *var;
+			struct term *type;
 			struct term *body;
 		} abs, nabs;
 		struct {
@@ -158,6 +163,10 @@ struct term {
 			struct term *when_t;
 			struct term *when_f;
 		} cond;
+		struct {
+			struct term *from;
+			struct term *to;
+		} arrow;
 	} as;
 } terms[2][TERMS_SPACE];
 size_t bank = 0;
@@ -177,16 +186,50 @@ struct term *parse_var(void)
 	return t;
 }
 
+struct term *parse_type(void)
+{
+	struct term *ty;
+	if (have(TOK_LPAREN)) {
+		consume(TOK_LPAREN);
+		ty = parse_type();
+		consume(TOK_RPAREN);
+	} else if (have(TOK_BOOL)) {
+		consume(TOK_BOOL);
+		ty = next_term++;
+		ty->type = TERM_BOOL;
+	} else {
+		PANIC("Unexpected token type %s\n", tok_desc[tok]);
+		return NULL;
+	}
+
+	// Handle arrow types (right-associative)
+	if (have(TOK_ARROW)) {
+		consume(TOK_ARROW);
+		struct term *from = ty;
+		struct term *to = parse_type();
+		ty = next_term++;
+		ty->type = TERM_ARROW;
+		ty->as.arrow.from = from;
+		ty->as.arrow.to = to;
+		return ty;
+	}
+
+	return ty;
+}
+
 struct term *parse_abs(void)
 {
 	consume(TOK_LAMBDA);
 	struct term *x = parse_var();
+	consume(TOK_COLON);
+	struct term *ty = parse_type();
 	consume(TOK_DOT);
 	struct term *t1 = parse_term();
 
 	struct term *t = next_term++;
 	t->type = TERM_ABS;
 	t->as.abs.var = x;
+	t->as.abs.type = ty;
 	t->as.abs.body = t1;
 	return t;
 }
@@ -251,6 +294,7 @@ struct term *parse_term(void)
 	if (t1 == NULL)
 		PANIC("Unexpected token type %s\n", tok_desc[tok]);
 
+	// Handle application (left-associative)
 	for (;;) {
 		struct term *t2 = parse_base_term();
 		if (t2 == NULL)
@@ -347,7 +391,7 @@ void remove_names(struct term *t)
 
 struct term *shift(struct term *t, int d, int c)
 {
-	// Makes a deep copy of t, shifted by d (initially, c = 0)
+	// Makes a deep copy of t, shifting de Bruijn indices by d (initially, c = 0)
 	struct term *new = next_term++;
 	new->type = t->type;
 	switch (t->type) {
@@ -360,6 +404,7 @@ struct term *shift(struct term *t, int d, int c)
 			new->as.nvar.idx += d;
 		return new;
 	case TERM_NABS:
+		new->as.nabs.type = shift(t->as.nabs.type, 0, c + 1);
 		new->as.nabs.body = shift(t->as.nabs.body, d, c + 1);
 		return new;
 	case TERM_APP:
@@ -374,6 +419,14 @@ struct term *shift(struct term *t, int d, int c)
 	case TERM_TRUE:
 		return new;
 	case TERM_FALSE:
+		return new;
+	// This function is also used just for its copying with d = 0,
+	// so it must be able to handle types as well as other terms.
+	case TERM_BOOL:
+		return new;
+	case TERM_ARROW:
+		new->as.arrow.from = t->as.arrow.from;
+		new->as.arrow.to = t->as.arrow.to;
 		return new;
 	default:
 		UNEXPECTED_TERM(t);
@@ -471,6 +524,92 @@ struct term *gc(struct term *t)
 }
 
 
+/******** Typing ********/
+
+bool type_eq(struct term *ty1, struct term *ty2)
+{
+	if (ty1 == NULL || ty2 == NULL)
+		return false;
+
+	if (ty1->type != ty2->type)
+		return false;
+
+	switch (ty1->type) {
+	case TERM_BOOL:
+		return true;
+	case TERM_ARROW:
+		if (!type_eq(ty1->as.arrow.from, ty2->as.arrow.from))
+			return false;
+		if (!type_eq(ty1->as.arrow.to, ty2->as.arrow.to))
+			return false;
+		return true;
+	default:
+		UNEXPECTED_TERM(ty1);
+		return false;
+	}
+}
+
+struct type_ctx {
+	struct term *type;
+	struct type_ctx *next;
+};
+
+struct term *type_ctx_lookup(struct type_ctx *gamma, intptr_t k)
+{
+	if (k < 0 || gamma == NULL)
+		return NULL;
+	if (k == 0)
+		return gamma->type;
+	return type_ctx_lookup(gamma->next, k - 1);
+}
+
+struct term *type_of(struct term *t, struct type_ctx *gamma)
+{
+	// The typing context Γ is a linked list generated on the fly
+	struct type_ctx gamma_prime;
+	gamma_prime.next = gamma;
+
+	struct term *ty = NULL, *ty1, *ty2, *ty3;
+	switch (t->type) {
+	case TERM_NVAR:
+		return type_ctx_lookup(gamma, t->as.nvar.idx);
+	case TERM_NABS:
+		ty = next_term++;
+		ty->type = TERM_ARROW;
+		ty->as.arrow.from = t->as.nabs.type;
+		gamma_prime.next = gamma;
+		gamma_prime.type = t->as.nabs.type;
+		ty->as.arrow.to = type_of(t->as.nabs.body, &gamma_prime);
+		return ty;
+	case TERM_APP:
+		ty1 = type_of(t->as.app.fun, gamma);
+		ty2 = type_of(t->as.app.arg, gamma);
+		if (ty1->type != TERM_ARROW)
+			return NULL;
+		if (type_eq(ty1->as.arrow.from, ty2))
+			return ty1->as.arrow.to;
+		return NULL;
+	case TERM_TRUE: // Fallthrough
+	case TERM_FALSE:
+		ty = next_term++;
+		ty->type = TERM_BOOL;
+		return ty;
+	case TERM_COND:
+		ty1 = type_of(t->as.cond.test, gamma);
+		if (ty1 == NULL || ty1->type != TERM_BOOL)
+			return NULL;
+		ty2 = type_of(t->as.cond.when_t, gamma);
+		ty3 = type_of(t->as.cond.when_f, gamma);
+		if (!type_eq(ty2, ty3))
+			return NULL;
+		return ty2;
+	default:
+		UNEXPECTED_TERM(t);
+		return NULL;
+	}
+}
+
+
 /******** Main ********/
 
 void lex_test(void)
@@ -501,6 +640,8 @@ void print_term(struct term *t)
 	case TERM_ABS:
 		printf("(λ");
 		print_term(t->as.abs.var);
+		printf(" : ");
+		print_term(t->as.abs.type);
 		printf(". ");
 		print_term(t->as.abs.body);
 		printf(")");
@@ -517,6 +658,8 @@ void print_term(struct term *t)
 		break;
 	case TERM_NABS:
 		printf("(λ ");
+		print_term(t->as.nabs.type);
+		printf(" ");
 		print_term(t->as.nabs.body);
 		printf(")");
 		break;
@@ -534,6 +677,16 @@ void print_term(struct term *t)
 		break;
 	case TERM_FALSE:
 		printf("false");
+		break;
+	case TERM_BOOL:
+		printf("Bool");
+		break;
+	case TERM_ARROW:
+		printf("(");
+		print_term(t->as.arrow.from);
+		printf(" -> ");
+		print_term(t->as.arrow.to);
+		printf(")");
 		break;
 	default:
 		UNEXPECTED_TERM(t);
@@ -557,6 +710,12 @@ int main()
 	printf("\n");
 
 	remove_names(t);
+
+	printf("Type: ");
+	struct term *ty = type_of(t, NULL);
+	print_term(ty);
+	printf("\n");
+
 	do {
 		t = gc(t);
 		print_term(t);
@@ -566,13 +725,13 @@ int main()
 	return 0;
 }
 
-// Arithmetic examples to try:
+// Typing examples to try:
 //
-// 2+2=4
-// (λplus. λc2. plus c2 c2) (λm.λn.λs.λz. m s (n s z)) (λs.λz. s (s z))
+// Bool -> Bool
+// λx:Bool. if x then true else false
 //
-// 2*3=6
-// (λtimes. λc2. λc3. times c2 c3) ((λplus. λc0. λm. λn. m (plus n) c0) (λm.λn.λs.λz. m s (n s z)) (λs.λz.z)) (λs.λz. s (s z)) (λs.λz. s (s (s z)))
+// Bool -> Bool -> Bool
+// λx:Bool. if x then (λy:Bool. if y then false else true) else (λz:Bool. z)
 //
-// 2^3=8
-// (λpow. λc2. λc3. pow c2 c3) (λm.λn. n m) (λs.λz. s (s z)) (λs.λz. s (s (s z)))
+// (Bool -> Bool) -> Bool -> Bool
+// λf : Bool->Bool. λx: Bool. if (f x) then false else true
