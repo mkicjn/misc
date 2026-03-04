@@ -589,7 +589,7 @@ struct term *type_of(struct term *t, struct type_ctx *gamma)
 	case TERM_APP:
 		ty1 = type_of(t->as.app.fun, gamma);
 		ty2 = type_of(t->as.app.arg, gamma);
-		if (ty1->type != TERM_ARROW)
+		if (ty1 == NULL || ty1->type != TERM_ARROW)
 			return NULL;
 		if (type_eq(ty1->as.arrow.from, ty2))
 			return ty1->as.arrow.to;
