@@ -449,6 +449,7 @@ struct term *subst(struct term *t, int k, struct term *v)
 		new->as.nvar.idx = t->as.nvar.idx;
 		return new;
 	case TERM_NABS:
+		new->as.nabs.type = shift(t->as.nabs.type, 0, 0);
 		new->as.nabs.body = subst(t->as.nabs.body, k + 1, shift(v, 1, 0));
 		return new;
 	case TERM_APP:
@@ -739,3 +740,6 @@ int main()
 //
 // (Bool -> Bool) -> Bool -> Bool
 // λf : Bool->Bool. λx: Bool. if (f x) then false else true
+//
+// Bool
+// (λf : Bool->Bool. λx: Bool. if (f x) then false else true) (λx: Bool. x) false
