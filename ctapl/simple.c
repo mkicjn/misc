@@ -297,17 +297,17 @@ struct term *parse_base_term(void)
 	case TOK_SUCC:
 		consume(TOK_SUCC);
 		t = new_term(TERM_SUCC);
-		t->as.succ.arg = parse_base_term();
+		t->as.succ.arg = parse_term();
 		return t;
 	case TOK_PRED:
 		consume(TOK_PRED);
 		t = new_term(TERM_PRED);
-		t->as.pred.arg = parse_base_term();
+		t->as.pred.arg = parse_term();
 		return t;
 	case TOK_ISZERO:
 		consume(TOK_ISZERO);
 		t = new_term(TERM_ISZERO);
-		t->as.iszero.arg = parse_base_term();
+		t->as.iszero.arg = parse_term();
 		return t;
 	default:
 		return NULL;
