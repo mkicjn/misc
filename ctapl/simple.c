@@ -24,11 +24,14 @@
 	X(IF, exact_match, "if") \
 	X(THEN, exact_match, "then") \
 	X(ELSE, exact_match, "else") \
+	X(ZERO, exact_match, "zero") \
 	X(SUCC, exact_match, "succ") \
-	X(ZERO, exact_match, "0") \
+	X(PRED, exact_match, "pred") \
+	X(ISZERO, exact_match, "iszero") \
 	X(LPAREN, exact_match, "(") \
 	X(RPAREN, exact_match, ")") \
 	X(BOOL, exact_match, "Bool") \
+	X(NAT, exact_match, "Nat") \
 	X(ARROW, exact_match, "->") \
 	X(NUMBER, sequence_of, NUMBER_CHARS) \
 	X(WORD, sequence_of, WORD_CHARS) \
@@ -139,6 +142,11 @@ struct term {
 		TERM_TRUE,
 		TERM_FALSE,
 		TERM_BOOL,
+		TERM_ZERO,
+		TERM_SUCC,
+		TERM_PRED,
+		TERM_ISZERO,
+		TERM_NAT,
 		TERM_ARROW,
 		NUM_TERM_TYPES
 	} type;
@@ -167,6 +175,9 @@ struct term {
 			struct term *from;
 			struct term *to;
 		} arrow;
+		struct {
+			struct term *arg;
+		} succ, pred, iszero;
 	} as;
 } terms[2][TERMS_SPACE];
 size_t bank = 0;
@@ -184,14 +195,21 @@ struct term *parse_term(void);
 struct term *parse_type(void)
 {
 	struct term *ty;
-	if (have(TOK_LPAREN)) {
+	switch (tok) {
+	case TOK_LPAREN:
 		consume(TOK_LPAREN);
 		ty = parse_type();
 		consume(TOK_RPAREN);
-	} else if (have(TOK_BOOL)) {
+		break;
+	case TOK_BOOL:
 		consume(TOK_BOOL);
 		ty = new_term(TERM_BOOL);
-	} else {
+		break;
+	case TOK_NAT:
+		consume(TOK_NAT);
+		ty = new_term(TERM_NAT);
+		break;
+	default:
 		PANIC("Unexpected token type %s\n", tok_desc[tok]);
 		return NULL;
 	}
@@ -254,6 +272,7 @@ struct term *parse_cond(void)
 
 struct term *parse_base_term(void)
 {
+	struct term *t;
 	switch (tok) {
 	case TOK_LAMBDA:
 		return parse_abs();
@@ -261,7 +280,7 @@ struct term *parse_base_term(void)
 		return parse_var();
 	case TOK_LPAREN:
 		consume(TOK_LPAREN);
-		struct term *t = parse_term();
+		t = parse_term();
 		consume(TOK_RPAREN);
 		return t;
 	case TOK_IF:
@@ -272,6 +291,24 @@ struct term *parse_base_term(void)
 	case TOK_FALSE:
 		consume(TOK_FALSE);
 		return new_term(TERM_FALSE);
+	case TOK_ZERO:
+		consume(TOK_ZERO);
+		return new_term(TERM_ZERO);
+	case TOK_SUCC:
+		consume(TOK_SUCC);
+		t = new_term(TERM_SUCC);
+		t->as.succ.arg = parse_term();
+		return t;
+	case TOK_PRED:
+		consume(TOK_PRED);
+		t = new_term(TERM_PRED);
+		t->as.pred.arg = parse_term();
+		return t;
+	case TOK_ISZERO:
+		consume(TOK_ISZERO);
+		t = new_term(TERM_ISZERO);
+		t->as.iszero.arg = parse_term();
+		return t;
 	default:
 		return NULL;
 	}
@@ -334,6 +371,17 @@ void remove_name(struct term *t, struct term *x, intptr_t level)
 		return;
 	case TERM_FALSE:
 		return;
+	case TERM_ZERO:
+		return;
+	case TERM_SUCC:
+		remove_name(t->as.succ.arg, x, level);
+		return;
+	case TERM_PRED:
+		remove_name(t->as.pred.arg, x, level);
+		return;
+	case TERM_ISZERO:
+		remove_name(t->as.iszero.arg, x, level);
+		return;
 	default:
 		UNEXPECTED_TERM(t);
 		return;
@@ -368,6 +416,17 @@ void remove_names(struct term *t)
 		return;
 	case TERM_FALSE:
 		return;
+	case TERM_ZERO:
+		return;
+	case TERM_SUCC:
+		remove_names(t->as.succ.arg);
+		return;
+	case TERM_PRED:
+		remove_names(t->as.pred.arg);
+		return;
+	case TERM_ISZERO:
+		remove_names(t->as.iszero.arg);
+		return;
 	default:
 		UNEXPECTED_TERM(t);
 		return;
@@ -382,9 +441,7 @@ struct term *shift(struct term *t, int d, int c)
 	// Makes a deep copy of t, shifting free de Bruijn indices by d (initially, c = 0)
 	struct term *new = new_term(t->type);
 	switch (t->type) {
-	case TERM_VAR:
-		new->as.var.name = t->as.var.name;
-		return new;
+	// Nameless variables and abstractions are special cases
 	case TERM_NVAR:
 		new->as.nvar.idx = t->as.nvar.idx;
 		if (t->as.nvar.idx >= c)
@@ -393,6 +450,10 @@ struct term *shift(struct term *t, int d, int c)
 	case TERM_NABS:
 		new->as.nabs.type = shift(t->as.nabs.type, 0, c + 1);
 		new->as.nabs.body = shift(t->as.nabs.body, d, c + 1);
+		return new;
+	// Most cases will simply involve recursing over subterms or otherwise copying data
+	case TERM_VAR:
+		new->as.var.name = t->as.var.name;
 		return new;
 	case TERM_APP:
 		new->as.app.fun = shift(t->as.app.fun, d, c);
@@ -407,13 +468,25 @@ struct term *shift(struct term *t, int d, int c)
 		return new;
 	case TERM_FALSE:
 		return new;
-	// This function is also used just for its copying with d = 0,
-	// so it must be able to handle types as well as other terms.
+	case TERM_ZERO:
+		return new;
+	case TERM_SUCC:
+		new->as.succ.arg = shift(t->as.succ.arg, d, c);
+		return new;
+	case TERM_PRED:
+		new->as.pred.arg = shift(t->as.succ.arg, d, c);
+		return new;
+	case TERM_ISZERO:
+		new->as.iszero.arg = shift(t->as.succ.arg, d, c);
+		return new;
+	// This function must also handle types, since it is used for copying with d = 0
 	case TERM_BOOL:
 		return new;
+	case TERM_NAT:
+		return new;
 	case TERM_ARROW:
-		new->as.arrow.from = t->as.arrow.from;
-		new->as.arrow.to = t->as.arrow.to;
+		new->as.arrow.from = shift(t->as.arrow.from, 0, c);
+		new->as.arrow.to = shift(t->as.arrow.to, 0, c);
 		return new;
 	default:
 		UNEXPECTED_TERM(t);
@@ -429,15 +502,17 @@ struct term *subst(struct term *t, int k, struct term *v)
 
 	struct term *new = new_term(t->type);
 	switch (t->type) {
-	case TERM_VAR:
-		new->as.var.name = t->as.var.name;
-		return new;
+	// Nameless variables and abstractions are special cases
 	case TERM_NVAR:
 		new->as.nvar.idx = t->as.nvar.idx;
 		return new;
 	case TERM_NABS:
 		new->as.nabs.type = shift(t->as.nabs.type, 0, 0);
 		new->as.nabs.body = subst(t->as.nabs.body, k + 1, shift(v, 1, 0));
+		return new;
+	// Most cases will simply involve recursing over subterms or otherwise copying data
+	case TERM_VAR:
+		new->as.var.name = t->as.var.name;
 		return new;
 	case TERM_APP:
 		new->as.app.fun = subst(t->as.app.fun, k, v);
@@ -451,6 +526,17 @@ struct term *subst(struct term *t, int k, struct term *v)
 	case TERM_TRUE:
 		return new;
 	case TERM_FALSE:
+		return new;
+	case TERM_ZERO:
+		return new;
+	case TERM_SUCC:
+		new->as.succ.arg = subst(t->as.succ.arg, k, v);
+		return new;
+	case TERM_PRED:
+		new->as.pred.arg = subst(t->as.pred.arg, k, v);
+		return new;
+	case TERM_ISZERO:
+		new->as.iszero.arg = subst(t->as.iszero.arg, k, v);
 		return new;
 	default:
 		UNEXPECTED_TERM(t);
@@ -497,6 +583,33 @@ bool reduce(struct term **tp)
 				return true;
 		}
 		return false;
+	case TERM_SUCC:
+		if (reduce(&t->as.succ.arg))
+			return true;
+		return false;
+	case TERM_PRED:
+		// TODO: Check properly for numeric values
+		if (reduce(&t->as.pred.arg))
+			return true;
+		if (t->as.pred.arg->type == TERM_ZERO) {
+			*tp = t->as.pred.arg;
+			return true;
+		} else if (t->as.pred.arg->type == TERM_SUCC) {
+			*tp = t->as.pred.arg->as.succ.arg;
+			return true;
+		}
+		return false;
+	case TERM_ISZERO:
+		if (reduce(&t->as.iszero.arg))
+			return true;
+		if (t->as.iszero.arg->type == TERM_ZERO) {
+			*tp = new_term(TERM_TRUE);
+			return true;
+		} else if (t->as.iszero.arg->type == TERM_SUCC) {
+			*tp = new_term(TERM_FALSE);
+			return true;
+		}
+		return false;
 	default:
 		return false;
 	}
@@ -523,6 +636,8 @@ bool type_eq(struct term *ty1, struct term *ty2)
 
 	switch (ty1->type) {
 	case TERM_BOOL:
+		return true;
+	case TERM_NAT:
 		return true;
 	case TERM_ARROW:
 		if (!type_eq(ty1->as.arrow.from, ty2->as.arrow.from))
@@ -580,7 +695,8 @@ struct term *type_of(struct term *t, struct type_ctx *gamma)
 		if (type_eq(ty1->as.arrow.from, ty2))
 			return ty1->as.arrow.to;
 		return NULL;
-	case TERM_TRUE: // Fallthrough
+	case TERM_TRUE:
+		return new_term(TERM_BOOL);
 	case TERM_FALSE:
 		return new_term(TERM_BOOL);
 	case TERM_COND:
@@ -592,6 +708,23 @@ struct term *type_of(struct term *t, struct type_ctx *gamma)
 		if (!type_eq(ty2, ty3))
 			return NULL;
 		return ty2;
+	case TERM_ZERO:
+		return new_term(TERM_NAT);
+	case TERM_SUCC:
+		ty1 = type_of(t->as.succ.arg, gamma);
+		if (ty1 == NULL || ty1->type != TERM_NAT)
+			return NULL;
+		return ty1;
+	case TERM_PRED:
+		ty1 = type_of(t->as.pred.arg, gamma);
+		if (ty1 == NULL || ty1->type != TERM_NAT)
+			return NULL;
+		return ty1;
+	case TERM_ISZERO:
+		ty1 = type_of(t->as.iszero.arg, gamma);
+		if (ty1 == NULL || ty1->type != TERM_NAT)
+			return NULL;
+		return new_term(TERM_BOOL);
 	default:
 		UNEXPECTED_TERM(t);
 		return NULL;
@@ -667,8 +800,29 @@ void print_term(struct term *t)
 	case TERM_FALSE:
 		printf("false");
 		break;
+	case TERM_ZERO:
+		printf("zero");
+		break;
+	case TERM_SUCC:
+		printf("(succ ");
+		print_term(t->as.succ.arg);
+		printf(")");
+		break;
+	case TERM_PRED:
+		printf("(pred ");
+		print_term(t->as.pred.arg);
+		printf(")");
+		break;
+	case TERM_ISZERO:
+		printf("(iszero ");
+		print_term(t->as.iszero.arg);
+		printf(")");
+		break;
 	case TERM_BOOL:
 		printf("Bool");
+		break;
+	case TERM_NAT:
+		printf("Nat");
 		break;
 	case TERM_ARROW:
 		printf("(");
