@@ -181,17 +181,19 @@ struct term *parse_abs(void)
 
 struct term *parse_base_term(void)
 {
-	if (have(TOK_LAMBDA)) {
+	switch (tok) {
+	case TOK_LAMBDA:
 		return parse_abs();
-	} else if (have(TOK_WORD)) {
+	case TOK_WORD:
 		return parse_var();
-	} else if (have(TOK_LPAREN)) {
+	case TOK_LPAREN:
 		consume(TOK_LPAREN);
 		struct term *t = parse_term();
 		consume(TOK_RPAREN);
 		return t;
+	default:
+		return NULL;
 	}
-	return NULL;
 }
 
 struct term *parse_term(void)

@@ -252,41 +252,29 @@ struct term *parse_cond(void)
 	return t;
 }
 
-struct term *parse_base_value(void)
-{
-	struct term *t = NULL;
-	switch (tok) {
-	case TOK_TRUE:
-		t = new_term(TERM_TRUE);
-		break;
-	case TOK_FALSE:
-		t = new_term(TERM_FALSE);
-		break;
-	default: // (Should never happen)
-		PANIC("Unexpected token type %s\n", tok_desc[tok]);
-		break;
-	}
-	consume(tok);
-	return t;
-}
-
 struct term *parse_base_term(void)
 {
-	if (have(TOK_LAMBDA)) {
+	switch (tok) {
+	case TOK_LAMBDA:
 		return parse_abs();
-	} else if (have(TOK_WORD)) {
+	case TOK_WORD:
 		return parse_var();
-	} else if (have(TOK_LPAREN)) {
+	case TOK_LPAREN:
 		consume(TOK_LPAREN);
 		struct term *t = parse_term();
 		consume(TOK_RPAREN);
 		return t;
-	} else if (have(TOK_IF))  {
+	case TOK_IF:
 		return parse_cond();
-	} else if (have(TOK_TRUE) || have(TOK_FALSE)) {
-		return parse_base_value();
+	case TOK_TRUE:
+		consume(TOK_TRUE);
+		return new_term(TERM_TRUE);
+	case TOK_FALSE:
+		consume(TOK_FALSE);
+		return new_term(TERM_FALSE);
+	default:
+		return NULL;
 	}
-	return NULL;
 }
 
 struct term *parse_term(void)
