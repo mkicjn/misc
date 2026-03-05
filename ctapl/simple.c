@@ -172,19 +172,14 @@ struct term {
 size_t bank = 0;
 struct term *next_term = terms[0];
 
-struct term *parse_term(void);
-
-struct term *parse_var(void)
+static inline struct term *new_term(enum term_type ty)
 {
-	expect(TOK_WORD);
-	char *x = intern(tok_buf, tok_len);
-	consume(TOK_WORD);
-
 	struct term *t = next_term++;
-	t->type = TERM_VAR;
-	t->as.var.name = x;
+	t->type = ty;
 	return t;
 }
+
+struct term *parse_term(void);
 
 struct term *parse_type(void)
 {
@@ -195,8 +190,7 @@ struct term *parse_type(void)
 		consume(TOK_RPAREN);
 	} else if (have(TOK_BOOL)) {
 		consume(TOK_BOOL);
-		ty = next_term++;
-		ty->type = TERM_BOOL;
+		ty = new_term(TERM_BOOL);
 	} else {
 		PANIC("Unexpected token type %s\n", tok_desc[tok]);
 		return NULL;
@@ -207,13 +201,23 @@ struct term *parse_type(void)
 		consume(TOK_ARROW);
 		struct term *from = ty;
 		struct term *to = parse_type();
-		ty = next_term++;
-		ty->type = TERM_ARROW;
+		ty = new_term(TERM_ARROW);
 		ty->as.arrow.from = from;
 		ty->as.arrow.to = to;
 	}
 
 	return ty;
+}
+
+struct term *parse_var(void)
+{
+	expect(TOK_WORD);
+	char *x = intern(tok_buf, tok_len);
+	consume(TOK_WORD);
+
+	struct term *t = new_term(TERM_VAR);
+	t->as.var.name = x;
+	return t;
 }
 
 struct term *parse_abs(void)
@@ -225,8 +229,7 @@ struct term *parse_abs(void)
 	consume(TOK_DOT);
 	struct term *t1 = parse_term();
 
-	struct term *t = next_term++;
-	t->type = TERM_ABS;
+	struct term *t = new_term(TERM_ABS);
 	t->as.abs.var = x;
 	t->as.abs.type = ty;
 	t->as.abs.body = t1;
@@ -242,8 +245,7 @@ struct term *parse_cond(void)
 	consume(TOK_ELSE);
 	struct term *when_f = parse_term();
 
-	struct term *t = next_term++;
-	t->type = TERM_COND;
+	struct term *t = new_term(TERM_COND);
 	t->as.cond.test = test;
 	t->as.cond.when_t = when_t;
 	t->as.cond.when_f = when_f;
@@ -252,13 +254,13 @@ struct term *parse_cond(void)
 
 struct term *parse_base_value(void)
 {
-	struct term *t = next_term++;
+	struct term *t = NULL;
 	switch (tok) {
 	case TOK_TRUE:
-		t->type = TERM_TRUE;
+		t = new_term(TERM_TRUE);
 		break;
 	case TOK_FALSE:
-		t->type = TERM_FALSE;
+		t = new_term(TERM_FALSE);
 		break;
 	default: // (Should never happen)
 		PANIC("Unexpected token type %s\n", tok_desc[tok]);
@@ -299,8 +301,7 @@ struct term *parse_term(void)
 		if (t2 == NULL)
 			break;
 
-		struct term *app = next_term++;
-		app->type = TERM_APP;
+		struct term *app = new_term(TERM_APP);
 		app->as.app.fun = t1;
 		app->as.app.arg = t2;
 		t1 = app;
@@ -390,9 +391,8 @@ void remove_names(struct term *t)
 
 struct term *shift(struct term *t, int d, int c)
 {
-	// Makes a deep copy of t, shifting de Bruijn indices by d (initially, c = 0)
-	struct term *new = next_term++;
-	new->type = t->type;
+	// Makes a deep copy of t, shifting free de Bruijn indices by d (initially, c = 0)
+	struct term *new = new_term(t->type);
 	switch (t->type) {
 	case TERM_VAR:
 		new->as.var.name = t->as.var.name;
@@ -439,8 +439,7 @@ struct term *subst(struct term *t, int k, struct term *v)
 	if (t->type == TERM_NVAR && t->as.nvar.idx == k)
 		return v;
 
-	struct term *new = next_term++;
-	new->type = t->type;
+	struct term *new = new_term(t->type);
 	switch (t->type) {
 	case TERM_VAR:
 		new->as.var.name = t->as.var.name;
@@ -581,8 +580,7 @@ struct term *type_of(struct term *t, struct type_ctx *gamma)
 		ty2 = type_of(t->as.nabs.body, &gamma_prime);
 		if (ty2 == NULL)
 			return NULL;
-		ty = next_term++;
-		ty->type = TERM_ARROW;
+		ty = new_term(TERM_ARROW);
 		ty->as.arrow.from = ty1;
 		ty->as.arrow.to = ty2;
 		return ty;
@@ -596,9 +594,7 @@ struct term *type_of(struct term *t, struct type_ctx *gamma)
 		return NULL;
 	case TERM_TRUE: // Fallthrough
 	case TERM_FALSE:
-		ty = next_term++;
-		ty->type = TERM_BOOL;
-		return ty;
+		return new_term(TERM_BOOL);
 	case TERM_COND:
 		ty1 = type_of(t->as.cond.test, gamma);
 		if (ty1 == NULL || ty1->type != TERM_BOOL)
