@@ -3,9 +3,32 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <poll.h>
 #include <time.h>
-#include <limits.h>
+#include <sys/random.h>
+
+/* ******** Pseudo-random Number Generation ******** */
+
+uint64_t splitmix64_ctr(uint64_t key, uint64_t ctr)
+{
+	uint64_t z = (key + ctr * 0x9e3779b97f4a7c15);
+	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+	z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+	return z ^ (z >> 31);
+}
+
+uint64_t global_key = 0xdeadbeef;
+uint64_t cbrng(uint64_t key, uint64_t ctr)
+{
+	return splitmix64_ctr(global_key + key, ctr);
+}
+
+double cbrngf(uint64_t key, uint64_t ctr)
+{
+	return (cbrng(key, ctr) >> 11) * 0x1.0p-53;
+}
+
 
 /* ******** Time Utilities ******** */
 
@@ -113,16 +136,6 @@ static inline void set_position(long e, int x, int y)
 	position[e].y = y;
 }
 
-long entity_at(int x, int y)
-{
-	// FIXME: Will return entities that are not visible (or any other desired property)
-	//        Need something at least marginally more sophisticated.
-	for (long e = 0; e < entities; e++)
-		if (position[e].en && position[e].x == x && position[e].y == y)
-			return e;
-	return -1;
-}
-
 
 /* ******** Drawing ******** */
 
@@ -157,12 +170,19 @@ void draw_loc(int x, int y)
 	if (!in_bounds(x, y))
 		return;
 
-	long e = entity_at(x, y);
+	long e;
+	for (e = 0; e < entities; e++) {
+		if (!position[e].en || !appearance[e].en)
+			continue;
+		if (position[e].x == x && position[e].y == y)
+			break;
+	}
+
 	cur_pos(x, y);
-	if (e < 0)
-		draw_glyph(ground_glyph(x, y));
-	else
+	if (e < entities)
 		draw_glyph(appearance[e].glyph);
+	else
+		draw_glyph(ground_glyph(x, y));
 }
 
 void draw_all(void)
@@ -181,6 +201,17 @@ void draw_all(void)
 
 /* ******** More Components ******** */
 
+// RNG counters
+struct {
+	//bool en; // (Always enabled)
+	uint64_t ctr;
+} rng[MAX_ENTITIES];
+
+uint64_t entity_rand(long e)
+{
+	return cbrng(e, rng[e].ctr++);
+}
+
 // Motility
 struct {
 	bool en;
@@ -194,7 +225,7 @@ void set_motility(long e, void (*style)(long self), int tempo)
 	motility[e].en = true;
 	motility[e].style = style;
 	motility[e].tempo = tempo;
-	motility[e].timer = tempo;
+	motility[e].timer = tempo - 1;
 }
 
 void trigger_motility(void)
@@ -223,14 +254,13 @@ void move_entity(long e, unsigned char dir)
 
 void wander(long self)
 {
-	// FIXME: An entity with tempo k/2 does not always move at the same time as one at tempo k - why?
 	if (!motility[self].en)
 		return;
 	if (motility[self].timer --> 0)
 		return;
 
-	move_entity(self, '1' + rand() % 9); // TODO: Better RNG
-	motility[self].timer = motility[self].tempo;
+	move_entity(self, '1' + entity_rand(self) % 9);
+	motility[self].timer = motility[self].tempo - 1;
 }
 
 
@@ -306,6 +336,7 @@ int main()
 	make_wanderer("\033[0;31m@", 2 * WIDTH / 3,     HEIGHT / 3, 16);
 	make_wanderer("\033[0;31m@", 2 * WIDTH / 3, 2 * HEIGHT / 3, 32);
 
+	//getrandom(&global_key, sizeof(global_key), 0);
 	install_signal_handlers();
 	screen_init();
 	draw_all();
