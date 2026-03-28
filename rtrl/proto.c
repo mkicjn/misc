@@ -108,7 +108,9 @@ long entities = 0;
 
 static inline long new_entity(void)
 {
-	return entities++; // TODO: OOM handling
+	if (entities < MAX_ENTITIES)
+		return entities++;
+	return -1;
 }
 
 // Appearance
@@ -119,6 +121,9 @@ struct {
 
 static inline void set_appearance(long e, const char *glyph)
 {
+	if (e < 0)
+		return;
+
 	appearance[e].en = true;
 	appearance[e].glyph = glyph;
 }
@@ -131,6 +136,9 @@ struct {
 
 static inline void set_position(long e, int x, int y)
 {
+	if (e < 0)
+		return;
+
 	position[e].en = true;
 	position[e].x = x;
 	position[e].y = y;
@@ -147,7 +155,7 @@ void draw_glyph(const char *glyph)
 
 void draw_entity(long e)
 {
-	if (!appearance[e].en || !position[e].en)
+	if (e < 0 || !appearance[e].en || !position[e].en)
 		return;
 
 	int x = position[e].x, y = position[e].y;
@@ -209,6 +217,9 @@ struct {
 
 uint64_t entity_rand(long e)
 {
+	if (e < 0)
+		return 0;
+
 	return cbrng(e, rng[e].ctr++);
 }
 
@@ -222,6 +233,9 @@ struct {
 
 void set_motility(long e, void (*style)(long self), int tempo)
 {
+	if (e < 0)
+		return;
+
 	motility[e].en = true;
 	motility[e].style = style;
 	motility[e].tempo = tempo;
@@ -237,7 +251,7 @@ void trigger_motility(void)
 
 void move_entity(long e, unsigned char dir)
 {
-	if (!position[e].en)
+	if (e < 0 || !position[e].en)
 		return;
 
 	int dx = 0, dy = 0;
@@ -344,11 +358,16 @@ int main()
 	unsigned long reflex = 16;
 	unsigned long next_tick = msec() + reflex;
 	while (!quit) {
-		int input = 0;
-		unsigned long timeout = next_tick - msec();
-		if (poll(&in, 1, timeout < 1 ? 1 : timeout) > 0)
-			input = getchar();
+		if (msec() >= next_tick) {
+			next_tick += reflex;
+			trigger_all();
+		}
 
+		int timeout = next_tick - msec();
+		if (poll(&in, 1, timeout < 0 ? 0 : timeout) <= 0)
+			continue;
+
+		int input = getchar();
 		switch (input) {
 		case 0:
 			break;
@@ -359,12 +378,6 @@ int main()
 		default:
 			move_entity(player, input);
 			break;
-		}
-
-		unsigned long now = msec();
-		if (now > next_tick) {
-			next_tick = now + reflex;
-			trigger_all();
 		}
 	}
 
