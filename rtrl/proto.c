@@ -42,36 +42,36 @@ unsigned long msec(void)
 
 /* ******** Screen Utilities ******** */
 
-#define WIDTH 80
-#define HEIGHT 23
+#define SCREEN_WIDTH 80
+#define SCREEN_HEIGHT 23
 
-static inline bool in_bounds(int x, int y)
+static inline bool on_screen(int x, int y)
 {
-	return (0 <= x && x < WIDTH) && (0 <= y && y < HEIGHT);
+	return (0 <= x && x < SCREEN_WIDTH) && (0 <= y && y < SCREEN_HEIGHT);
 }
 
-static inline void cur_pos(int x, int y)
+static inline bool cursor_pos(int x, int y)
 {
 	printf("\033[%d;%dH", y+1, x+1);
+	return on_screen(x, y);
 }
 
 static inline void clear_screen(void)
 {
 	printf("\033[2J");
+	cursor_pos(0, 0);
 }
 
 void screen_init(void)
 {
 	system("stty raw -echo isig");
 	printf("\033[?25l");
-
 	clear_screen();
-	cur_pos(0, 0);
 }
 
 void screen_deinit(void)
 {
-	cur_pos(0, HEIGHT);
+	cursor_pos(0, SCREEN_HEIGHT);
 
 	printf("\033[?25h");
 	system("stty sane");
@@ -100,6 +100,12 @@ static inline void apply_dir(int dir, int *xp, int *yp)
 	*yp += dy[dir & 0xff];
 }
 
+void put_glyph(const char *glyph)
+{
+	printf("%s", glyph);
+	fflush(stdout);
+}
+
 
 /* ******** Entities and Basic Components ******** */
 
@@ -119,91 +125,149 @@ struct {
 	const char *glyph;
 } appearance[MAX_ENTITIES];
 
-static inline void set_appearance(long e, const char *glyph)
+static inline long set_appearance(long e, const char *glyph)
 {
 	if (e < 0)
-		return;
+		return e;
 
 	appearance[e].en = true;
 	appearance[e].glyph = glyph;
+	return e;
 }
 
 // Position
 struct {
 	bool en;
 	int x, y;
+	long sector;
 } position[MAX_ENTITIES];
 
-static inline void set_position(long e, int x, int y)
+static inline long set_position(long e, int x, int y, long sector)
 {
 	if (e < 0)
-		return;
+		return e;
 
 	position[e].en = true;
 	position[e].x = x;
 	position[e].y = y;
+	position[e].sector = sector;
+	return e;
 }
 
 
-/* ******** Drawing ******** */
+/* ******** Sectors ******** */
+// TODO: Portals
 
-void draw_glyph(const char *glyph)
+struct {
+	bool en;
+	int width, height;
+} sector[MAX_ENTITIES];
+
+static inline long set_sector(long s, int width, int height)
 {
-	printf("%s", glyph);
-	fflush(stdout);
+	if (s < 0)
+		return s;
+
+	sector[s].en = true;
+	sector[s].width = width;
+	sector[s].height = height;
+	return s;
 }
 
-void draw_entity(long e)
+bool in_sector(long s, int x, int y)
 {
-	if (e < 0 || !appearance[e].en || !position[e].en)
+	if (s < 0 || !sector[s].en)
+		return false;
+
+	return (0 <= x && x < sector[s].width)
+		&& (0 <= y && y < sector[s].height);
+}
+
+void draw_sector_background(long s)
+{
+	if (s < 0 || !sector[s].en || !position[s].en || !appearance[s].en)
 		return;
 
-	int x = position[e].x, y = position[e].y;
-	if (!in_bounds(x, y))
+	int x0 = position[s].x, y0 = position[s].y;
+	for (int y = y0; y < y0 + sector[s].height; y++) {
+		for (int x = x0; x < x0 + sector[s].width; x++) {
+			if (cursor_pos(x, y))
+				put_glyph(appearance[s].glyph);
+		}
+	}
+}
+
+void draw_sector_entities(long s)
+{
+	if (s < 0 || !sector[s].en || !position[s].en)
 		return;
 
-	cur_pos(x, y);
-	draw_glyph(appearance[e].glyph);
+	for (long e = 0; e < entities; e++) {
+		if (!appearance[e].en || !position[e].en || position[e].sector != s)
+			continue;
+		if (!in_sector(s, position[e].x, position[e].y))
+			continue;
+		int x = position[s].x + position[e].x;
+		int y = position[s].y + position[e].y;
+		if (cursor_pos(x, y))
+			put_glyph(appearance[e].glyph);
+	}
 }
 
-const char *ground_glyph(int x, int y)
+void draw_sector(long s)
 {
-	(void)x;
-	(void)y;
-	return "\033[0;32m_";
+	draw_sector_background(s);
+	draw_sector_entities(s);
 }
 
-void draw_loc(int x, int y)
+void redraw_all(void)
 {
-	if (!in_bounds(x, y))
+	clear_screen();
+	for (int s = 0; s < entities; s++) {
+		if (!sector[s].en)
+			continue;
+		draw_sector(s);
+	}
+}
+
+void redraw_at(long s, int x, int y)
+{
+	if (s < 0 || !in_sector(s, x, y))
+		return;
+	if (!cursor_pos(position[s].x + x, position[s].y + y))
 		return;
 
 	long e;
 	for (e = 0; e < entities; e++) {
-		if (!position[e].en || !appearance[e].en)
+		if (!position[e].en || !appearance[e].en || position[e].sector != s)
 			continue;
-		if (position[e].x == x && position[e].y == y)
+		if (position[e].sector == s && position[e].x == x && position[e].y == y)
 			break;
 	}
 
-	cur_pos(x, y);
 	if (e < entities)
-		draw_glyph(appearance[e].glyph);
+		put_glyph(appearance[e].glyph);
+	else if (appearance[s].en)
+		put_glyph(appearance[s].glyph);
 	else
-		draw_glyph(ground_glyph(x, y));
+		put_glyph("\033[m ");
 }
 
-void draw_all(void)
+void redraw_entity(long e)
 {
-	cur_pos(0, 0);
-	for (int y = 0; y < HEIGHT; y++) {
-		for (int x = 0; x < WIDTH; x++)
-			draw_glyph(ground_glyph(x, y));
-		printf("\r\n");
-	}
+	if (e < 0 || !position[e].en || !appearance[e].en)
+		return;
 
-	for (long e = 0; e < entities; e++)
-		draw_entity(e);
+	long s = position[e].sector;
+	if (s < 0 || !position[s].en)
+		return;
+
+	long x = position[s].x + position[e].x;
+	long y = position[s].y + position[e].y;
+	if (!cursor_pos(x, y))
+		return;
+
+	put_glyph(appearance[e].glyph);
 }
 
 
@@ -223,30 +287,36 @@ uint64_t entity_rand(long e)
 	return cbrng(e, rng[e].ctr++);
 }
 
-// Motility
+// Animacy
 struct {
 	bool en;
-	void (*style)(long self);
+	void (*think)(long self);
 	int tempo;
 	int timer;
-} motility[MAX_ENTITIES];
+} animacy[MAX_ENTITIES];
 
-void set_motility(long e, void (*style)(long self), int tempo)
+static inline long set_animacy(long e, void (*think)(long self), int tempo)
 {
 	if (e < 0)
-		return;
+		return e;
 
-	motility[e].en = true;
-	motility[e].style = style;
-	motility[e].tempo = tempo;
-	motility[e].timer = tempo - 1;
+	animacy[e].en = true;
+	animacy[e].think = think;
+	animacy[e].tempo = tempo;
+	animacy[e].timer = tempo - 1;
+	return e;
 }
 
-void trigger_motility(void)
+void trigger_animacy(void)
 {
-	for (long e = 0; e < entities; e++)
-		if (motility[e].en)
-			motility[e].style(e);
+	for (long e = 0; e < entities; e++) {
+		if (!animacy[e].en)
+			continue;
+		if (animacy[e].timer --> 0)
+			continue;
+		animacy[e].timer = animacy[e].tempo - 1;
+		animacy[e].think(e);
+	}
 }
 
 void move_entity(long e, unsigned char dir)
@@ -256,25 +326,28 @@ void move_entity(long e, unsigned char dir)
 
 	int dx = 0, dy = 0;
 	apply_dir(dir, &dx, &dy);
+	if (dx == 0 && dy == 0)
+		return;
 
+	long s = position[e].sector;
 	int x = position[e].x, y = position[e].y;
-	if ((dx || dy) && in_bounds(x + dx, y + dy)) {
-		position[e].x += dx;
-		position[e].y += dy;
-		draw_entity(e);
-		draw_loc(x, y);
+	if (s < 0 || !in_sector(s, x + dx, y + dy))
+		return;
+
+	position[e].x += dx;
+	position[e].y += dy;
+
+	if (sector[e].en) {
+		redraw_all();
+	} else {
+		redraw_at(s, x, y);
+		redraw_entity(e);
 	}
 }
 
 void wander(long self)
 {
-	if (!motility[self].en)
-		return;
-	if (motility[self].timer --> 0)
-		return;
-
 	move_entity(self, '1' + entity_rand(self) % 9);
-	motility[self].timer = motility[self].tempo - 1;
 }
 
 
@@ -297,8 +370,7 @@ void signal_handler(int signo)
 			quit = true;
 		break;
 	case SIGWINCH:
-		clear_screen();
-		draw_all();
+		redraw_all();
 		break;
 	default:
 		die();
@@ -315,26 +387,27 @@ void install_signal_handlers(void)
 }
 
 
+
 /* ******** Main ******** */
 
 void trigger_all(void)
 {
 	// Trigger all components with runtime behavior
-	trigger_motility();
+	trigger_animacy();
 }
 
-long make_inert(const char *glyph, int x, int y)
+long make_inert(const char *glyph, int x, int y, long s)
 {
 	long e = new_entity();
 	set_appearance(e, glyph);
-	set_position(e, x, y);
+	set_position(e, x, y, s);
 	return e;
 }
 
-long make_wanderer(const char *glyph, int x, int y, int tempo)
+long make_wanderer(const char *glyph, int x, int y, long s, int tempo)
 {
-	long e = make_inert(glyph, x, y);
-	set_motility(e, wander, tempo);
+	long e = make_inert(glyph, x, y, s);
+	set_animacy(e, wander, tempo);
 	return e;
 }
 
@@ -344,16 +417,27 @@ int main()
 	in.fd = fileno(stdin);
 	in.events = POLLIN;
 
-	long player = make_inert("\033[0;34m@", WIDTH / 2, HEIGHT / 2);
-	make_wanderer("\033[0;31m@",     WIDTH / 3,     HEIGHT / 3, 4);
-	make_wanderer("\033[0;31m@",     WIDTH / 3, 2 * HEIGHT / 3, 8);
-	make_wanderer("\033[0;31m@", 2 * WIDTH / 3,     HEIGHT / 3, 16);
-	make_wanderer("\033[0;31m@", 2 * WIDTH / 3, 2 * HEIGHT / 3, 32);
+	long substrate = new_entity();
+	set_sector(substrate, 4, 4);
+	set_position(substrate, 0, 0, -1);
 
-	//getrandom(&global_key, sizeof(global_key), 0);
+	long world = new_entity();
+	set_sector(world, SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4);
+	set_position(world, 2, 2, substrate);
+	set_appearance(world, "\033[0;32m\"");
+	set_animacy(world, wander, 100);
+
+	make_wanderer("\033[0;31m@",     sector[world].width / 3,     sector[world].height / 3, world, 8);
+	make_wanderer("\033[0;31m@", 2 * sector[world].width / 3,     sector[world].height / 3, world, 16);
+	make_wanderer("\033[0;31m@",     sector[world].width / 3, 2 * sector[world].height / 3, world, 32);
+	make_wanderer("\033[0;31m@", 2 * sector[world].width / 3, 2 * sector[world].height / 3, world, 64);
+
+	long player = make_inert("\033[0;34m@", sector[world].width / 2, sector[world].height / 2, world);
+
+	getrandom(&global_key, sizeof(global_key), 0);
 	install_signal_handlers();
 	screen_init();
-	draw_all();
+	redraw_all();
 
 	unsigned long reflex = 16;
 	unsigned long next_tick = msec() + reflex;
