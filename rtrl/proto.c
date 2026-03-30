@@ -273,14 +273,27 @@ void redraw_entity(long e)
 
 // RNG counters
 struct {
-	//bool en; // (Always enabled)
+	bool en;
 	uint64_t ctr;
 } rng[MAX_ENTITIES];
+
+static inline long set_rng(long e, uint64_t ctr)
+{
+	if (e < 0)
+		return e;
+
+	rng[e].en = true;
+	rng[e].ctr = ctr;
+	return e;
+}
 
 uint64_t entity_rand(long e)
 {
 	if (e < 0)
 		return 0;
+
+	if (!rng[e].en) // https://xkcd.com/221
+		return cbrng(e, rng[e].ctr);
 
 	return cbrng(e, rng[e].ctr++);
 }
@@ -289,19 +302,19 @@ uint64_t entity_rand(long e)
 struct {
 	bool en;
 	void (*think)(long self);
-	int tempo;
+	int period;
 	int timer;
 } animacy[MAX_ENTITIES];
 
-static inline long set_animacy(long e, void (*think)(long self), int tempo)
+static inline long set_animacy(long e, void (*think)(long self), int period)
 {
 	if (e < 0)
 		return e;
 
 	animacy[e].en = true;
 	animacy[e].think = think;
-	animacy[e].tempo = tempo;
-	animacy[e].timer = tempo - 1;
+	animacy[e].period = period;
+	animacy[e].timer = period - 1;
 	return e;
 }
 
@@ -312,7 +325,7 @@ void trigger_animacy(void)
 			continue;
 		if (animacy[e].timer --> 0)
 			continue;
-		animacy[e].timer = animacy[e].tempo - 1;
+		animacy[e].timer = animacy[e].period - 1;
 		animacy[e].think(e);
 	}
 }
@@ -402,10 +415,11 @@ long make_inert(const char *glyph, int x, int y, long s)
 	return e;
 }
 
-long make_wanderer(const char *glyph, int x, int y, long s, int tempo)
+long make_wanderer(const char *glyph, int x, int y, long s, int period)
 {
 	long e = make_inert(glyph, x, y, s);
-	set_animacy(e, wander, tempo);
+	set_animacy(e, wander, period);
+	set_rng(e, 0);
 	return e;
 }
 
