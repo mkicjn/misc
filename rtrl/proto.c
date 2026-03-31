@@ -137,10 +137,9 @@ static inline long set_appearance(long e, const char *glyph)
 struct {
 	bool en;
 	int x, y;
-	long sector;
 } position[MAX_ENTITIES];
 
-static inline long set_position(long e, int x, int y, long sector)
+static inline long set_position(long e, int x, int y)
 {
 	if (e < 0)
 		return e;
@@ -148,14 +147,10 @@ static inline long set_position(long e, int x, int y, long sector)
 	position[e].en = true;
 	position[e].x = x;
 	position[e].y = y;
-	position[e].sector = sector;
 	return e;
 }
 
-
-/* ******** Sectors ******** */
-// TODO: Portals
-
+// Sector
 struct {
 	bool en;
 	int width, height;
@@ -174,14 +169,36 @@ static inline long set_sector(long s, int width, int height)
 
 bool in_sector(long s, int x, int y)
 {
-	if (s < 0 || !sector[s].en)
+	if (s < 0 || !sector[s].en || !position[s].en)
 		return false;
 
-	return (0 <= x && x < sector[s].width)
-		&& (0 <= y && y < sector[s].height);
+	int x0 = position[s].x, x1 = x0 + sector[s].width;
+	int y0 = position[s].y, y1 = y0 + sector[s].height;
+	return ((x0 <= x && x < x1) && (y0 <= y && y < y1));
 }
 
-void draw_sector_background(long s)
+// Bounded
+struct {
+	bool en;
+	long sector;
+} bounded[MAX_ENTITIES];
+
+static inline long set_bounded(long e, long s)
+{
+	if (e < 0 || s < 0 || !sector[s].en)
+		return e;
+
+	bounded[e].en = true;
+	bounded[e].sector = s;
+	return e;
+}
+
+// TODO: Portals, to connect sectors
+
+
+/* ******** Drawing ******** */
+
+void draw_sector(long s)
 {
 	if (s < 0 || !sector[s].en || !position[s].en || !appearance[s].en)
 		return;
@@ -195,77 +212,32 @@ void draw_sector_background(long s)
 	}
 }
 
-void draw_sector_entities(long s)
+void draw_entity(long e)
 {
-	if (s < 0 || !sector[s].en || !position[s].en)
+	if (e < 0 || !appearance[e].en || !position[e].en)
 		return;
 
-	for (long e = 0; e < entities; e++) {
-		if (!appearance[e].en || !position[e].en || position[e].sector != s)
-			continue;
-		if (!in_sector(s, position[e].x, position[e].y))
-			continue;
-		int x = position[s].x + position[e].x;
-		int y = position[s].y + position[e].y;
-		if (cursor_pos(x, y))
+	if (sector[e].en) {
+		draw_sector(e);
+	} else {
+		if (cursor_pos(position[e].x, position[e].y))
 			fputs(appearance[e].glyph, stdout);
 	}
 }
 
-void draw_sector(long s)
-{
-	draw_sector_background(s);
-	draw_sector_entities(s);
-}
-
-void redraw_all(void)
+void draw_all(void)
 {
 	clear_screen();
 	for (int s = 0; s < entities; s++) {
-		if (!sector[s].en)
-			continue;
-		draw_sector(s);
-	}
-}
-
-void redraw_at(long s, int x, int y)
-{
-	if (s < 0 || !in_sector(s, x, y))
-		return;
-	if (!cursor_pos(position[s].x + x, position[s].y + y))
-		return;
-
-	long e;
-	for (e = 0; e < entities; e++) {
-		if (!position[e].en || !appearance[e].en || position[e].sector != s)
-			continue;
-		if (position[e].sector == s && position[e].x == x && position[e].y == y)
-			break;
+		if (sector[s].en)
+			draw_entity(s);
 	}
 
-	if (e < entities)
-		fputs(appearance[e].glyph, stdout);
-	else if (appearance[s].en)
-		fputs(appearance[s].glyph, stdout);
-	else
-		fputs("\033[m ", stdout);
-}
-
-void redraw_entity(long e)
-{
-	if (e < 0 || !position[e].en || !appearance[e].en)
-		return;
-
-	long s = position[e].sector;
-	if (s < 0 || !position[s].en)
-		return;
-
-	long x = position[s].x + position[e].x;
-	long y = position[s].y + position[e].y;
-	if (!cursor_pos(x, y))
-		return;
-
-	fputs(appearance[e].glyph, stdout);
+	for (int e = 0; e < entities; e++) {
+		if (!sector[e].en)
+			draw_entity(e);
+	}
+	fflush(stdout);
 }
 
 
@@ -340,20 +312,13 @@ void move_entity(long e, unsigned char dir)
 	if (dx == 0 && dy == 0)
 		return;
 
-	long s = position[e].sector;
-	int x = position[e].x, y = position[e].y;
-	if (s < 0 || !in_sector(s, x + dx, y + dy))
+	int x = position[e].x + dx;
+	int y = position[e].y + dy;
+	if (bounded[e].en && !in_sector(bounded[e].sector, x, y))
 		return;
 
-	position[e].x += dx;
-	position[e].y += dy;
-
-	if (sector[e].en) {
-		redraw_all();
-	} else {
-		redraw_at(s, x, y);
-		redraw_entity(e);
-	}
+	position[e].x = x;
+	position[e].y = y;
 }
 
 void wander(long self)
@@ -381,7 +346,7 @@ void signal_handler(int signo)
 			quit = true;
 		break;
 	case SIGWINCH:
-		redraw_all();
+		draw_all();
 		break;
 	default:
 		die();
@@ -411,7 +376,8 @@ long make_inert(const char *glyph, int x, int y, long s)
 {
 	long e = new_entity();
 	set_appearance(e, glyph);
-	set_position(e, x, y, s);
+	set_position(e, x, y);
+	set_bounded(e, s);
 	return e;
 }
 
@@ -430,26 +396,27 @@ int main()
 	in.events = POLLIN;
 
 	long substrate = new_entity();
+	set_position(substrate, 0, 0);
 	set_sector(substrate, 4, 4);
-	set_position(substrate, 0, 0, -1);
 
 	long world = new_entity();
 	set_sector(world, SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4);
-	set_position(world, 2, 2, substrate);
+	set_position(world, 2, 2);
+	set_bounded(world, substrate);
 	set_appearance(world, "\033[0;32m\"");
 	set_animacy(world, wander, 100);
+	set_rng(world, 0);
 
-	make_wanderer("\033[0;31m@",     sector[world].width / 3,     sector[world].height / 3, world, 8);
-	make_wanderer("\033[0;33m@", 2 * sector[world].width / 3,     sector[world].height / 3, world, 16);
-	make_wanderer("\033[0;35m@",     sector[world].width / 3, 2 * sector[world].height / 3, world, 32);
-	make_wanderer("\033[0;36m@", 2 * sector[world].width / 3, 2 * sector[world].height / 3, world, 64);
+	make_wanderer("\033[0;31m@",     SCREEN_WIDTH / 3,     SCREEN_HEIGHT / 3, world, 8);
+	make_wanderer("\033[0;33m@", 2 * SCREEN_WIDTH / 3,     SCREEN_HEIGHT / 3, world, 16);
+	make_wanderer("\033[0;35m@",     SCREEN_WIDTH / 3, 2 * SCREEN_HEIGHT / 3, world, 32);
+	make_wanderer("\033[0;36m@", 2 * SCREEN_WIDTH / 3, 2 * SCREEN_HEIGHT / 3, world, 64);
 
-	long player = make_inert("\033[0;34m@", sector[world].width / 2, sector[world].height / 2, world);
+	long player = make_inert("\033[0;34m@", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, world);
 
 	getrandom(&global_key, sizeof(global_key), 0);
 	install_signal_handlers();
 	screen_init();
-	redraw_all();
 
 	unsigned long reflex = 16;
 	unsigned long next_tick = msec() + reflex;
@@ -459,7 +426,7 @@ int main()
 			trigger_all();
 		}
 
-		fflush(stdout);
+		draw_all();
 		int timeout = next_tick - msec();
 		if (poll(&in, 1, timeout < 0 ? 0 : timeout) <= 0)
 			continue;
