@@ -198,17 +198,51 @@ static inline long set_bounded(long e, long s)
 
 /* ******** Drawing ******** */
 
-void draw_sector(long s)
+const char *drawbuf[SCREEN_WIDTH][SCREEN_HEIGHT];
+enum {
+	DRAW_EMPTY,
+	DRAW_AGAIN,
+	DRAW_GLYPH,
+} drawstat[SCREEN_WIDTH][SCREEN_HEIGHT];
+
+void flip_pos(int x, int y)
 {
-	if (s < 0 || !sector[s].en || !position[s].en || !appearance[s].en)
+	switch (drawstat[x][y]) {
+	case DRAW_AGAIN:
+		break;
+	case DRAW_GLYPH:
+		cursor_pos(x, y);
+		fputs(drawbuf[x][y], stdout);
+		break;
+	default:
+		cursor_pos(x, y);
+		fputs("\033[m ", stdout);
+		drawbuf[x][y] = NULL;
+		break;
+	}
+}
+
+void flip(void)
+{
+	for (int y = 0; y < SCREEN_HEIGHT; y++) {
+		for (int x = 0; x < SCREEN_WIDTH; x++) {
+			flip_pos(x, y);
+			drawstat[x][y] = DRAW_EMPTY;
+		}
+	}
+	fflush(stdout);
+}
+
+void put_glyph(const char *glyph, int x, int y)
+{
+	if (!on_screen(x, y))
 		return;
 
-	int x = position[s].x, y = position[s].y;
-	for (int dy = 0; dy < sector[s].height; dy++) {
-		for (int dx = 0; dx < sector[s].width; dx++) {
-			if (cursor_pos(x + dx, y + dy))
-				fputs(appearance[s].glyph, stdout);
-		}
+	if (drawbuf[x][y] == glyph) {
+		drawstat[x][y] = DRAW_AGAIN;
+	} else {
+		drawstat[x][y] = DRAW_GLYPH;
+		drawbuf[x][y] = glyph;
 	}
 }
 
@@ -218,26 +252,26 @@ void draw_entity(long e)
 		return;
 
 	if (sector[e].en) {
-		draw_sector(e);
+		int x = position[e].x, y = position[e].y;
+		for (int dy = 0; dy < sector[e].height; dy++)
+			for (int dx = 0; dx < sector[e].width; dx++)
+				put_glyph(appearance[e].glyph, x + dx, y + dy);
 	} else {
-		if (cursor_pos(position[e].x, position[e].y))
-			fputs(appearance[e].glyph, stdout);
+		put_glyph(appearance[e].glyph, position[e].x, position[e].y);
 	}
 }
 
 void draw_all(void)
 {
-	clear_screen();
-	for (int s = 0; s < entities; s++) {
+	for (int s = 0; s < entities; s++)
 		if (sector[s].en)
 			draw_entity(s);
-	}
 
-	for (int e = 0; e < entities; e++) {
+	for (int e = 0; e < entities; e++)
 		if (!sector[e].en)
 			draw_entity(e);
-	}
-	fflush(stdout);
+
+	flip();
 }
 
 
@@ -346,7 +380,7 @@ void signal_handler(int signo)
 			quit = true;
 		break;
 	case SIGWINCH:
-		draw_all();
+		//draw_all();
 		break;
 	default:
 		die();
@@ -361,7 +395,6 @@ void install_signal_handlers(void)
 	signal(SIGSEGV, signal_handler);
 	signal(SIGWINCH, signal_handler);
 }
-
 
 
 /* ******** Main ******** */
@@ -399,20 +432,20 @@ int main()
 	set_position(substrate, 0, 0);
 	set_sector(substrate, 4, 4);
 
-	long world = new_entity();
-	set_sector(world, SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4);
-	set_position(world, 2, 2);
-	set_bounded(world, substrate);
-	set_appearance(world, "\033[0;32m\"");
-	set_animacy(world, wander, 100);
-	set_rng(world, 0);
+	long platform = new_entity();
+	set_sector(platform, SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4);
+	set_position(platform, 2, 2);
+	set_bounded(platform, substrate);
+	set_appearance(platform, "\033[0;32m\"");
+	set_animacy(platform, wander, 99);
+	set_rng(platform, 0);
 
-	make_wanderer("\033[0;31m@",     SCREEN_WIDTH / 3,     SCREEN_HEIGHT / 3, world, 8);
-	make_wanderer("\033[0;33m@", 2 * SCREEN_WIDTH / 3,     SCREEN_HEIGHT / 3, world, 16);
-	make_wanderer("\033[0;35m@",     SCREEN_WIDTH / 3, 2 * SCREEN_HEIGHT / 3, world, 32);
-	make_wanderer("\033[0;36m@", 2 * SCREEN_WIDTH / 3, 2 * SCREEN_HEIGHT / 3, world, 64);
+	make_wanderer("\033[0;31m@",     SCREEN_WIDTH / 3,     SCREEN_HEIGHT / 3, platform, 8);
+	make_wanderer("\033[0;33m@", 2 * SCREEN_WIDTH / 3,     SCREEN_HEIGHT / 3, platform, 16);
+	make_wanderer("\033[0;35m@",     SCREEN_WIDTH / 3, 2 * SCREEN_HEIGHT / 3, platform, 32);
+	make_wanderer("\033[0;36m@", 2 * SCREEN_WIDTH / 3, 2 * SCREEN_HEIGHT / 3, platform, 64);
 
-	long player = make_inert("\033[0;34m@", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, world);
+	long player = make_inert("\033[0;34m@", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, platform);
 
 	getrandom(&global_key, sizeof(global_key), 0);
 	install_signal_handlers();
