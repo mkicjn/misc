@@ -119,18 +119,50 @@ static inline long new_entity(void)
 
 // Appearance
 struct {
-	bool en;
-	const char *glyph;
+	enum {
+		APPEARANCE_NONE = false,
+		APPEARANCE_GLYPH,
+		APPEARANCE_TEXTURE,
+	} en;
+	union {
+		const char *glyph;
+		const char *(*texture)(long self, int x, int y);
+	} as;
 } appearance[MAX_ENTITIES];
 
-static inline long set_appearance(long e, const char *glyph)
+static inline long set_glyph(long e, const char *glyph)
 {
 	if (e < 0)
 		return e;
 
-	appearance[e].en = true;
-	appearance[e].glyph = glyph;
+	appearance[e].en = APPEARANCE_GLYPH;
+	appearance[e].as.glyph = glyph;
 	return e;
+}
+
+static inline long set_texture(long e, const char *(*texture)(long self, int x, int y))
+{
+	if (e < 0)
+		return e;
+
+	appearance[e].en = APPEARANCE_TEXTURE;
+	appearance[e].as.texture = texture;
+	return e;
+}
+
+static inline const char *get_appearance(long e, int x, int y)
+{
+	if (e < 0)
+		return NULL;
+
+	switch (appearance[e].en) {
+	case APPEARANCE_GLYPH:
+		return appearance[e].as.glyph;
+	case APPEARANCE_TEXTURE:
+		return appearance[e].as.texture(e, x, y);
+	default:
+		return NULL;
+	}
 }
 
 // Position
@@ -233,11 +265,12 @@ void flip(void)
 	fflush(stdout);
 }
 
-void put_glyph(const char *glyph, int x, int y)
+void draw_entity_at(long e, int x, int y)
 {
-	if (!on_screen(x, y))
+	if (e < 0 || !appearance[e].en || !on_screen(x, y))
 		return;
 
+	const char *glyph = get_appearance(e, x, y);
 	if (drawbuf[x][y] == glyph) {
 		drawstat[x][y] = DRAW_AGAIN;
 	} else {
@@ -251,13 +284,13 @@ void draw_entity(long e)
 	if (e < 0 || !appearance[e].en || !position[e].en)
 		return;
 
+	int x = position[e].x, y = position[e].y;
 	if (sector[e].en) {
-		int x = position[e].x, y = position[e].y;
 		for (int dy = 0; dy < sector[e].height; dy++)
 			for (int dx = 0; dx < sector[e].width; dx++)
-				put_glyph(appearance[e].glyph, x + dx, y + dy);
+				draw_entity_at(e, x + dx, y + dy);
 	} else {
-		put_glyph(appearance[e].glyph, position[e].x, position[e].y);
+		draw_entity_at(e, x, y);
 	}
 }
 
@@ -304,6 +337,15 @@ uint64_t entity_rand(long e)
 	return cbrng(e, rng[e].ctr++);
 }
 
+uint64_t entity_rand_at(long e, uint32_t x, uint32_t y)
+{
+	uint64_t ctr;
+	ctr  = (uint64_t)1 << 63;
+	ctr ^= (uint64_t)x << 32;
+	ctr ^= (uint64_t)y;
+	return cbrng(e, ctr);
+}
+
 // Animacy
 struct {
 	bool en;
@@ -341,13 +383,10 @@ void move_entity(long e, unsigned char dir)
 	if (e < 0 || !position[e].en)
 		return;
 
-	int dx = 0, dy = 0;
-	apply_dir(dir, &dx, &dy);
-	if (dx == 0 && dy == 0)
-		return;
+	int x = position[e].x;
+	int y = position[e].y;
+	apply_dir(dir, &x, &y);
 
-	int x = position[e].x + dx;
-	int y = position[e].y + dy;
 	if (bounded[e].en && !in_sector(bounded[e].sector, x, y))
 		return;
 
@@ -399,16 +438,29 @@ void install_signal_handlers(void)
 
 /* ******** Main ******** */
 
-void trigger_all(void)
+const char *grass(long self, int x, int y)
 {
-	// Trigger all components with runtime behavior
-	trigger_animacy();
+	static const char *glyphs[] = {
+		"\033[0;32m\"",
+		"\033[0;32m'",
+		"\033[0;32m.",
+		"\033[0;32m,",
+		"\033[0;92m\"",
+		"\033[0;92m'",
+		"\033[0;92m.",
+		"\033[0;92m,",
+	};
+	if (position[self].en) {
+		x -= position[self].x;
+		y -= position[self].y;
+	}
+	return glyphs[entity_rand_at(self, x, y) % 8];
 }
 
 long make_inert(const char *glyph, int x, int y, long s)
 {
 	long e = new_entity();
-	set_appearance(e, glyph);
+	set_glyph(e, glyph);
 	set_position(e, x, y);
 	set_bounded(e, s);
 	return e;
@@ -436,7 +488,7 @@ int main()
 	set_sector(platform, SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4);
 	set_position(platform, 2, 2);
 	set_bounded(platform, substrate);
-	set_appearance(platform, "\033[0;32m\"");
+	set_texture(platform, grass);
 	set_animacy(platform, wander, 99);
 	set_rng(platform, 0);
 
@@ -456,7 +508,8 @@ int main()
 	while (!quit) {
 		if (msec() >= next_tick) {
 			next_tick += reflex;
-			trigger_all();
+			// Trigger all components with runtime behavior
+			trigger_animacy();
 		}
 
 		draw_all();
