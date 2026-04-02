@@ -6,9 +6,11 @@
 #include <stdint.h>
 #include <poll.h>
 #include <time.h>
+
+#include <unistd.h>
 #include <sys/random.h>
 
-/* ******** Pseudo-random Number Generation ******** */
+/* ******** Pseudo-Random Number Generation ******** */
 
 uint64_t splitmix64_ctr(uint64_t key, uint64_t ctr)
 {
@@ -27,16 +29,6 @@ uint64_t cbrng(uint64_t key, uint64_t ctr)
 double cbrngf(uint64_t key, uint64_t ctr)
 {
 	return (cbrng(key, ctr) >> 11) * 0x1.0p-53;
-}
-
-
-/* ******** Time Utilities ******** */
-
-unsigned long msec(void)
-{
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
 
@@ -102,6 +94,35 @@ static inline void apply_dir(int dir, int *xp, int *yp)
 
 	*xp += dx[dir & 0xff];
 	*yp += dy[dir & 0xff];
+}
+
+
+/* ******** Time/Input Polling Utilities ******** */
+
+unsigned long msec(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+int key_by(int deadline_ms)
+{
+	struct pollfd fd = {
+		.fd = fileno(stdin),
+		.events = POLLIN
+	};
+
+	unsigned long timeout = deadline_ms - msec();
+	if (poll(&fd, 1, timeout < 1 ? 1 : timeout) <= 0)
+		return -1;
+
+	// Consume any excess characters that may be available
+	int c = -1;
+	while (poll(&fd, 1, 0) > 0)
+		c = getchar();
+
+	return c;
 }
 
 
@@ -349,12 +370,12 @@ uint64_t entity_rand_at(long e, uint32_t x, uint32_t y)
 // Animacy
 struct {
 	bool en;
-	void (*think)(long self);
+	bool (*think)(long self);
 	int period;
 	int timer;
 } animacy[MAX_ENTITIES];
 
-static inline long set_animacy(long e, void (*think)(long self), int period)
+static inline long set_animacy(long e, bool (*think)(long self), int period)
 {
 	if (e < 0)
 		return e;
@@ -366,16 +387,20 @@ static inline long set_animacy(long e, void (*think)(long self), int period)
 	return e;
 }
 
-void trigger_animacy(void)
+bool trigger_animacy(void)
 {
+	bool ret = false;
 	for (long e = 0; e < entities; e++) {
 		if (!animacy[e].en)
 			continue;
 		if (animacy[e].timer --> 0)
 			continue;
-		animacy[e].timer = animacy[e].period - 1;
-		animacy[e].think(e);
+		if (animacy[e].think(e)) {
+			animacy[e].timer = animacy[e].period - 1;
+			ret = true;
+		}
 	}
+	return ret;
 }
 
 void move_entity(long e, unsigned char dir)
@@ -394,9 +419,10 @@ void move_entity(long e, unsigned char dir)
 	position[e].y = y;
 }
 
-void wander(long self)
+bool wander(long self)
 {
 	move_entity(self, '1' + entity_rand(self) % 9);
+	return true;
 }
 
 
@@ -419,7 +445,7 @@ void signal_handler(int signo)
 			quit = true;
 		break;
 	case SIGWINCH:
-		//draw_all();
+		draw_all();
 		break;
 	default:
 		die();
@@ -474,12 +500,18 @@ long make_wanderer(const char *glyph, int x, int y, long s, int period)
 	return e;
 }
 
+unsigned long player_deadline = 0;
+bool player_control(long self)
+{
+	int input = key_by(player_deadline);
+	if (input < 0)
+		return false;
+	move_entity(self, input);
+	return true;
+}
+
 int main()
 {
-	struct pollfd in;
-	in.fd = fileno(stdin);
-	in.events = POLLIN;
-
 	long substrate = new_entity();
 	set_position(substrate, 0, 0);
 	set_sector(substrate, 4, 4);
@@ -498,37 +530,29 @@ int main()
 	make_wanderer("\033[0;36m@", 2 * SCREEN_WIDTH / 3, 2 * SCREEN_HEIGHT / 3, platform, 64);
 
 	long player = make_inert("\033[0;34m@", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, platform);
+	set_animacy(player, player_control, 8);
 
 	getrandom(&global_key, sizeof(global_key), 0);
 	install_signal_handlers();
 	screen_init();
+	draw_all();
 
 	unsigned long reflex = 16;
-	unsigned long next_tick = msec() + reflex;
+	player_deadline = msec() + reflex;
 	while (!quit) {
-		if (msec() >= next_tick) {
-			next_tick += reflex;
+		if (msec() >= player_deadline) {
+			player_deadline += reflex;
 			// Trigger all components with runtime behavior
-			trigger_animacy();
+			bool redraw = false;
+			redraw |= trigger_animacy();
+			//redraw |= trigger_a();
+			//redraw |= trigger_b();
+			//redraw |= trigger_c();
+			//...
+			if (redraw)
+				draw_all();
 		}
-
-		draw_all();
-		int timeout = next_tick - msec();
-		if (poll(&in, 1, timeout < 0 ? 0 : timeout) <= 0)
-			continue;
-
-		int input = getchar();
-		switch (input) {
-		case 0:
-			break;
-		case 4: // Fallthrough
-		case 'q':
-			quit = true;
-			break;
-		default:
-			move_entity(player, input);
-			break;
-		}
+		usleep(1000);
 	}
 
 	die();
