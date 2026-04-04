@@ -293,7 +293,10 @@ void draw_entity_at(long e, int x, int y)
 
 	const char *glyph = get_appearance(e, x, y);
 	if (drawbuf[x][y] == glyph) {
-		drawstat[x][y] = DRAW_AGAIN;
+		if (drawstat[x][y] == DRAW_EMPTY) {
+			// ^ Avoid DRAW_GLYPH -> DRAW_AGAIN transition
+			drawstat[x][y] = DRAW_AGAIN;
+		}
 	} else {
 		drawstat[x][y] = DRAW_GLYPH;
 		drawbuf[x][y] = glyph;
