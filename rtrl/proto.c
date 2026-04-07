@@ -236,7 +236,7 @@ struct {
 	long sector;
 } bounded[MAX_ENTITIES];
 
-static inline long set_bounded(long e, long s)
+static inline long set_boundary(long e, long s)
 {
 	if (e < 0 || s < 0 || !sector[s].en)
 		return e;
@@ -271,6 +271,7 @@ void flip_pos(int x, int y)
 		cursor_pos(x, y);
 		fputs("\033[m ", stdout);
 		drawbuf[x][y] = NULL;
+		// ^ Clear to avoid improper DRAW_AGAIN
 		break;
 	}
 }
@@ -284,6 +285,20 @@ void flip(void)
 		}
 	}
 	fflush(stdout);
+}
+
+void redraw(void)
+{
+	clear_screen();
+	for (int y = 0; y < SCREEN_HEIGHT; y++) {
+		for (int x = 0; x < SCREEN_WIDTH; x++) {
+			if (drawbuf[x][y] != NULL)
+				drawstat[x][y] = DRAW_GLYPH;
+			else
+				drawstat[x][y] = DRAW_EMPTY;
+		}
+	}
+	flip();
 }
 
 void draw_entity_at(long e, int x, int y)
@@ -363,6 +378,12 @@ uint64_t entity_rand(long e)
 
 uint64_t entity_rand_at(long e, uint32_t x, uint32_t y)
 {
+	if (e < 0)
+		return 0;
+
+	if (!rng[e].en)
+		return cbrng(e, rng[e].ctr);
+
 	uint64_t ctr;
 	ctr  = (uint64_t)1 << 63;
 	ctr ^= (uint64_t)x << 32;
@@ -390,6 +411,15 @@ static inline long set_animacy(long e, bool (*think)(long self), int period)
 	return e;
 }
 
+void set_period(long e, int new_period)
+{
+	if (e < 0 || !animacy[e].en)
+		return;
+
+	animacy[e].timer += new_period - animacy[e].period;
+	animacy[e].period = new_period;
+}
+
 bool trigger_animacy(void)
 {
 	bool ret = false;
@@ -406,26 +436,29 @@ bool trigger_animacy(void)
 	return ret;
 }
 
-void move_entity(long e, unsigned char dir)
+bool move_entity(long e, unsigned char dir)
 {
 	if (e < 0 || !position[e].en)
-		return;
+		return false;
 
-	int x = position[e].x;
-	int y = position[e].y;
-	apply_dir(dir, &x, &y);
+	int dx = 0, dy = 0;
+	apply_dir(dir, &dx, &dy);
+	if (dx == 0 && dy == 0)
+		return false;
 
+	int x = position[e].x + dx;
+	int y = position[e].y + dy;
 	if (bounded[e].en && !in_sector(bounded[e].sector, x, y))
-		return;
+		return false;
 
 	position[e].x = x;
 	position[e].y = y;
+	return true;
 }
 
 bool wander(long self)
 {
-	move_entity(self, '1' + entity_rand(self) % 9);
-	return true;
+	return move_entity(self, '1' + entity_rand(self) % 9);
 }
 
 
@@ -448,7 +481,7 @@ void signal_handler(int signo)
 			quit = true;
 		break;
 	case SIGWINCH:
-		draw_all();
+		redraw();
 		break;
 	default:
 		die();
@@ -474,10 +507,10 @@ const char *grass(long self, int x, int y)
 		"\033[0;32m'",
 		"\033[0;32m.",
 		"\033[0;32m,",
-		"\033[0;92m\"",
-		"\033[0;92m'",
-		"\033[0;92m.",
-		"\033[0;92m,",
+		"\033[0;1;92m\"",
+		"\033[0;1;92m'",
+		"\033[0;1;92m.",
+		"\033[0;1;92m,",
 	};
 	if (position[self].en) {
 		x -= position[self].x;
@@ -486,31 +519,24 @@ const char *grass(long self, int x, int y)
 	return glyphs[entity_rand_at(self, x, y) % 8];
 }
 
-long make_inert(const char *glyph, int x, int y, long s)
-{
-	long e = new_entity();
-	set_glyph(e, glyph);
-	set_position(e, x, y);
-	set_bounded(e, s);
-	return e;
-}
-
-long make_wanderer(const char *glyph, int x, int y, long s, int period)
-{
-	long e = make_inert(glyph, x, y, s);
-	set_animacy(e, wander, period);
-	set_rng(e, 0);
-	return e;
-}
-
 unsigned long player_deadline = 0;
 bool player_control(long self)
 {
 	int input = key_by(player_deadline);
-	if (input < 0)
-		return false;
-	move_entity(self, input);
-	return true;
+	switch (input) {
+	case '[':
+		set_period(self, animacy[self].period / 2 + 1);
+		break;
+	case ']':
+		set_period(self, animacy[self].period * 2);
+		break;
+	case 'q':
+		quit = true;
+		break;
+	default:
+		return move_entity(self, input);
+	}
+	return false;
 }
 
 int main()
@@ -522,18 +548,22 @@ int main()
 	long platform = new_entity();
 	set_sector(platform, SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4);
 	set_position(platform, 2, 2);
-	set_bounded(platform, substrate);
+	set_boundary(platform, substrate);
 	set_texture(platform, grass);
 	set_animacy(platform, wander, 99);
 	set_rng(platform, 0);
 
-	make_wanderer("\033[0;31m@",     SCREEN_WIDTH / 3,     SCREEN_HEIGHT / 3, platform, 8);
-	make_wanderer("\033[0;33m@", 2 * SCREEN_WIDTH / 3,     SCREEN_HEIGHT / 3, platform, 16);
-	make_wanderer("\033[0;35m@",     SCREEN_WIDTH / 3, 2 * SCREEN_HEIGHT / 3, platform, 32);
-	make_wanderer("\033[0;36m@", 2 * SCREEN_WIDTH / 3, 2 * SCREEN_HEIGHT / 3, platform, 64);
-
-	long player = make_inert("\033[0;34m@", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, platform);
+	long player = new_entity();
+	set_glyph(player, "\033[0;34m@");
+	set_position(player, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+	set_boundary(player, platform);
 	set_animacy(player, player_control, 8);
+
+#define WANDERER(g, x, y, s, p) set_rng(set_animacy(set_boundary(set_position(set_glyph(new_entity(), g), x, y), s), wander, p), 0)
+	WANDERER("\033[0;31m@",     SCREEN_WIDTH / 3,     SCREEN_HEIGHT / 3, platform, 8);
+	WANDERER("\033[0;33m@", 2 * SCREEN_WIDTH / 3,     SCREEN_HEIGHT / 3, platform, 16);
+	WANDERER("\033[0;35m@",     SCREEN_WIDTH / 3, 2 * SCREEN_HEIGHT / 3, platform, 32);
+	WANDERER("\033[0;36m@", 2 * SCREEN_WIDTH / 3, 2 * SCREEN_HEIGHT / 3, platform, 64);
 
 	getrandom(&global_key, sizeof(global_key), 0);
 	install_signal_handlers();
