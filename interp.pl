@@ -1,41 +1,118 @@
 % Relational interpreter experiment
+% (for the simply-typed lambda calculus with Booleans)
 
-lisp_eval(_, t, t).
+% Typing rules (not used yet)
 
-lisp_eval(_, [], []).
+lb_env_type(_, true, bool).
+lb_env_type(_, false, bool).
 
-lisp_eval(_, [quote, X], X).
+lb_env_type(Env, not(X), bool) :-
+	lb_env_type(Env, X, bool).
 
-lisp_eval(Γ, [cons, A, B], [X|Y]) :-
-	lisp_eval(Γ, A, X),
-	lisp_eval(Γ, B, Y).
+lb_env_type(Env, lambda(Var,Body), (TFrom->TTo)) :-
+	lb_env_type([Var-TFrom|Env], Body, TTo).
 
-lisp_eval(Γ, [car, A], X) :-
-	lisp_eval(Γ, A, [X|_]).
+lb_env_type(Env, apply(Lambda,Arg), TTo) :-
+	lb_env_type(Env, Arg, TFrom),
+	lb_env_type(Env, Lambda, (TFrom->TTo)).
 
-lisp_eval(Γ, [cdr, A], X) :-
-	lisp_eval(Γ, A, [_|X]).
+lb_env_type(Env, if(A,B,C), T) :-
+	lb_env_type(Env, A, bool),
+	lb_env_type(Env, B, T),
+	lb_env_type(Env, C, T).
 
-lisp_eval(Γ, [eq, A, B], t) :-
-	lisp_eval(Γ, A, X),
-	lisp_eval(Γ, B, X).
+lb_env_type(Env, var(Var), T) :-
+	member(Var-T, Env).
 
-lisp_eval(_, [eq, _, _], []). % TODO: Can this be improved upon in pure Prolog?
+lb_type(X, T) :-
+	lb_env_type([], X, T).
 
-lisp_eval(Γ, K, V) :-
-	member(K=V, Γ).
 
-lisp_eval(Γ, [[lambda, [A], B], C], R) :-
-	lisp_eval(Γ, C, D),
-	lisp_eval([A=D|Γ], B, R).
+% Interpreter
+% TODO: Add typing goals?
 
-lisp_eval(Γ, [cond|Xs], R) :-
-	member([If, Then], Xs),
-	lisp_eval(Γ, If, t),
-	lisp_eval(Γ, Then, R).
+lb_not(true, false).
+lb_not(false, true).
 
-lisp_eval(Γ, [eval, X], R) :-
-	lisp_eval(Γ, X, R).
 
-% TODO: Iterative deepening for nested lists?
-% miniKanren's interleaving strategy seems superior here
+lb_apply(closure(Env,Arg,Body), Val, R) :-
+	lb_env_eval([Arg-Val|Env], Body, R).
+
+
+lb_if(Env, if(true,X,_), R) :-
+	lb_env_eval(Env, X, R).
+lb_if(Env, if(false,_,X), R) :-
+	lb_env_eval(Env, X, R).
+
+
+lb_env_eval(_, true, true).
+lb_env_eval(_, false, false).
+
+lb_env_eval(Env, if(Cond,Then,Else), R) :-
+	lb_env_eval(Env, Cond, C),
+	lb_if(Env, if(C,Then,Else), R).
+
+lb_env_eval(Env, not(X), R) :-
+	lb_env_eval(Env, X, Y),
+	lb_not(Y, R).
+
+lb_env_eval(Env, lambda(Var,Body), closure(Env,Var,Body)).
+
+lb_env_eval(Env, apply(X, Y), R) :-
+	lb_env_eval(Env, X, X1),
+	lb_env_eval(Env, Y, Y1),
+	lb_apply(X1, Y1, R).
+
+lb_env_eval(Env, var(Var), R) :-
+	member(Var-R, Env).
+
+lb_eval(X, R) :-
+	lb_env_eval([], X, R).
+
+
+% Iterative deepening setup
+
+lb_serial(false) -->
+	[false].
+lb_serial(true) -->
+	[true].
+lb_serial(not(X)) -->
+	[not], lb_serial(X).
+lb_serial(if(X,Y,Z)) -->
+	[if], lb_serial(X), lb_serial(Y), lb_serial(Z).
+lb_serial(lambda(X,Y)) -->
+	[lambda], [X], lb_serial(Y).
+lb_serial(apply(X,Y)) -->
+	[apply], lb_serial(X), lb_serial(Y).
+lb_serial(var(X)) -->
+	[var, X].
+
+lb_term_size(X, N) :-
+	length(S, N),
+	phrase(lb_serial(X), S).
+
+lb_term(X) :-
+	lb_term_size(X, _).
+
+% Examples:
+%
+% Enumerate all terms:
+% ?- lb_term(X).
+%
+% Enumerate all well-typed terms:
+% ?- lb_term(X), lb_type(X, _).
+%
+% Synthesis of expressions that invert their argument:
+% ?- lb_term(F), lb_eval(apply(F,true), false), lb_eval(apply(F,false), true).
+%
+% More synthesis tasks (fill in the blank):
+% ?- lb_term(F), lb_type(F, (_->_)), F=lambda(a,if(var(a),_,_)), lb_eval(apply(F,true), false), lb_eval(apply(F,false), true).
+% ?- lb_term(F), F=lambda(_,apply(_,_)), lb_type(F, (_->bool)), lb_eval(apply(F, lambda(a,not(var(a)))), true).
+%
+% Verification task - can this function ever return true?
+% F=lambda(a,if(var(a),not(var(a)),var(a))), lb_eval(apply(F,X), true).
+% ^ TODO: Does not terminate - how can it be made to?
+%   Obvious solution is:
+lb_bool(true).
+lb_bool(false).
+% ?- F=lambda(a,if(var(a),not(var(a)),var(a))), lb_bool(B), lb_eval(apply(F,B), true).
