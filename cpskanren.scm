@@ -30,7 +30,7 @@
 	  ((atom? b) #f)
 	  (else
 	    (let* ((s (unify (car a) (car b) s)))
-	      (if s (unify (cdr a) (cdr b) s)))))))
+	      (and s (unify (cdr a) (cdr b) s)))))))
 
 
 ; The hard part - using continuations instead of streams
@@ -41,7 +41,7 @@
   (lambda (k)
     (lambda (s)
       (let ((s (unify a b s)))
-	(if s (k s))))))
+	(and s (k s))))))
 
 (define (conj g1 g2)
   (lambda (k)
