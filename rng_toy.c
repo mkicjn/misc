@@ -109,12 +109,12 @@ uint64_t getrandom_next(void)
 }
 
 
-
 uint64_t xorshift(uint64_t state)
 {
 	state ^= state << 13;
 	state ^= state >> 7;
-	return state * CBRNG_CONST;
+	state ^= state << 17;
+	return state;
 }
 uint64_t xorshift_state = 1;
 void xorshift_seed(uint64_t s)
@@ -125,10 +125,33 @@ uint64_t xorshift_next_state()
 {
 	return xorshift(xorshift_state);
 }
-uint32_t xorshift_next(void)
+uint64_t xorshift_next(void)
 {
 	xorshift_state = xorshift_next_state();
-	return xorshift(xorshift_state) >> 32;
+	return xorshift(xorshift_state);
+}
+
+
+uint64_t xorshift_star(uint64_t state)
+{
+	state ^= state >> 12;
+	state ^= state << 25;
+	state ^= state >> 27;
+	return state * 0x2545f4914f6cdd1dull;
+}
+void xorshift_star_seed(uint64_t s)
+{
+	xorshift_state = s;
+}
+uint64_t xorshift_star_next_state()
+{
+	return xorshift_star(xorshift_state);
+}
+uint32_t xorshift_star_next(void)
+{
+	xorshift_state = xorshift_star_next_state();
+	// (Return upper 32 bits only)
+	return xorshift_star(xorshift_state) >> 32;
 }
 
 
