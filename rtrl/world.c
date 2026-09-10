@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
+#include <limits.h>
 
 #include <sys/random.h>
 
@@ -143,10 +144,61 @@ const char *shade(double n)
 
 	if (n < 0.5) {
 		// Water
-		return "\033[94m";
+		if (n > 0.45) {
+			return "\033[94;40m"; // Light blue
+		} else if (n > 0.25) {
+			return "\033[34;40m"; // Blue
+		} else {
+			return "\033[30;40m"; // Black
+		}
 	} else {
 		// Land
-		return "\033[92m";
+		if (n < 0.525) {
+			return "\033[93;40m"; // Yellow
+		} else {
+			return "\033[92;40m"; // Light green
+		}
+	}
+}
+
+const char *glyph(double n)
+{
+	if (n < 0.5) {
+		// Water
+		return "__";
+	} else {
+		// Land
+		if (n < 0.525) {
+			return "~~";
+		} else if (n < 0.55) {
+			switch ((int)(n * 100) % 4) {
+			case 0:
+				return ",.";
+			case 1:
+				return ".'";
+			case 2:
+				return "'\"";
+			case 3:
+				return "\",";
+			default:
+				return "  ";
+			}
+		} else {
+			switch ((int)(n * 100) % 5) {
+			case 0:
+				return ",.";
+			case 1:
+				return ".'";
+			case 2:
+				return "'\"";
+			case 3:
+				return "\",";
+			case 4:
+				return "%%";
+			default:
+				return "  ";
+			}
+		}
 	}
 }
 
@@ -161,7 +213,7 @@ int main(int argc, char **argv)
 		for (int x = 0; x < WIDTH; x++) {
 			double n = sample(x, y);
 			n *= edge_derate(x, y);
-			printf("%s~~", shade(n));
+			printf("%s%s", shade(n), glyph(n));
 		}
 		printf("\033[m\n");
 	}
