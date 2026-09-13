@@ -9,54 +9,56 @@
 
 // Counter-based RNG
 
-uint64_t splitmix64_ctr(uint64_t key, uint64_t ctr)
+uint64_t cbrng(uint64_t key, uint64_t ctr)
 {
+	// https://prng.di.unimi.it/splitmix64.c
 	uint64_t z = (key + ctr * 0x9e3779b97f4a7c15);
 	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
 	z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
 	return z ^ (z >> 31);
 }
 
-uint64_t key = 0xdeadbeef;
-uint64_t cbrng(uint64_t ctr)
+double cbrngf(uint64_t key, uint64_t ctr)
 {
-	return splitmix64_ctr(key, ctr);
-}
-
-double cbrngf(uint64_t ctr)
-{
-	return (cbrng(ctr) >> 11) * 0x1.0p-53;
+	// https://prng.di.unimi.it/
+	// "Generating uniform doubles in the unit interval"
+	return (cbrng(key, ctr) >> 11) * 0x1.0p-53;
 }
 
 
-// 2D vector operations
+// 3D vector operations
 
-struct vec2 {
-	double x, y;
+struct vec3 {
+	double x, y, z;
 };
 
-double vec2dot(struct vec2 *a, struct vec2 *b)
+double vec3dot(struct vec3 *a, struct vec3 *b)
 {
-	return (a->x * b->x) + (a->y * b->y);
+	return (a->x * b->x) + (a->y * b->y) + (a->z * b->z);
 }
 
-void vec2sub(struct vec2 *a, struct vec2 *b)
+void vec3sub(struct vec3 *a, struct vec3 *b)
 {
 	a->x -= b->x;
 	a->y -= b->y;
+	a->z -= b->z;
 }
 
 
-// 2D Perlin noise generation
-// (Assuming implementation is correct)
+// 3D gradient noise
 
-#define VIRT_WIDTH (1ul << 32)
+#define VIRT_WIDTH (1ul << 20)
+#define VIRT_HEIGHT (1ul << 20)
 
-void gradient(uint64_t origin, int x, int y, struct vec2 *g)
+void gradient(uint64_t key, int x, int y, int z, struct vec3 *g)
 {
-	double theta = cbrngf(origin + x + y * VIRT_WIDTH) * 2.0 * M_PI;
-	g->x = cos(theta);
-	g->y = sin(theta);
+	uint64_t p = (z * VIRT_HEIGHT + y) * VIRT_WIDTH + x;
+	// https://mathworld.wolfram.com/SpherePointPicking.html
+	double theta = cbrngf(key, p * 2) * 2.0 * M_PI;
+	double u = cbrngf(key, p * 2 + 1) * 2.0 - 1.0;
+	g->x = sqrt(1 - u * u) * cos(theta);
+	g->y = sqrt(1 - u * u) * sin(theta);
+	g->z = u;
 }
 
 double smoothstep(double x)
@@ -64,29 +66,36 @@ double smoothstep(double x)
 	return x * x * (3 - 2 * x);
 }
 
-double noise(uint64_t origin, int x, int y, unsigned period)
+double noise(uint64_t key, int x, int y, int z, unsigned period)
 {
-	struct vec2 p = {
+	struct vec3 p = {
 		.x = ((double)x) / period,
 		.y = ((double)y) / period,
+		.z = ((double)z) / period,
 	};
 	int cx = x / period;
 	int cy = y / period;
+	int cz = z / period;
 	double ix = smoothstep(p.x - cx);
 	double iy = smoothstep(p.y - cy);
+	double iz = smoothstep(p.z - cz);
 	double noise = 0.0;
-	for (int dy = 0; dy <= 1; dy++) {
-		for (int dx = 0; dx <= 1; dx++) {
-			struct vec2 g;
-			gradient(origin, cx + dx, cy + dy, &g);
-			struct vec2 dp = {
-				.x = cx + dx,
-				.y = cy + dy,
-			};
-			vec2sub(&dp, &p);
-			noise += vec2dot(&g, &dp)
-				* (dx == 0 ? 1.0 - ix : ix)
-				* (dy == 0 ? 1.0 - iy : iy);
+	for (int dz = 0; dz <= 1; dz++) {
+		for (int dy = 0; dy <= 1; dy++) {
+			for (int dx = 0; dx <= 1; dx++) {
+				struct vec3 g;
+				gradient(key, cx + dx, cy + dy, cz + dz, &g);
+				struct vec3 dp = {
+					.x = cx + dx,
+					.y = cy + dy,
+					.z = cz + dz,
+				};
+				vec3sub(&dp, &p);
+				noise += vec3dot(&g, &dp)
+					* (dx == 0 ? 1.0 - ix : ix)
+					* (dy == 0 ? 1.0 - iy : iy)
+					* (dz == 0 ? 1.0 - iz : iz);
+			}
 		}
 	}
 	return noise;
@@ -99,11 +108,11 @@ double noise(uint64_t origin, int x, int y, unsigned period)
 #define HEIGHT 60
 
 #define SAMPLE_PERIOD 16
-double sample(int x, int y)
+double sample(uint64_t key, int x, int y)
 {
-	double n = noise(0, x, y, SAMPLE_PERIOD) * (3.0 / 6.0);
-	n += noise(0, x, y, SAMPLE_PERIOD / 2) * (2.0 / 6.0);
-	n += noise(0, x, y, SAMPLE_PERIOD / 4) * (1.0 / 6.0);
+	double n = noise(key, x, y, 0, SAMPLE_PERIOD) * (3.0 / 6.0);
+	n += noise(key + 1, x, y, 0, SAMPLE_PERIOD / 2) * (2.0 / 6.0);
+	n += noise(key + 2, x, y, 0, SAMPLE_PERIOD / 4) * (1.0 / 6.0);
 
 	n = 0.5 + (n * 0.5);
 	return n;
@@ -130,34 +139,49 @@ double edge_derate(int x, int y)
 		n *= (y / DERATE_HEIGHT);
 
 	// Smooth and weaken the transition
-	return 0.50 + (smoothstep(n) * 0.50);
+	return 0.5 + (smoothstep(n) * 0.5);
 }
 
 const char *shade(double n)
 {
-	// TODO:
-	// * More detail
-	// * Reconsider 0.0-1.0 range? (-1.0 to 1.0?)
-	// * Compare integers instead?
-	// * Add glyph mapping
-	//   * "Texturing" by modulus?
-
 	if (n < 0.5) {
 		// Water
 		if (n > 0.45) {
-			return "\033[94;40m"; // Light blue
-		} else if (n > 0.25) {
-			return "\033[34;40m"; // Blue
+			return "\033[0;94;40m"; // Light blue
+		} else if (n > 0.30) {
+			return "\033[0;34;40m"; // Blue
 		} else {
-			return "\033[30;40m"; // Black
+			return "\033[0;30;40m"; // Black
 		}
 	} else {
 		// Land
 		if (n < 0.525) {
-			return "\033[93;40m"; // Yellow
+			return "\033[0;93;40m"; // Yellow
+		} else if (n < 0.57) {
+			return "\033[0;92;40m"; // Bright green
+		} else if (n < 0.62) {
+			return "\033[0;2;32;40m"; // Dark green
+		} else if (n < 0.65) {
+			return "\033[0;2;37;40m"; // Dark gray
 		} else {
-			return "\033[92;40m"; // Light green
+			return "\033[0;1;37;40m"; // White
 		}
+	}
+}
+
+const char *grass(double n)
+{
+	switch ((int)(n * 10000) % 4) {
+	case 0:
+		return ",.";
+	case 1:
+		return ".'";
+	case 2:
+		return "'\"";
+	case 3:
+		return "\",";
+	default:
+		return "  ";
 	}
 }
 
@@ -170,34 +194,17 @@ const char *glyph(double n)
 		// Land
 		if (n < 0.525) {
 			return "~~";
-		} else if (n < 0.55) {
-			switch ((int)(n * 100) % 4) {
-			case 0:
-				return ",.";
-			case 1:
-				return ".'";
-			case 2:
-				return "'\"";
-			case 3:
-				return "\",";
-			default:
-				return "  ";
-			}
-		} else {
-			switch ((int)(n * 100) % 5) {
-			case 0:
-				return ",.";
-			case 1:
-				return ".'";
-			case 2:
-				return "'\"";
-			case 3:
-				return "\",";
-			case 4:
+		} else if (n < 0.57) {
+			return grass(n);
+		} else if (n < 0.62) {
+			if ((int)(n * 10000) % 5 == 0)
 				return "%%";
-			default:
-				return "  ";
-			}
+			else
+				return grass(n);
+		} else if (n < 0.65) {
+			return "==";
+		} else {
+			return "^^";
 		}
 	}
 }
@@ -205,13 +212,14 @@ const char *glyph(double n)
 int main(int argc, char **argv)
 {
 	// Seed RNG
+	uint64_t key = 0xdeadbeef;
 	if (0 > getrandom(&key, sizeof(key), 0))
 		perror("getrandom()");
 
 	// Render
 	for (int y = 0; y < HEIGHT; y++) {
 		for (int x = 0; x < WIDTH; x++) {
-			double n = sample(x, y);
+			double n = sample(key, x, y);
 			n *= edge_derate(x, y);
 			printf("%s%s", shade(n), glyph(n));
 		}
