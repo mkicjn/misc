@@ -104,14 +104,15 @@ double noise(uint64_t key, int x, int y, int z, unsigned period)
 
 // Terminal display
 
-#define WIDTH 80
+#define WIDTH 72
 #define HEIGHT 60
 
 #define SAMPLE_PERIOD 20
-double sample(uint64_t key, int x, int y)
+double height_sample(uint64_t key, int x, int y)
 {
 	// Generate fractal noise
-	double n = noise(key, x, y, 0, SAMPLE_PERIOD) * (3.0 / 6.0);
+	double n = 0.0;
+	n += noise(key,     x, y, 0, SAMPLE_PERIOD)     * (3.0 / 6.0);
 	n += noise(key + 1, x, y, 0, SAMPLE_PERIOD / 2) * (2.0 / 6.0);
 	n += noise(key + 2, x, y, 0, SAMPLE_PERIOD / 4) * (1.0 / 6.0);
 
@@ -169,13 +170,15 @@ const char *shade(double n)
 			return "\033[0;2;32;40m"; // Dark green
 		} else if (n < 0.65) {
 			return "\033[0;2;37;40m"; // Dark gray
-		} else {
+		} else if (n < 0.70) {
 			return "\033[0;1;37;40m"; // White
+		} else {
+			return "\033[0;1;91;40m"; // Bright red
 		}
 	}
 }
 
-const char *grass(double n)
+const char *grass_glyph(double n)
 {
 	switch ((int)(n * 10000) % 4) {
 	case 0:
@@ -191,6 +194,24 @@ const char *grass(double n)
 	}
 }
 
+const char *trees_glyph(double n)
+{
+	switch ((int)(n * 10000) % 25) {
+	case 0:
+		return "%%";
+	case 1:
+		return ".%";
+	case 2:
+		return "%,";
+	case 3:
+		return "'%";
+	case 4:
+		return "%\"";
+	default:
+		return grass_glyph(n);
+	}
+}
+
 const char *glyph(double n)
 {
 	if (n < 0.5) {
@@ -201,12 +222,9 @@ const char *glyph(double n)
 		if (n < 0.525) {
 			return "~~";
 		} else if (n < 0.57) {
-			return grass(n);
+			return grass_glyph(n);
 		} else if (n < 0.62) {
-			if ((int)(n * 10000) % 5 == 0)
-				return "%%";
-			else
-				return grass(n);
+			return trees_glyph(n);
 		} else if (n < 0.65) {
 			return "==";
 		} else {
@@ -215,17 +233,11 @@ const char *glyph(double n)
 	}
 }
 
-int main(int argc, char **argv)
+void render_world(uint64_t key)
 {
-	// Seed RNG
-	uint64_t key = 0xdeadbeef;
-	if (0 > getrandom(&key, sizeof(key), 0))
-		perror("getrandom()");
-
-	// Render
 	for (int y = 0; y < HEIGHT; y++) {
 		for (int x = 0; x < WIDTH; x++) {
-			double n = sample(key, x, y);
+			double n = height_sample(key, x, y);
 			n *= edge_derate(x, y);
 			printf("%s%s", shade(n), glyph(n));
 			//int i = n * 256;
@@ -233,5 +245,20 @@ int main(int argc, char **argv)
 		}
 		printf("\033[m\n");
 	}
+}
+
+int main(int argc, char **argv)
+{
+	uint64_t key = 0xdeadbeef;
+	if (argc > 1) {
+		sscanf(argv[1], "%llx", &key);
+	} else {
+		if (0 > getrandom(&key, sizeof(key), 0))
+			perror("getrandom()");
+	}
+
+	render_world(key);
+
+	printf("Seed: %llx\n", key);
 	return 0;
 }
