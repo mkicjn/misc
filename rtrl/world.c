@@ -107,12 +107,18 @@ double noise(uint64_t key, int x, int y, int z, unsigned period)
 #define WIDTH 80
 #define HEIGHT 60
 
-#define SAMPLE_PERIOD 16
+#define SAMPLE_PERIOD 20
 double sample(uint64_t key, int x, int y)
 {
+	// Generate fractal noise
 	double n = noise(key, x, y, 0, SAMPLE_PERIOD) * (3.0 / 6.0);
 	n += noise(key + 1, x, y, 0, SAMPLE_PERIOD / 2) * (2.0 / 6.0);
 	n += noise(key + 2, x, y, 0, SAMPLE_PERIOD / 4) * (1.0 / 6.0);
+
+	// Add ridges & rivers
+	double w = noise(key + 3, x, y, 0, SAMPLE_PERIOD);
+	if (-0.1 <= w && w <= 0.1)
+		n += 1.5 * w;
 
 	n = 0.5 + (n * 0.5);
 	return n;
@@ -222,6 +228,8 @@ int main(int argc, char **argv)
 			double n = sample(key, x, y);
 			n *= edge_derate(x, y);
 			printf("%s%s", shade(n), glyph(n));
+			//int i = n * 256;
+			//printf("\033[48;2;%d;%d;%dm  ", i, i, i);
 		}
 		printf("\033[m\n");
 	}
