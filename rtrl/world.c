@@ -158,86 +158,78 @@ double surface_sample(uint64_t key, int x, int y)
 	return surface;
 }
 
-const char *shade(double n)
+const char *grass_texture(double n)
+{
+	switch ((int)(n * 10000) % 4) {
+	case 0:
+		return "\033[0;92;40m,.";
+	case 1:
+		return "\033[0;92;40m.'";
+	case 2:
+		return "\033[0;92;40m'\"";
+	case 3:
+		return "\033[0;92;40m\",";
+	default:
+		return "\033[0;105m  ";
+	}
+}
+
+const char *trees_texture(double n)
+{
+	switch ((int)(n * 10000) % 25) {
+	case 0:
+		return "\033[0;2;32;40m%%";
+	case 1:
+		return "\033[0;2;32;40m.%";
+	case 2:
+		return "\033[0;2;32;40m%,";
+	case 3:
+		return "\033[0;2;32;40m'%";
+	case 4:
+		return "\033[0;2;32;40m%\"";
+	default:
+		// (Fallthrough)
+	}
+
+	switch ((int)(n * 10000) % 4) {
+	case 0:
+		return "\033[0;2;32;40m,.";
+	case 1:
+		return "\033[0;2;32;40m.'";
+	case 2:
+		return "\033[0;2;32;40m'\"";
+	case 3:
+		return "\033[0;2;32;40m\",";
+	default:
+		return "\033[0;105m  ";
+	}
+}
+
+const char *surface_shade(double n)
 {
 	if (n < 0.5) {
 		// Water
 		if (n > 0.45) {
-			return "\033[0;94;40m"; // Light blue
+			return "\033[0;94;40m~~"; // Light blue
 		} else if (n > 0.30) {
-			return "\033[0;34;40m"; // Blue
+			return "\033[0;34;40m~~"; // Blue
 		} else {
-			return "\033[0;30;40m"; // Black
+			return "\033[0;30;40m~~"; // Black
 		}
 	} else {
 		// Land
 		if (n < 0.525) {
-			return "\033[0;93;40m"; // Yellow
+			return "\033[0;93;40m~~"; // Yellow
 		} else if (n < 0.57) {
-			return "\033[0;92;40m"; // Bright green
+			return grass_texture(n); // Bright green
 		} else if (n < 0.62) {
-			return "\033[0;2;32;40m"; // Dark green
+			return trees_texture(n); // Dark green
 		} else if (n < 0.65) {
-			return "\033[0;2;37;40m"; // Dark gray
+			return "\033[0;2;37;40m=="; // Dark gray
 		} else if (n < 0.70) {
-			return "\033[0;37;40m"; // White
+			return "\033[0;37;40m^^"; // White
 		} else {
-			return "\033[0;1;97;40m"; // Bright white
-		}
-	}
-}
-
-const char *grass_glyph(double n)
-{
-	switch ((int)(n * 10000) % 4) {
-	case 0:
-		return ",.";
-	case 1:
-		return ".'";
-	case 2:
-		return "'\"";
-	case 3:
-		return "\",";
-	default:
-		return "  ";
-	}
-}
-
-const char *trees_glyph(double n)
-{
-	switch ((int)(n * 10000) % 25) {
-	case 0:
-		return "%%";
-	case 1:
-		return ".%";
-	case 2:
-		return "%,";
-	case 3:
-		return "'%";
-	case 4:
-		return "%\"";
-	default:
-		return grass_glyph(n);
-	}
-}
-
-const char *glyph(double n)
-{
-	if (n < 0.5) {
-		// Water
-		return "__";
-	} else {
-		// Land
-		if (n < 0.525) {
-			return "~~";
-		} else if (n < 0.57) {
-			return grass_glyph(n);
-		} else if (n < 0.62) {
-			return trees_glyph(n);
-		} else if (n < 0.65) {
-			return "==";
-		} else {
-			return "^^";
+			return "\033[0;1;97;40m^^"; // Bright white
 		}
 	}
 }
@@ -259,7 +251,7 @@ void render_world(uint64_t key)
 	for (int y = 0; y < HEIGHT; y++) {
 		for (int x = 0; x < WIDTH; x++) {
 			double n = surface_sample(key, x, y);
-			printf("%s%s", shade(n), glyph(n));
+			printf("%s", surface_shade(n));
 		}
 		printf("\033[m\n");
 	}
@@ -274,7 +266,7 @@ int main(int argc, char **argv)
 	for (int i = 0; i < argc; i++) {
 		switch (argv[i][0]) {
 		case 'k':
-			sscanf(&argv[i][1], "%llx", &key);
+			sscanf(&argv[i][1], "%lx", &key);
 			random_seed = false;
 			break;
 		case 'x':
@@ -294,6 +286,6 @@ int main(int argc, char **argv)
 		render_world(key);
 	}
 
-	printf("Seed: %llx\n", key);
+	printf("Seed: %lx\n", key);
 	return 0;
 }
