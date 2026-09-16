@@ -1,9 +1,9 @@
 //`which tcc` $CFLAGS -run $0 "$@"; exit $?
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <math.h>
-#include <limits.h>
 
 #include <sys/random.h>
 
@@ -107,24 +107,6 @@ double noise(uint64_t key, int x, int y, int z, unsigned period)
 #define WIDTH 72
 #define HEIGHT 60
 
-#define SAMPLE_PERIOD 20
-double height_sample(uint64_t key, int x, int y)
-{
-	// Generate fractal noise
-	double n = 0.0;
-	n += noise(key,     x, y, 0, SAMPLE_PERIOD)     * (3.0 / 6.0);
-	n += noise(key + 1, x, y, 0, SAMPLE_PERIOD / 2) * (2.0 / 6.0);
-	n += noise(key + 2, x, y, 0, SAMPLE_PERIOD / 4) * (1.0 / 6.0);
-
-	// Add ridges & rivers
-	double w = noise(key + 3, x, y, 0, SAMPLE_PERIOD);
-	if (-0.1 <= w && w <= 0.1)
-		n += 1.5 * w;
-
-	n = 0.5 + (n * 0.5);
-	return n;
-}
-
 #define DERATE_WIDTH ((double)(WIDTH/10))
 #define DERATE_HEIGHT ((double)(HEIGHT/10))
 double edge_derate(int x, int y)
@@ -149,6 +131,33 @@ double edge_derate(int x, int y)
 	return 0.5 + (smoothstep(n) * 0.5);
 }
 
+#define SAMPLE_PERIOD 20
+double surface_sample(uint64_t key, int x, int y)
+{
+	// Fractal noise base
+	double surface = 0.0;
+	surface += noise(key,     x, y, 0, SAMPLE_PERIOD)     * (4.0 / 7.0);
+	surface += noise(key + 1, x, y, 0, SAMPLE_PERIOD / 2) * (2.0 / 7.0);
+	surface += noise(key + 2, x, y, 0, SAMPLE_PERIOD / 4) * (1.0 / 7.0);
+
+	// Add feature layers (rivers & ridges)
+	double river = noise(key + 3, x, y, 0, SAMPLE_PERIOD / 2);
+	if (-0.1 <= river && river <= 0.1)
+		surface -= 3 * (0.1 - fabs(river));
+
+	double ridge = noise(key + 4, x, y, 0, SAMPLE_PERIOD);
+	if (-0.1 <= ridge && ridge <= 0.1)
+		surface += 2 * (0.1 - fabs(ridge));
+
+	// Normalize to 0.0-1.0
+	surface = 0.5 + (surface * 0.5);
+
+	// Derate around the edges
+	surface *= edge_derate(x, y);
+
+	return surface;
+}
+
 const char *shade(double n)
 {
 	if (n < 0.5) {
@@ -171,9 +180,9 @@ const char *shade(double n)
 		} else if (n < 0.65) {
 			return "\033[0;2;37;40m"; // Dark gray
 		} else if (n < 0.70) {
-			return "\033[0;1;37;40m"; // White
+			return "\033[0;37;40m"; // White
 		} else {
-			return "\033[0;1;91;40m"; // Bright red
+			return "\033[0;1;97;40m"; // Bright white
 		}
 	}
 }
@@ -233,15 +242,24 @@ const char *glyph(double n)
 	}
 }
 
+void visualize_surface(uint64_t key)
+{
+	for (int y = 0; y < HEIGHT; y++) {
+		for (int x = 0; x < WIDTH; x++) {
+			double n = surface_sample(key, x, y);
+			int i = n * 256;
+			printf("\033[48;2;%d;%d;%dm  ", i, i, i);
+		}
+		printf("\033[m\n");
+	}
+}
+
 void render_world(uint64_t key)
 {
 	for (int y = 0; y < HEIGHT; y++) {
 		for (int x = 0; x < WIDTH; x++) {
-			double n = height_sample(key, x, y);
-			n *= edge_derate(x, y);
+			double n = surface_sample(key, x, y);
 			printf("%s%s", shade(n), glyph(n));
-			//int i = n * 256;
-			//printf("\033[48;2;%d;%d;%dm  ", i, i, i);
 		}
 		printf("\033[m\n");
 	}
@@ -249,15 +267,32 @@ void render_world(uint64_t key)
 
 int main(int argc, char **argv)
 {
-	uint64_t key = 0xdeadbeef;
-	if (argc > 1) {
-		sscanf(argv[1], "%llx", &key);
-	} else {
+	uint64_t key = 0xbad5eed;
+	bool random_seed = true;
+	bool xray_mode = false;
+
+	for (int i = 0; i < argc; i++) {
+		switch (argv[i][0]) {
+		case 'k':
+			sscanf(&argv[i][1], "%llx", &key);
+			random_seed = false;
+			break;
+		case 'x':
+			xray_mode = true;
+			break;
+		}
+	}
+
+	if (random_seed) {
 		if (0 > getrandom(&key, sizeof(key), 0))
 			perror("getrandom()");
 	}
 
-	render_world(key);
+	if (xray_mode) {
+		visualize_surface(key);
+	} else {
+		render_world(key);
+	}
 
 	printf("Seed: %llx\n", key);
 	return 0;
