@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <math.h>
+#include <inttypes.h>
+#include <unistd.h>
 
 #include <sys/random.h>
 
@@ -107,25 +109,25 @@ double noise(uint64_t key, int x, int y, int z, unsigned period)
 #define WIDTH 72
 #define HEIGHT 60
 
-#define DERATE_WIDTH ((double)(WIDTH/10))
-#define DERATE_HEIGHT ((double)(HEIGHT/10))
+#define SURFACE_BIAS_WIDTH ((double)(WIDTH/10))
+#define SURFACE_BIAS_HEIGHT ((double)(HEIGHT/10))
 double surface_bias(int x, int y)
 {
 	double n = 1.0;
 
 	// Trend towards 0 at west/north edges
-	if (x < DERATE_WIDTH)
-		n *= (x / DERATE_WIDTH);
-	if (y < DERATE_HEIGHT)
-		n *= (y / DERATE_HEIGHT);
+	if (x < SURFACE_BIAS_WIDTH)
+		n *= (x / SURFACE_BIAS_WIDTH);
+	if (y < SURFACE_BIAS_HEIGHT)
+		n *= (y / SURFACE_BIAS_HEIGHT);
 
 	// Trend towards 0 at east/south edges
 	x = (WIDTH - 1) - x;
 	y = (HEIGHT - 1) - y;
-	if (x < DERATE_WIDTH)
-		n *= (x / DERATE_WIDTH);
-	if (y < DERATE_HEIGHT)
-		n *= (y / DERATE_HEIGHT);
+	if (x < SURFACE_BIAS_WIDTH)
+		n *= (x / SURFACE_BIAS_WIDTH);
+	if (y < SURFACE_BIAS_HEIGHT)
+		n *= (y / SURFACE_BIAS_HEIGHT);
 
 	// Smooth and weaken transition
 	return 0.5 + (smoothstep(n) * 0.5);
@@ -229,6 +231,90 @@ void visualize_surface(uint64_t key)
 	}
 }
 
+#define CLIMATE_BIAS_HEIGHT ((double)(HEIGHT/6))
+double pole_bias(int x, int y)
+{
+	(void)x;
+	double n = 1.0;
+
+	// Trend towards 0 at north/south edges
+	if (y < CLIMATE_BIAS_HEIGHT)
+		n *= (y / CLIMATE_BIAS_HEIGHT);
+	y = (HEIGHT - 1) - y;
+	if (y < CLIMATE_BIAS_HEIGHT)
+		n *= (y / CLIMATE_BIAS_HEIGHT);
+
+	// Smooth and weaken transition
+	return 0.35 + (smoothstep(n) * 0.65);
+}
+
+double equator_bias(int x, int y)
+{
+	(void)x;
+	double n = 1.0;
+
+	// Trend towards 0 at north/south edges
+	y -= (HEIGHT / 2);
+	if (y >= 0 && y < CLIMATE_BIAS_HEIGHT)
+		n *= (y / CLIMATE_BIAS_HEIGHT);
+	y = -y;
+	if (y >= 0 && y < CLIMATE_BIAS_HEIGHT)
+		n *= (y / CLIMATE_BIAS_HEIGHT);
+
+	// Smooth and weaken transition
+	return 0.65 + (smoothstep(n) * 0.35);
+}
+
+double temperature_sample(uint64_t key, int x, int y, int z)
+{
+	// Fractal noise base
+	double temperature = 0.0;
+	temperature += noise(key + 5, x, y, z, SAMPLE_PERIOD)     * (3.0 / 6.0);
+	temperature += noise(key + 6, x, y, z, SAMPLE_PERIOD / 2) * (2.0 / 6.0);
+	temperature += noise(key + 7, x, y, z, SAMPLE_PERIOD / 4) * (1.0 / 6.0);
+
+	// Trend towards hot/cold at equator/poles
+	temperature = -1.0 + (1.0 + temperature) * pole_bias(x, y);
+	temperature = 1.0 - (1.0 - temperature) * equator_bias(x, y);
+
+	return temperature;
+}
+
+void visualize_temperature(uint64_t key)
+{
+	for (int y = 0; y < HEIGHT; y++) {
+		for (int x = 0; x < WIDTH; x++) {
+			double n = temperature_sample(key, x, y, 0);
+			int i = 128 + n * 128;
+			printf("\033[48;2;%d;%d;%dm  ", i, i, i);
+		}
+		printf("\033[m\n");
+	}
+	// Show temperature varying over time
+	for (int z = 0; z < 100; z++) {
+		usleep(500e3);
+		for (int y = 0; y < HEIGHT; y++) {
+			for (int x = 0; x < WIDTH; x++) {
+				double n = temperature_sample(key, x, y, z);
+				if (n > 0.25) {
+					printf("\033[0;41m  ");
+				} else if (n > -0.25) {
+					printf("\033[0;42m  ");
+				} else {
+					printf("\033[0;44m  ");
+				}
+			}
+			printf("\033[m\n");
+		}
+	}
+	// TODO:
+	// * Tune constants
+	// * Consider adding Z arguments to surface
+	//   * Consider varying Z instead of key
+	// * Shade differently by temperature
+	// * Model clouds/precipitation
+}
+
 void render_world(uint64_t key)
 {
 	for (int y = 0; y < HEIGHT; y++) {
@@ -240,20 +326,21 @@ void render_world(uint64_t key)
 	}
 }
 
+
 int main(int argc, char **argv)
 {
 	uint64_t key = 0xbad5eed;
 	bool random_seed = true;
-	bool xray_mode = false;
+	char visualize = '\0';
 
 	for (int i = 0; i < argc; i++) {
 		switch (argv[i][0]) {
 		case 'k':
-			sscanf(&argv[i][1], "%lx", &key);
+			sscanf(&argv[i][1], "%" SCNx64, &key);
 			random_seed = false;
 			break;
-		case 'x':
-			xray_mode = true;
+		case 'v':
+			visualize = argv[i][1];
 			break;
 		}
 	}
@@ -263,10 +350,16 @@ int main(int argc, char **argv)
 			perror("getrandom()");
 	}
 
-	if (xray_mode) {
+	switch (visualize) {
+	case 's':
 		visualize_surface(key);
-	} else {
+		break;
+	case 't':
+		visualize_temperature(key);
+		break;
+	default:
 		render_world(key);
+		break;
 	}
 
 	printf("Seed: %lx\n", key);
