@@ -109,17 +109,17 @@ double noise(uint64_t key, int x, int y, int z, unsigned period)
 
 #define DERATE_WIDTH ((double)(WIDTH/10))
 #define DERATE_HEIGHT ((double)(HEIGHT/10))
-double edge_derate(int x, int y)
+double surface_bias(int x, int y)
 {
 	double n = 1.0;
 
-	// Handle nearness to lower limits
+	// Trend towards 0 at west/north edges
 	if (x < DERATE_WIDTH)
 		n *= (x / DERATE_WIDTH);
 	if (y < DERATE_HEIGHT)
 		n *= (y / DERATE_HEIGHT);
 
-	// Handle nearness to upper limits
+	// Trend towards 0 at east/south edges
 	x = (WIDTH - 1) - x;
 	y = (HEIGHT - 1) - y;
 	if (x < DERATE_WIDTH)
@@ -127,7 +127,7 @@ double edge_derate(int x, int y)
 	if (y < DERATE_HEIGHT)
 		n *= (y / DERATE_HEIGHT);
 
-	// Smooth and weaken the transition
+	// Smooth and weaken transition
 	return 0.5 + (smoothstep(n) * 0.5);
 }
 
@@ -136,9 +136,9 @@ double surface_sample(uint64_t key, int x, int y)
 {
 	// Fractal noise base
 	double surface = 0.0;
-	surface += noise(key,     x, y, 0, SAMPLE_PERIOD)     * (4.0 / 7.0);
-	surface += noise(key + 1, x, y, 0, SAMPLE_PERIOD / 2) * (2.0 / 7.0);
-	surface += noise(key + 2, x, y, 0, SAMPLE_PERIOD / 4) * (1.0 / 7.0);
+	surface += noise(key,     x, y, 0, SAMPLE_PERIOD)     * (3.0 / 6.0);
+	surface += noise(key + 1, x, y, 0, SAMPLE_PERIOD / 2) * (2.0 / 6.0);
+	surface += noise(key + 2, x, y, 0, SAMPLE_PERIOD / 4) * (1.0 / 6.0);
 
 	// Add feature layers (rivers & ridges)
 	double river = noise(key + 3, x, y, 0, SAMPLE_PERIOD / 2);
@@ -149,87 +149,70 @@ double surface_sample(uint64_t key, int x, int y)
 	if (-0.1 <= ridge && ridge <= 0.1)
 		surface += 2 * (0.1 - fabs(ridge));
 
-	// Normalize to 0.0-1.0
-	surface = 0.5 + (surface * 0.5);
-
-	// Derate around the edges
-	surface *= edge_derate(x, y);
+	// Trend towards sea level at edges
+	surface = -1.0 + (1.0 + surface) * surface_bias(x, y);
 
 	return surface;
 }
 
-const char *grass_texture(double n)
+const char *plains_texture(double n)
 {
-	switch ((int)(n * 10000) % 4) {
-	case 0:
-		return "\033[0;92;40m,.";
-	case 1:
-		return "\033[0;92;40m.'";
-	case 2:
-		return "\033[0;92;40m'\"";
-	case 3:
-		return "\033[0;92;40m\",";
-	default:
-		return "\033[0;105m  ";
-	}
+	static const char *palette[] = {
+		"\033[0;92;40m" ",.",
+		"\033[0;92;40m" ".'",
+		"\033[0;92;40m" "'\"",
+		"\033[0;92;40m" "\",",
+	};
+	int i = (int)(n * 10000);
+	return palette[i % 4];
 }
 
-const char *trees_texture(double n)
+const char *forest_texture(double n)
 {
-	switch ((int)(n * 10000) % 25) {
-	case 0:
-		return "\033[0;2;32;40m%%";
-	case 1:
-		return "\033[0;2;32;40m.%";
-	case 2:
-		return "\033[0;2;32;40m%,";
-	case 3:
-		return "\033[0;2;32;40m'%";
-	case 4:
-		return "\033[0;2;32;40m%\"";
-	default:
-		// (Fallthrough)
-	}
-
-	switch ((int)(n * 10000) % 4) {
-	case 0:
-		return "\033[0;2;32;40m,.";
-	case 1:
-		return "\033[0;2;32;40m.'";
-	case 2:
-		return "\033[0;2;32;40m'\"";
-	case 3:
-		return "\033[0;2;32;40m\",";
-	default:
-		return "\033[0;105m  ";
+	static const char *palette[] = {
+		"\033[0;2;32;40m" "%%",
+		"\033[0;2;32;40m" ".%",
+		"\033[0;2;32;40m" "%,",
+		"\033[0;2;32;40m" "'%",
+		"\033[0;2;32;40m" "%\"",
+		"\033[0;2;32;40m" ",.",
+		"\033[0;2;32;40m" ".'",
+		"\033[0;2;32;40m" "'\"",
+		"\033[0;2;32;40m" "\",",
+	};
+	int i = (int)(n * 10000);
+	if (i % 5 == 0) {
+		return palette[i % 5];
+	} else {
+		return palette[5 + i % 4];
 	}
 }
 
 const char *surface_shade(double n)
 {
-	if (n < 0.5) {
+	if (n < 0.0) {
 		// Water
-		if (n > 0.45) {
-			return "\033[0;94;40m~~"; // Light blue
-		} else if (n > 0.30) {
-			return "\033[0;34;40m~~"; // Blue
+		if (n > -0.10) {
+			return "\033[0;94;40m" "~~"; // Light blue
+		} else if (n > -0.40) {
+			return "\033[0;34;40m" "~~"; // Blue
 		} else {
-			return "\033[0;30;40m~~"; // Black
+			return "\033[0;30;40m" "~~"; // Black
 		}
 	} else {
 		// Land
-		if (n < 0.525) {
-			return "\033[0;93;40m~~"; // Yellow
-		} else if (n < 0.57) {
-			return grass_texture(n); // Bright green
-		} else if (n < 0.62) {
-			return trees_texture(n); // Dark green
-		} else if (n < 0.65) {
-			return "\033[0;2;37;40m=="; // Dark gray
-		} else if (n < 0.70) {
-			return "\033[0;37;40m^^"; // White
+		if (n < 0.05) {
+			return "\033[0;93;40m" "~~"; // Yellow
+		} else if (n < 0.15) {
+			return plains_texture(n); // Bright green
+		} else if (n < 0.25) {
+			return forest_texture(n); // Dark green
+		} else if (n < 0.30) {
+			return "\033[0;2;37;40m" "=="; // Dark gray
+		} else if (n < 0.40) {
+			return "\033[0;37;40m" "^^"; // White
 		} else {
-			return "\033[0;1;97;40m^^"; // Bright white
+			return "\033[0;1;97;40m" "^^"; // Bright white
 		}
 	}
 }
@@ -239,7 +222,7 @@ void visualize_surface(uint64_t key)
 	for (int y = 0; y < HEIGHT; y++) {
 		for (int x = 0; x < WIDTH; x++) {
 			double n = surface_sample(key, x, y);
-			int i = n * 256;
+			int i = 128 + n * 128;
 			printf("\033[48;2;%d;%d;%dm  ", i, i, i);
 		}
 		printf("\033[m\n");
