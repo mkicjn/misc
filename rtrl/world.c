@@ -145,7 +145,7 @@ double surface_sample(uint64_t key, int x, int y)
 	// Add feature layers (rivers & ridges)
 	double river = noise(key + 3, x, y, 0, SAMPLE_PERIOD / 2);
 	if (-0.1 <= river && river <= 0.1)
-		surface -= 3 * (0.1 - fabs(river));
+		surface -= 2 * (0.1 - fabs(river));
 
 	double ridge = noise(key + 4, x, y, 0, SAMPLE_PERIOD);
 	if (-0.1 <= ridge && ridge <= 0.1)
