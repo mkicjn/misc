@@ -1,12 +1,9 @@
-collatzStep :: Int -> Int
-collatzStep n =
-  case n `mod` 2 of
-    0 -> n `div` 2;
-    1 -> 3 * n + 1
-
 collatzLen :: Int -> Int
 collatzLen 1 = 0
 collatzLen n =
-  (1+) . collatzLen $ collatzStep n
+  (1+) $ collatzLen $ step n
+  where step n
+         | even n     = n `div` 2
+         | otherwise  = 3 * n + 1
 
 main = print $ maximum $ map collatzLen [1..1000000]

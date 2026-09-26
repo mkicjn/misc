@@ -1,11 +1,10 @@
-
+-- collatz.hs with lazy lists
 import Data.List (elemIndex)
 
+collatz :: Int -> [Int]
 collatz = iterate step
-  where step n = case n `mod` 2 of
-                 0 -> n `div` 2;
-                 1 -> 3 * n + 1
+  where step n
+         | even n    = n `div` 2
+         | otherwise = 3 * n + 1
 
-collatzLen = elemIndex 1 . collatz
-
-main = print $ maximum $ map collatzLen [1..1000000]
+main = print $ maximum . map (elemIndex 1) $ map collatz [1..1000000]
