@@ -32,7 +32,9 @@ ALSO_CLEAN = \
 	src/collatz.cmi \
 	src/collatz.cmo \
 	src/collatz.cmx \
-	src/collatz.hi
+	src/collatz.hi \
+	src/collatz2.hi \
+	src/*.o
 
 all: $(ALL)
 
