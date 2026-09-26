@@ -23,13 +23,15 @@ ALL = \
 	collatz_rust \
 	collatz_ocaml \
 	collatz_ocamlc \
-	collatz_ocamlopt
+	collatz_ocamlopt \
+	collatz_ghc
 
 ALSO_CLEAN = \
 	Collatz.class \
 	src/collatz.cmi \
 	src/collatz.cmo \
-	src/collatz.cmx
+	src/collatz.cmx \
+	src/collatz.hi
 
 all: $(ALL)
 
@@ -148,3 +150,6 @@ collatz_ocamlc: src/collatz.ml
 	ocamlc -o $@ $^
 collatz_ocamlopt: src/collatz.ml
 	ocamlopt -o $@ $^
+
+collatz_ghc: src/collatz.hs
+	ghc -O3 -o $@ $^

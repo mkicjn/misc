@@ -22,5 +22,6 @@ pkgs.mkShell {
     openjdk
     rustc
     ocaml
+    ghc
   ];
 }
