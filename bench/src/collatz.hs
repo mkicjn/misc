@@ -9,8 +9,4 @@ collatzLen 1 = 0
 collatzLen n =
   (1+) . collatzLen $ collatzStep n
 
-collatzMax :: Int -> Int
-collatzMax lim =
-  foldl max 0 $ map collatzLen [1..lim]
-
-main = print $ collatzMax 1000000
+main = print $ maximum $ map collatzLen [1..1000000]

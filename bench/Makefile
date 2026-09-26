@@ -24,7 +24,8 @@ ALL = \
 	collatz_ocaml \
 	collatz_ocamlc \
 	collatz_ocamlopt \
-	collatz_ghc
+	collatz_ghc \
+	collatz2_ghc
 
 ALSO_CLEAN = \
 	Collatz.class \
@@ -152,4 +153,6 @@ collatz_ocamlopt: src/collatz.ml
 	ocamlopt -o $@ $^
 
 collatz_ghc: src/collatz.hs
+	ghc -O3 -o $@ $^
+collatz2_ghc: src/collatz2.hs
 	ghc -O3 -o $@ $^
