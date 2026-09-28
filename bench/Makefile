@@ -1,31 +1,31 @@
 ALL = \
 	collatz_fasm \
-	collatz_gcc \
-	collatz_tcc \
-	collatz_gforth-fast \
-	collatz_gforth \
-	collatz_gforth-itc \
-	collatz_sbcl \
-	collatz_sbcl_noopt \
-	collatz_pypy3 \
-	collatz_python3 \
-	collatz_tclsh \
-	collatz_csc \
-	collatz_csi \
-	collatz_scheme \
-	collatz_newlisp \
-	collatz_racket \
-	collatz_lua \
-	collatz_luajit \
-	collatz_swipl \
-	collatz_java \
-	collatz_javac \
 	collatz_rust \
-	collatz_ocaml \
-	collatz_ocamlc \
-	collatz_ocamlopt \
+	collatz_gcc \
+	collatz_sbcl \
 	collatz_ghc \
-	collatz2_ghc
+	collatz2_ghc \
+	collatz_javac \
+	collatz_ocamlopt \
+	collatz_gforth-fast \
+	collatz_luajit \
+	collatz_java \
+	collatz_tcc \
+	collatz_sbcl_noopt \
+	collatz_scheme \
+	collatz_racket \
+	collatz_gforth \
+	collatz_pypy3 \
+	collatz_ocamlc \
+	collatz_ocaml \
+	collatz_gforth-itc \
+	collatz_lua \
+	collatz_csc \
+	collatz_swipl \
+	collatz_tclsh \
+	collatz_python3 \
+	collatz_newlisp \
+	collatz_csi
 
 ALSO_CLEAN = \
 	Collatz.class \
