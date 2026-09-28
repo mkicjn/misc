@@ -17,8 +17,8 @@ ALL = \
 	collatz_gforth \
 	collatz_pypy3 \
 	collatz_ocamlc \
-	collatz_ocaml \
 	collatz_gforth-itc \
+	collatz_ocaml \
 	collatz_lua \
 	collatz_csc \
 	collatz_swipl \

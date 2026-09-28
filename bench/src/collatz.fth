@@ -1,6 +1,6 @@
-: ITER  DUP 1 AND 0= IF  2/  ELSE  DUP 2* + 1+  THEN ;
-: COLLATZ  0 SWAP  BEGIN  DUP 1 >  WHILE  SWAP 1+ SWAP  ITER  REPEAT  DROP ;
-: MAXLEN  0 SWAP  BEGIN   DUP COLLATZ ROT MAX SWAP  1- DUP 0= UNTIL DROP ;
+: step  dup 1 and if  3 * 1+  else  2/  then ;
+: len   0 >r  begin dup 1 > while  step r> 1+ >r  repeat drop r> ;
+: maxlen  0 swap for  i len max  next ;
 
-1000000 MAXLEN .
-BYE
+1000000 maxlen .
+bye
