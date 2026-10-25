@@ -37,7 +37,11 @@ void print_term(struct term *t)
 		printf(")");
 		break;
 	case Fwd:
+		printf("->");
 		print_term(t->as.fwd.dest);
+		break;
+	default:
+		printf("{type %d}", t->type);
 		break;
 	}
 }
@@ -77,52 +81,77 @@ struct term *app(struct term *l, struct term *r)
 	return t;
 }
 
-bool reduce(struct term **tp)
+bool reduce(struct term *t)
 {
-	struct term *t = *tp;
-	struct term *prev[3];
-	prev[0] = NULL;
-	prev[1] = NULL;
-	prev[2] = NULL;
-	bool done = false;
-	while (!done) {
-		switch (t->type) {
-		case App:
-			prev[2] = prev[1];
-			prev[1] = prev[0];
-			prev[0] = t;
-			t = t->as.app.left;
-			break;
-		case Fwd:
+	struct term *apps[10]; // FIXME: Stack limit
+	size_t d = 0; // "depth"
+
+	for (;;) {
+		if (t->type == Fwd) {
 			t = t->as.fwd.dest;
+		} else if (t->type == App) {
+			apps[d++] = t;
+			t = t->as.app.left;
+		} else {
 			break;
-		default:
-			done = true;
 		}
 	}
 
+#ifdef DEBUG
+	for (int i = 0; i < d; i++) {
+		printf("Level %d: ", i);
+		print_term(apps[i]);
+		printf("\n");
+	}
+	printf("Combinator (level %d): ", d);
+	print_term(t);
+	printf("\n");
+#endif
+
+	struct term *arg0 = d > 0 ? apps[d - 1]->as.app.right : NULL;
+	struct term *arg1 = d > 1 ? apps[d - 2]->as.app.right : NULL;
+	struct term *arg2 = d > 2 ? apps[d - 3]->as.app.right : NULL;
+	struct term *top = NULL;
 	switch (t->type) {
 	case S:
-		if (prev[2] == NULL)
-			break;
-		*tp = app(app(prev[0]->as.app.right, prev[2]->as.app.right),
-		          app(prev[1]->as.app.right, prev[2]->as.app.right));
-		t->type = Fwd;
-		t->as.fwd.dest = *tp;
+		if (arg2 == NULL)
+			return false;
+#ifdef DEBUG
+		printf("Apply S to ");
+		print_term(arg0);
+		printf(", ");
+		print_term(arg1);
+		printf(", ");
+		print_term(arg2);
+		printf("\n");
+#endif
+		top = apps[d - 3];
+		top->type = Fwd;
+		top->as.fwd.dest = app(app(arg0, arg2), app(arg1, arg2));
 		return true;
 	case K:
-		if (prev[1] == NULL)
-			break;
-		t->type = Fwd;
-		t->as.fwd.dest = prev[0]->as.app.right;
-		*tp = t;
+		if (arg1 == NULL)
+			return false;
+#ifdef DEBUG
+		printf("Apply K to ");
+		print_term(arg0);
+		printf(", ");
+		print_term(arg1);
+		printf("\n");
+#endif
+		top = apps[d - 2];
+		*top = *arg0;
 		return true;
 	case I:
-		if (prev[0] == NULL)
-			break;
-		t->type = Fwd;
-		t->as.fwd.dest = prev[0]->as.app.right;
-		*tp = t;
+		if (arg0 == NULL)
+			return false;
+#ifdef DEBUG
+		printf("Apply I to ");
+		print_term(arg0);
+		printf("\n");
+#endif
+		top = apps[d - 1];
+		*top = *arg0;
 		return true;
 	}
 	return false;
@@ -130,13 +159,14 @@ bool reduce(struct term **tp)
 
 int main()
 {
-	//struct term *t = app(i(), app(app(k(), s()), i()));
-	struct term *t = app(app(app(s(), k()), k()),
-			     app(app(k(), app(i(), i())), s()));
+	// TODO: Implement hash consing?
+	struct term *skk = app(app(s(), k()), k());
+	struct term *t = app(skk, app(app(k(), app(skk, i())), s()));
+	//struct term *t = app(skk, skk);
 	do {
 		// Reduction here is until WHNF (I think)
 		print_term(t);
 		printf("\n");
-	} while (reduce(&t));
+	} while (reduce(t));
 	return 0;
 }
