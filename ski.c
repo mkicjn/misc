@@ -179,7 +179,7 @@ bool reduce_S(struct spine *spine)
 	struct term *arg0 = spine->app->right;
 	struct term *arg1 = spine->up->app->right;
 	struct term *arg2 = spine->up->up->app->right;
-	spine->up->up->app->forward = a(a(arg0, arg2), a(arg1, arg2));
+	spine->up->up->app->forward = follow(a(a(arg0, arg2), a(arg1, arg2)));
 	return true;
 }
 
