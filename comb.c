@@ -7,36 +7,24 @@
 // https://github.com/mkicjn/splay
 #include "../splay/src/splay.c"
 
+#define IN(X,T) ((uintptr_t)(X) >= (uintptr_t)(T) \
+		&& (uintptr_t)(X) < (uintptr_t)(T) + sizeof(T))
 
-// Terms, memory pool, and printing
 
-#define MAX_TERMS 10000
+// Terms, memory pool
+
+#define MAX_APPS 10000
 
 struct term {
 	struct term *left, *right, *forward;
 	struct splay_link link;
-};
-
-struct term *S = (struct term *)-1;
-struct term *K = (struct term *)-2;
-struct term *I = (struct term *)-3;
-struct term *B = (struct term *)-4;
-struct term *C = (struct term *)-5;
-struct term *W = (struct term *)-6;
-
-struct term apps[MAX_TERMS];
+} apps[MAX_APPS];
 size_t n_apps = 0;
-
-static inline bool is_app(struct term *t)
-{
-	return (uintptr_t)apps <= (uintptr_t)(t)
-		&& (uintptr_t)t < (uintptr_t)(&apps[MAX_TERMS]);
-}
 
 struct term *follow(struct term *t)
 {
 	// FIXME: Need better cycle detection
-	while (is_app(t) && t->forward && t->forward != t)
+	while (IN(t, apps) && t->forward && t->forward != t)
 		t = t->forward;
 	return t;
 }
@@ -46,81 +34,11 @@ size_t term_size(struct term *t, bool fwd)
 	if (fwd)
 		t = follow(t);
 
-	if (!is_app(t))
+	if (!IN(t, apps))
 		return 1;
 
 	return 1 + term_size(t->left, fwd)
 		 + term_size(t->right, fwd);
-}
-
-void print_term(struct term *t, bool fwd)
-{
-	if (fwd)
-		t = follow(t);
-
-	if (is_app(t)) {
-		print_term(t->left, fwd);
-		struct term *right = t->right;
-		if (fwd)
-			right = follow(right);
-		if (is_app(right)) {
-			printf("(");
-			print_term(right, fwd);
-			printf(")");
-		} else {
-			print_term(right, fwd);
-		}
-	} else if (t == S) {
-		printf("S");
-	} else if (t == K) {
-		printf("K");
-	} else if (t == I) {
-		printf("I");
-	} else if (t == B) {
-		printf("B");
-	} else if (t == C) {
-		printf("C");
-	} else if (t == W) {
-		printf("W");
-	} else {
-		printf("???");
-	}
-}
-
-void print_term_idx(struct term *t)
-{
-	if (t == S) {
-		printf("S");
-	} else if (t == K) {
-		printf("K");
-	} else if (t == I) {
-		printf("I");
-	} else if (t == B) {
-		printf("B");
-	} else if (t == C) {
-		printf("C");
-	} else if (t == W) {
-		printf("W");
-	} else {
-		printf("%zd", t - apps);
-	}
-}
-
-void dump_apps(void)
-{
-	for (size_t i = 0; i < n_apps; i++) {
-		printf("%zu: ", i);
-		printf("(");
-		print_term_idx(apps[i].left);
-		printf(" ");
-		print_term_idx(apps[i].right);
-		printf(")");
-		if (apps[i].forward) {
-			printf(" -> ");
-			print_term_idx(apps[i].forward);
-		}
-		printf("\n");
-	}
 }
 
 
@@ -145,9 +63,6 @@ enum splay_dir term_nav(const struct splay_link *xl, const struct splay_link *yl
 struct splay_link *root = NULL;
 struct term *a(struct term *x, struct term *y) // apply
 {
-	x = follow(x);
-	y = follow(y);
-
 	struct term *app = &apps[n_apps];
 	app->left = x;
 	app->right = y;
@@ -183,6 +98,31 @@ bool reduce_B(struct spine *spine);
 bool reduce_C(struct spine *spine);
 bool reduce_W(struct spine *spine);
 
+typedef bool (*Comb)(struct spine *spine);
+
+enum comb {
+	S, K, I, B, C, W,
+	NUM_COMBS
+};
+
+const char *comb_names[NUM_COMBS] = {
+	[S] = "S",
+	[K] = "K",
+	[I] = "I",
+	[B] = "B",
+	[C] = "C",
+	[W] = "W",
+};
+
+Comb combs[NUM_COMBS] = {
+	[S] = reduce_S,
+	[K] = reduce_K,
+	[I] = reduce_I,
+	[B] = reduce_B,
+	[C] = reduce_C,
+	[W] = reduce_W,
+};
+
 bool reduce1(struct term *t, struct spine *spine)
 {
 	struct spine down;
@@ -190,20 +130,10 @@ bool reduce1(struct term *t, struct spine *spine)
 	down.up = spine;
 	down.app = t;
 
-	if (is_app(t))
+	if (IN(t, apps))
 		return reduce1(t->left, &down);
-	else if (t == S)
-		return reduce_S(spine);
-	else if (t == K)
-		return reduce_K(spine);
-	else if (t == I)
-		return reduce_I(spine);
-	else if (t == B)
-		return reduce_B(spine);
-	else if (t == C)
-		return reduce_C(spine);
-	else if (t == W)
-		return reduce_W(spine);
+	else if (IN(t, combs))
+		return (*(Comb *)t)(spine);
 	else
 		return false;
 }
@@ -212,9 +142,9 @@ bool reduce_S(struct spine *spine)
 {
 	if (spine == NULL || spine->up == NULL || spine->up->up == NULL)
 		return false;
-	struct term *arg0 = spine->app->right;
-	struct term *arg1 = spine->up->app->right;
-	struct term *arg2 = spine->up->up->app->right;
+	struct term *arg0 = follow(spine->app->right);
+	struct term *arg1 = follow(spine->up->app->right);
+	struct term *arg2 = follow(spine->up->up->app->right);
 	spine->up->up->app->forward = a(a(arg0, arg2), a(arg1, arg2));
 	return true;
 }
@@ -223,8 +153,8 @@ bool reduce_K(struct spine *spine)
 {
 	if (spine == NULL || spine->up == NULL)
 		return false;
-	struct term *arg0 = spine->app->right;
-	struct term *arg1 = spine->up->app->right;
+	struct term *arg0 = follow(spine->app->right);
+	struct term *arg1 = follow(spine->up->app->right);
 	spine->up->app->forward = arg0;
 	return true;
 }
@@ -233,7 +163,7 @@ bool reduce_I(struct spine *spine)
 {
 	if (spine == NULL)
 		return false;
-	struct term *arg0 = spine->app->right;
+	struct term *arg0 = follow(spine->app->right);
 	spine->app->forward = arg0;
 	return true;
 }
@@ -242,9 +172,9 @@ bool reduce_B(struct spine *spine)
 {
 	if (spine == NULL || spine->up == NULL || spine->up->up == NULL)
 		return false;
-	struct term *arg0 = spine->app->right;
-	struct term *arg1 = spine->up->app->right;
-	struct term *arg2 = spine->up->up->app->right;
+	struct term *arg0 = follow(spine->app->right);
+	struct term *arg1 = follow(spine->up->app->right);
+	struct term *arg2 = follow(spine->up->up->app->right);
 	spine->up->up->app->forward = a(arg0, a(arg1, arg2));
 	return true;
 }
@@ -253,9 +183,9 @@ bool reduce_C(struct spine *spine)
 {
 	if (spine == NULL || spine->up == NULL || spine->up->up == NULL)
 		return false;
-	struct term *arg0 = spine->app->right;
-	struct term *arg1 = spine->up->app->right;
-	struct term *arg2 = spine->up->up->app->right;
+	struct term *arg0 = follow(spine->app->right);
+	struct term *arg1 = follow(spine->up->app->right);
+	struct term *arg2 = follow(spine->up->up->app->right);
 	spine->up->up->app->forward = a(a(arg0, arg2), arg1);
 	return true;
 }
@@ -264,8 +194,8 @@ bool reduce_W(struct spine *spine)
 {
 	if (spine == NULL || spine->up == NULL || spine->up->up == NULL)
 		return false;
-	struct term *arg0 = spine->app->right;
-	struct term *arg1 = spine->up->app->right;
+	struct term *arg0 = follow(spine->app->right);
+	struct term *arg1 = follow(spine->up->app->right);
 	spine->up->app->forward = a(a(arg0, arg1), arg1);
 	return true;
 }
@@ -281,7 +211,59 @@ size_t reduce(struct term *t, size_t lim)
 }
 
 
-// String parsing
+// Printing
+
+void print_term(struct term *t, bool fwd)
+{
+	if (fwd)
+		t = follow(t);
+
+	if (IN(t, apps)) {
+		print_term(t->left, fwd);
+		struct term *right = t->right;
+		if (fwd)
+			right = follow(right);
+		if (IN(right, apps)) {
+			printf("(");
+			print_term(right, fwd);
+			printf(")");
+		} else {
+			print_term(right, fwd);
+		}
+	} else if (IN(t, combs)) {
+		printf("%s", comb_names[(Comb *)t - combs]);
+	} else {
+		printf("???");
+	}
+}
+
+void print_term_idx(struct term *t)
+{
+	if (IN(t, combs))
+		printf("%s", comb_names[(Comb *)t - combs]);
+	else
+		printf("%zd", t - apps);
+}
+
+void dump_apps(void)
+{
+	for (size_t i = 0; i < n_apps; i++) {
+		printf("%zu: ", i);
+		printf("(");
+		print_term_idx(apps[i].left);
+		printf(" ");
+		print_term_idx(apps[i].right);
+		printf(")");
+		if (apps[i].forward) {
+			printf(" -> ");
+			print_term_idx(apps[i].forward);
+		}
+		printf("\n");
+	}
+}
+
+
+// Parsing
 
 struct term *parse(const char *str)
 {
@@ -297,27 +279,27 @@ struct term *parse(const char *str)
 		switch (*(cur++)) {
 		case 'S':
 		case 's':
-			next = S;
+			next = (struct term *)&combs[S];
 			break;
 		case 'K':
 		case 'k':
-			next = K;
+			next = (struct term *)&combs[K];
 			break;
 		case 'I':
 		case 'i':
-			next = I;
+			next = (struct term *)&combs[I];
 			break;
 		case 'B':
 		case 'b':
-			next = B;
+			next = (struct term *)&combs[B];
 			break;
 		case 'C':
 		case 'c':
-			next = C;
+			next = (struct term *)&combs[C];
 			break;
 		case 'W':
 		case 'w':
-			next = W;
+			next = (struct term *)&combs[W];
 			break;
 		case '(':
 			next = parse(NULL);
