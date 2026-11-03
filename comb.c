@@ -192,7 +192,7 @@ bool reduce_C(struct spine *spine)
 
 bool reduce_W(struct spine *spine)
 {
-	if (spine == NULL || spine->up == NULL || spine->up->up == NULL)
+	if (spine == NULL || spine->up == NULL)
 		return false;
 	struct term *arg0 = follow(spine->app->right);
 	struct term *arg1 = follow(spine->up->app->right);
